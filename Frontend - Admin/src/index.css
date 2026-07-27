@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Design tokens — palet "charcoal-amber", terinspirasi dari terminal trading
+  tapi dibuat khas sendiri (bukan hijau-neon/vermilion klise). Amber dipilih
+  karena punya konotasi "sinyal/perhatian" yang pas untuk dashboard EA forex,
+  dan dipakai dobel-fungsi untuk aksen brand maupun status "suspended".
+*/
+:root {
+  --bg: #f7f6f3;
+  --surface: #ffffff;
+  --surface-alt: #f0eee8;
+  --border: #e4e1da;
+  --text-primary: #1d1a24;
+  --text-muted: #6b6780;
+  --accent: #c9822a;
+  --accent-soft: #f3e2c9;
+  --success: #2f9268;
+  --success-soft: #d9f0e6;
+  --danger: #c94040;
+  --danger-soft: #f7dede;
+  --warning: #c9822a;
+  --warning-soft: #f3e2c9;
+  --info: #3b6fb5;
+  --info-soft: #dde8f6;
+}
+
+.dark {
+  --bg: #14121a;
+  --surface: #1d1a24;
+  --surface-alt: #252030;
+  --border: #2c2836;
+  --text-primary: #edeaf2;
+  --text-muted: #8b87a0;
+  --accent: #e8a33d;
+  --accent-soft: #3a2f1a;
+  --success: #4fbf8b;
+  --success-soft: #1a2e26;
+  --danger: #e85d5d;
+  --danger-soft: #331e1e;
+  --warning: #e8a33d;
+  --warning-soft: #3a2f1a;
+  --info: #5b93e8;
+  --info-soft: #1a2438;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  color: var(--text-primary);
+  font-family: "Inter", sans-serif;
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Numerik penting (token count, id, timestamp) selalu monospace,
+   biar mudah di-scan & sejalur secara visual — ciri khas dashboard ini. */
+.tabular {
+  font-family: "JetBrains Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+/* Scrollbar tipis, konsisten di kedua tema */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 8px;
+}
+
+/* Fokus keyboard tetap terlihat jelas (aksesibilitas) */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

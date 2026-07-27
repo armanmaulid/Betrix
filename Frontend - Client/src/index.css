@@ -1,0 +1,402 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Same charcoal-amber token set as EA Console (admin), for brand consistency
+  across admin + client. Client defaults to dark since AnalysisPage renders
+  with theme="dark" on the chart — adjust here if you add a light/dark
+  toggle later.
+*/
+:root {
+  --bg: #f7f6f3;
+  --surface: #ffffff;
+  --surface-alt: #f0eee8;
+  --border: #e4e1da;
+  --text-primary: #1d1a24;
+  --text-muted: #6b6780;
+  --accent: #ff7700;
+  --accent-soft: #f3e2c9;
+  --success: #2f9268;
+  --success-soft: #d9f0e6;
+  --danger: #c94040;
+  --danger-soft: #f7dede;
+  --warning: #ff7700;
+  --warning-soft: #f3e2c9;
+  --info: #3b82c4;
+  --info-soft: #dbe9f4;
+}
+
+.dark {
+  --bg: #050505;
+  --surface: #0f0f0f;
+  --surface-alt: #1a1a1a;
+  --border: #2a2a2a;
+  --text-primary: #e8e8e8;
+  --text-muted: #6b6b6b;
+  --accent: #ff7700;
+  --accent-soft: #331a00;
+  --accent-glow: #ff9944;
+  --success: #00ff88;
+  --success-soft: #002211;
+  --danger: #ff2e5f;
+  --danger-soft: #330011;
+  --warning: #ff7700;
+  --warning-soft: #331a00;
+  --info: #00d9ff;
+  --info-soft: #002233;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background-color: var(--bg);
+  color: var(--text-primary);
+  /* Monospace agresif — bukan cuma angka (.tabular), tapi teks umum juga.
+     Bloomberg nyaris semua teks monospace; ini yang bikin kesan "terminal"
+     bukan "app". Inter jadi fallback kalau JetBrains Mono gagal load. */
+  font-family: "JetBrains Mono", "Inter", monospace;
+  transition: background-color 0.1s linear, color 0.1s linear;
+}
+
+.tabular {
+  font-family: "JetBrains Mono", monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 8px;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+   SNAP, BUKAN SMOOTH — semua transition di app ini dipercepat ke
+   100ms linear. Tailwind default transition-colors itu 150ms ease,
+   kesannya masih "lembut/consumer-app". Terminal finansial harus
+   terasa instan/snap. Taruh di akhir file biar menang cascade untuk
+   utility class Tailwind (mis. transition-colors) yang dipakai di
+   komponen-komponen lain.
+   ============================================================ */
+* {
+  transition-duration: 100ms !important;
+  transition-timing-function: linear !important;
+}
+
+/* Pastikan tidak ada shadow/rounded yang nyelip dari default Tailwind
+   di komponen manapun — Bloomberg = 0 border-radius, 0 drop-shadow. */
+button,
+input,
+select,
+textarea {
+  border-radius: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Bloomberg-style ticker marquee (TickerStrip.tsx). Content is rendered
+   twice back-to-back and this slides the track exactly -50%, so the second
+   copy lines up perfectly where the first started — seamless infinite loop.
+   Duration is set inline per-instance (scales with symbol count). */
+@keyframes ticker-scroll {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-ticker {
+  animation-name: ticker-scroll;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ticker {
+    animation: none;
+  }
+}
+
+/* Highlight used by NewsFeed.tsx for items that just arrived via polling:
+   a gradient bar sweeps left -> right once (::after), while the item's own
+   background tints and slowly fades back to transparent underneath it.
+   Border kiri --info menandakan "item informational baru", dibedakan dari
+   warna flash naik/turun harga (success/danger) supaya makna warna tetap
+   konsisten di seluruh app. */
+@keyframes news-sweep {
+  0% {
+    transform: translateX(-150%) skewX(-15deg);
+  }
+  100% {
+    transform: translateX(250%) skewX(-15deg);
+  }
+}
+
+@keyframes news-tint {
+  0% {
+    background-color: var(--info-soft);
+  }
+  60% {
+    background-color: var(--info-soft);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.news-highlight {
+  position: relative;
+  overflow: hidden;
+  border-left: 2px solid var(--info);
+  animation: news-tint 2.5s ease-out;
+}
+
+.news-highlight::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 35%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, var(--info) 50%, transparent);
+  opacity: 0.55;
+  transform: translateX(-150%) skewX(-15deg);
+  animation: news-sweep 0.8s ease-out;
+  pointer-events: none;
+}
+
+/* ============================================================
+   FLASH ON PRICE UPDATE — background cell nge-flash hijau/merah
+   sekilas tiap kali harga berubah (dipakai WatchlistPanel &
+   TickerStrip). Class ditambah lewat JS sesaat lalu dilepas oleh
+   komponen setelah durasi animasi selesai.
+   ============================================================ */
+@keyframes flash-up {
+  0% {
+    background-color: var(--success-soft);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+@keyframes flash-down {
+  0% {
+    background-color: var(--danger-soft);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+.flash-up {
+  animation: flash-up 350ms ease-out;
+}
+.flash-down {
+  animation: flash-down 350ms ease-out;
+}
+
+/* ============================================================
+   BUTTON SWEEP HIGHLIGHT — sapuan cahaya kiri -> kanan sekali lewat
+   saat tombol ditekan (:active), bukan efek hover lembut. Pasang
+   className="btn-sweep" di tombol mana pun yang ingin efek ini.
+   ============================================================ */
+.btn-sweep {
+  position: relative;
+  overflow: hidden;
+}
+.btn-sweep::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -60%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  pointer-events: none;
+  opacity: 0;
+}
+.btn-sweep:active::after {
+  opacity: 1;
+  animation: btn-sweep-move 250ms linear;
+}
+@keyframes btn-sweep-move {
+  from {
+    left: -60%;
+  }
+  to {
+    left: 120%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flash-up,
+  .flash-down,
+  .news-highlight,
+  .news-highlight::after,
+  .btn-sweep::after {
+    animation: none !important;
+  }
+}
+
+/* ============================================================
+   BLOOMBERG TERMINAL IMMERSIVE AUTH ANIMATIONS
+   ============================================================ */
+
+/* Page enter animation */
+@keyframes auth-page-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Ticker waterfall streaming background */
+@keyframes ticker-fall {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+/* Geometric overlay rotation */
+@keyframes rotate-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Particles floating upward */
+@keyframes particle-float {
+  0% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  90% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-100vh) translateX(var(--drift, 0));
+    opacity: 0;
+  }
+}
+
+/* Input focus glow */
+@keyframes input-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+  50% {
+    box-shadow: 0 0 12px 2px var(--accent-glow);
+  }
+}
+
+/* Form card expand from center */
+@keyframes form-expand {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Scanline CRT effect */
+@keyframes scanline {
+  from {
+    transform: translateY(-100%);
+  }
+  to {
+    transform: translateY(100%);
+  }
+}
+
+/* Success checkmark draw */
+@keyframes checkmark-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Error shake */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-8px); }
+  75% { transform: translateX(8px); }
+}
+
+/* Button press scale */
+.btn-press {
+  transition: transform 80ms linear !important;
+}
+.btn-press:active {
+  transform: scale(0.98);
+}
+
+/* Input typing pulse */
+.input-typing {
+  animation: input-glow 2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  @keyframes auth-page-enter,
+  @keyframes ticker-fall,
+  @keyframes rotate-slow,
+  @keyframes particle-float,
+  @keyframes input-glow,
+  @keyframes form-expand,
+  @keyframes scanline,
+  @keyframes checkmark-draw,
+  @keyframes shake {
+    animation: none !important;
+  }
+}
+
+/* ============================================================
+   FILTER PANEL SLIDE ANIMATION
+   ============================================================ */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}

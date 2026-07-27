@@ -1,0 +1,213 @@
+import "dotenv/config";
+const startTime = Date.now();
+import express from "express";
+import { printStartupBanner } from "./utils/startupLogger.js";
+import { printRoutes } from "./utils/routeMapper.js";
+import cors from "cors";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
+import passport from "passport";
+import chatRoutes from "./routes/chat.js";
+import authRoutes from "./routes/auth.js";
+import usageRoutes from "./routes/usage.js";
+import adminRoutes from "./routes/admin.js";
+import messagesRoutes from "./routes/messages.js";
+import activityRoutes from "./routes/activity.js";
+import newsRoutes from "./routes/news.js";
+import marketRoutes from "./routes/market.js";
+import { fetchAndStoreNews, cleanupOldNews } from "./services/newsFetcher.js";
+import { sendHeartbeat } from "./services/newsRealtimeStore.js";
+import { healthCheck } from "./routes/health.js";
+import { cleanupExpiredSessions } from "./services/sessionStore.js";
+import { cleanupOldFailedAttempts } from "./services/loginAttemptStore.js";
+import { cleanupExpiredTokens } from "./services/verificationStore.js";
+import { cleanupOldUsageRecords } from "./services/tokenUsageStore.js";
+import { sanitizeInput } from "./middleware/sanitize.js";
+import { requestLogger } from "./middleware/requestLogger.js";
+import { normalizeRequestIP } from "./middleware/normalizeIP.js";
+import { logger } from "./utils/logger.js";
+import { pool } from "./db/pool.js";
+import { initializeMt5Client } from "./services/mt5Client.js";
+import "./config/passport.js";
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+app.set("trust proxy", Number(process.env.TRUST_PROXY_HOPS) || 1);
+
+// Security headers
+app.use(helmet());
+
+// CORS whitelist
+const allowedOrigins = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",")
+  : ["http://localhost:3000", "http://localhost:5173"]; // Default untuk dev
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+
+    if (allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  },
+  credentials: true,
+}));
+
+app.use(express.json({ limit: "100kb" }));
+
+app.use(passport.initialize());
+
+app.use(normalizeRequestIP);
+
+app.use(sanitizeInput);
+
+app.use(requestLogger);
+
+// Rate limit per IP — kontrol kasar biar kredit AI provider tidak jebol.
+const limiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: Number(process.env.RATE_LIMIT_PER_MINUTE) || 30, // User: 30 req/min
+  message: { error: "Terlalu banyak request, coba lagi sebentar lagi" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Stricter rate limit untuk auth endpoints (login/register)
+const authLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000, // 5 menit
+  max: 10, // 10 requests total (berhasil + gagal)
+  message: { error: "Terlalu banyak percobaan login/register, coba lagi dalam 5 menit" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Rate limit tambahan khusus register — device fingerprint (IP+UA) gampang
+// dipalsukan lewat script, jadi "1 device = 1 akun" TIDAK cukup untuk
+// mencegah mass-registration atau email enumeration otomatis.
+const registerLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 jam
+  max: Number(process.env.RATE_LIMIT_REGISTER_PER_HOUR) || 5,
+  message: { error: "Terlalu banyak percobaan registrasi, coba lagi nanti" },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+app.use("/api/auth/register", registerLimiter);
+app.use("/api/auth", authLimiter);
+// Apply rate limiter ke semua /api/* KECUALI /api/admin, /api/market, /api/news
+app.use("/api", (req, res, next) => {
+  if (req.path.startsWith('/admin') || req.path.startsWith('/market') || req.path.startsWith('/news')) {
+    return next();
+  }
+  limiter(req, res, next);
+});
+
+app.get("/health", healthCheck);
+
+app.use("/api/auth", authRoutes);
+app.use("/api", chatRoutes);
+app.use("/api/usage", usageRoutes);
+app.use("/api/admin", adminRoutes);
+app.use("/api/messages", messagesRoutes);
+app.use("/api/news", newsRoutes);
+app.use("/api/market", marketRoutes);
+app.use("/api/me", activityRoutes);
+
+app.use((err, req, res, next) => {
+  logger.error("unhandled error", { error: err.message, stack: err.stack });
+  res.status(500).json({ error: "Terjadi kesalahan internal" });
+});
+
+const server = app.listen(PORT, async () => {
+  const pkg = { name: "betrix-forex-ea-backend", version: "0.1.0" };
+
+  const cleanups = await Promise.allSettled([
+    cleanupExpiredSessions(),
+    cleanupOldFailedAttempts(),
+    cleanupExpiredTokens(),
+    cleanupOldUsageRecords(),
+    cleanupOldNews(),
+  ]);
+  const labels = ["sessions", "login attempts", "verify tokens", "usage records", "old news"];
+  const cleanupSummary = cleanups.map((r, i) =>
+    r.status === "fulfilled" ? `${labels[i]}=${r.value}` : `${labels[i]}=err`
+  ).join(", ");
+
+  console.clear();
+  await printStartupBanner({
+    port: PORT,
+    startTime,
+    env: process.env.NODE_ENV || "development",
+    packageInfo: pkg,
+    cleanupSummary
+  });
+
+  // ── 5. Setup Intervals & Background Services ──
+  setInterval(() => {
+    Promise.allSettled([
+      cleanupExpiredSessions(),
+      cleanupOldFailedAttempts(),
+      cleanupExpiredTokens(),
+      cleanupOldUsageRecords(),
+      cleanupOldNews(),
+    ]).then((results) => {
+      const total = results.reduce((sum, r) =>
+        sum + (r.status === "fulfilled" ? r.value : 0), 0);
+      if (total > 0) logger.info(`[cleanup] removed ${total} expired record(s)`);
+    });
+  }, 60 * 60 * 1000);
+
+  fetchAndStoreNews().catch((err) =>
+    logger.error("Fetch news gagal", { error: err.message })
+  );
+
+  setInterval(() => {
+    fetchAndStoreNews().catch((err) =>
+      logger.error("Auto-fetch news gagal", { error: err.message })
+    );
+  }, 60 * 1000);
+
+  setInterval(() => sendHeartbeat(), 30 * 1000);
+
+  printRoutes(app);
+
+  initializeMt5Client();
+  logger.info("MT5 Bridge Client initialized", { context: "MT5" });
+});
+
+
+// Graceful shutdown
+let isShuttingDown = false;
+
+async function gracefulShutdown(signal) {
+  if (isShuttingDown) return;
+  isShuttingDown = true;
+
+  logger.info(`${signal} received, starting graceful shutdown`, { context: "Shutdown" });
+
+  server.close(async () => {
+    logger.info("HTTP server closed", { context: "Server" });
+
+    try {
+      await pool.end();
+      logger.info("Database pool closed", { context: "Database" });
+
+      logger.info("Graceful shutdown completed", { context: "Shutdown" });
+      process.exit(0);
+    } catch (err) {
+      logger.error("Error during shutdown", { error: err.message });
+      process.exit(1);
+    }
+  });
+
+  setTimeout(() => {
+    logger.error("Forced shutdown after timeout");
+    process.exit(1);
+  }, 30000);
+}
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
