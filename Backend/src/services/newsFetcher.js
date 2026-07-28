@@ -18,7 +18,6 @@ const FEEDS = [
   { url: "https://www.actionforex.com/feed/", source: "ActionForex" },
   { url: "https://www.investing.com/rss/news_14.rss", source: "Investing Eco" },
   { url: "https://www.investing.com/rss/news_11.rss", source: "Investing Comms" },
-  { url: "https://www.babypips.com/news/feed", source: "BabyPips" },
   { url: "https://www.forexcrunch.com/feed/", source: "ForexCrunch" },
   { url: "https://feeds.a.dj.com/rss/RSSMarketsMain.xml", source: "WSJ Markets" },
   

@@ -30,7 +30,6 @@ const SOURCE_LIST = [
   "ActionForex",
   "Investing Eco",
   "Investing Comms",
-  "BabyPips",
   "ForexCrunch",
   "WSJ Markets",
   "FXStreet Crypto",
