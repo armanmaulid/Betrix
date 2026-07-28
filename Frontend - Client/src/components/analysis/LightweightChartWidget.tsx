@@ -107,20 +107,50 @@ export function LightweightChartWidget({ symbol, timeframe }: LightweightChartWi
   const tickerPrices = useTickerPrices([{ symbol, label: symbol, decimals: 5 }]);
   const livePrice = tickerPrices[symbol]?.price;
 
+function getTimeframeSeconds(tf: string): number {
+  switch (tf) {
+    case "M1": return 60;
+    case "M5": return 300;
+    case "M15": return 900;
+    case "M30": return 1800;
+    case "H1": return 3600;
+    case "H4": return 14400;
+    case "D1": return 86400;
+    default: return 60;
+  }
+}
+
   useEffect(() => {
     if (!seriesRef.current || !lastCandleRef.current || !livePrice) return;
     
     const last = lastCandleRef.current;
-    const updatedCandle = {
-      ...last,
-      close: livePrice,
-      high: Math.max(last.high, livePrice),
-      low: Math.min(last.low, livePrice)
-    };
-    
-    lastCandleRef.current = updatedCandle;
-    seriesRef.current.update(updatedCandle);
-  }, [livePrice]);
+    const tfSeconds = getTimeframeSeconds(timeframe);
+    const nowSecs = Math.floor(Date.now() / 1000);
+    const bucketStart = (Math.floor(nowSecs / tfSeconds) * tfSeconds) as Time;
+
+    if (bucketStart === last.time) {
+      const updatedCandle = {
+        ...last,
+        close: livePrice,
+        high: Math.max(last.high, livePrice),
+        low: Math.min(last.low, livePrice)
+      };
+      
+      lastCandleRef.current = updatedCandle;
+      seriesRef.current.update(updatedCandle);
+    } else if ((bucketStart as number) > (last.time as number)) {
+      const newCandle = {
+        time: bucketStart,
+        open: last.close, // smooth transition from previous candle
+        high: Math.max(last.close, livePrice),
+        low: Math.min(last.close, livePrice),
+        close: livePrice
+      };
+      
+      lastCandleRef.current = newCandle;
+      seriesRef.current.update(newCandle);
+    }
+  }, [livePrice, timeframe]);
 
   return (
     <div className="relative h-full w-full bg-[#050505]">

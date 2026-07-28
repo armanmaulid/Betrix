@@ -9,13 +9,6 @@ const IMPACT_DOT: Record<CalendarEvent["importance"], string> = {
   none: "bg-[var(--border)]",
 };
 
-const IMPACT_LABEL: Record<CalendarEvent["importance"], string> = {
-  high: "H",
-  medium: "M",
-  low: "L",
-  none: "N",
-};
-
 const IMPACTS: Array<CalendarEvent["importance"]> = ["high", "medium", "low"];
 
 interface FilterState {

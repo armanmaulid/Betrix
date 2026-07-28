@@ -27,6 +27,11 @@ export async function fetchCandles(symbol: string, timeframe: string, count = 20
   const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
   
   const res = await fetch(url, { headers, signal });
+  if (res.status === 401) {
+    localStorage.removeItem("eaconsole.sessionToken");
+    window.location.href = "/login";
+    throw new Error("Sesi kadaluarsa, silakan login kembali.");
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.detail || `MT5 bridge error (${res.status})`);
@@ -79,6 +84,11 @@ export async function fetchEconomicCalendar(): Promise<CalendarResponse> {
   const token = localStorage.getItem("eaconsole.sessionToken");
   const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
   const res = await fetch(`${BACKEND_URL}/api/market/economic-calendar`, { headers });
+  if (res.status === 401) {
+    localStorage.removeItem("eaconsole.sessionToken");
+    window.location.href = "/login";
+    throw new Error("Sesi kadaluarsa, silakan login kembali.");
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.detail || `MT5 bridge error (${res.status})`);

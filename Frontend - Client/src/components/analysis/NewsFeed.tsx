@@ -78,6 +78,11 @@ export function NewsFeed() {
       const res = await fetch("/api/news?limit=20", {
         headers: { Authorization: `Bearer ${token}` }
       });
+      if (res.status === 401) {
+        localStorage.removeItem("eaconsole.sessionToken");
+        window.location.href = "/login";
+        throw new Error("Sesi kadaluarsa, silakan login kembali.");
+      }
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
         throw new Error(body.error || `HTTP ${res.status}`);
