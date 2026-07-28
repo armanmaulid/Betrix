@@ -19,39 +19,54 @@ import { isDeviceEnforcementEnabled } from "../utils/deviceEnforcement.js";
 //   { ok: true, sessionToken }
 //   { ok: false, status, error, hasActiveSession? }
 export async function establishAuthenticatedSession(user, req) {
-  if (!isDeviceEnforcementEnabled()) {
-    const sessionToken = await createSession(user.id);
-    return { ok: true, sessionToken };
-  }
-
   const deviceFingerprint = getDeviceFingerprint(req);
   const existingUserId = await checkDeviceBinding(deviceFingerprint);
 
-  if (existingUserId && existingUserId !== user.id) {
-    return {
-      ok: false,
-      status: 403,
-      error: "Device ini sudah terdaftar ke akun lain. Satu device hanya bisa untuk satu akun.",
-    };
+  const enforce = isDeviceEnforcementEnabled();
+
+  if (enforce) {
+    if (existingUserId && existingUserId !== user.id) {
+      return {
+        ok: false,
+        status: 403,
+        error: "Device ini sudah terdaftar ke akun lain. Satu device hanya bisa untuk satu akun.",
+      };
+    }
   }
 
+  // Jika device sudah dipakai akun lain, dan kita TIDAK enforce, 
+  // idealnya kita re-bind atau biarkan saja. Tapi API sekarang bind unik per device.
+  // Karena checkDeviceBinding mengecek fingerprint, jika beda user dan !enforce, 
+  // kita tetap bisa unbind yang lama dan bind yang baru, atau abaikan saja.
+  // Supaya sederhana: jika tidak ada existing, bind. Jika ada dan == user.id, update.
+  // Jika ada dan !== user.id (dan !enforce), kita update binding-nya (re-bind).
+  
   if (!existingUserId) {
     await bindDeviceToUser(user.id, deviceFingerprint);
+  } else if (existingUserId !== user.id) {
+    // Re-bind ke user baru karena tidak di-enforce (allow shared devices)
+    // NOTE: ini memerlukan query UPDATE sederhana atau DELETE lalu INSERT.
+    // Karena store cuma punya bindDeviceToUser yang mungkin kena UNIQUE constraint...
+    // Sebaiknya kita abaikan saja pencatatan untuk akun ke-2 jika berbagi device TANPA enforcement, 
+    // ATAU kita panggil update.
+    // Untuk amannya, biarkan yang original jika beda akun.
   } else {
     await updateDeviceLastSeen(deviceFingerprint);
   }
 
-  // Cek apakah sudah ada session aktif untuk device ini
-  const existingSessionToken = await getSessionByDevice(user.id, deviceFingerprint);
-  if (existingSessionToken) {
-    const sessionUser = await validateSession(existingSessionToken);
-    if (sessionUser) {
-      return {
-        ok: false,
-        status: 409,
-        error: "Anda sudah login dari device ini. Logout terlebih dahulu untuk login ulang.",
-        hasActiveSession: true,
-      };
+  if (enforce) {
+    // Cek apakah sudah ada session aktif untuk device ini
+    const existingSessionToken = await getSessionByDevice(user.id, deviceFingerprint);
+    if (existingSessionToken) {
+      const sessionUser = await validateSession(existingSessionToken);
+      if (sessionUser) {
+        return {
+          ok: false,
+          status: 409,
+          error: "Anda sudah login dari device ini. Logout terlebih dahulu untuk login ulang.",
+          hasActiveSession: true,
+        };
+      }
     }
   }
 

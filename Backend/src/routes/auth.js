@@ -15,7 +15,7 @@ import { logUserActivity } from "../services/activityLogger.js";
 import { establishAuthenticatedSession } from "../services/authSession.js";
 import { redis } from "../db/redis.js";
 import passport from "../config/passport.js";
-import { addClient } from "../services/sseManager.js";
+import { addClient, broadcastToSession } from "../services/sseManager.js";
 
 const router = Router();
 
@@ -239,22 +239,30 @@ router.post("/logout", async (req, res) => {
   }
 
   try {
-    const user = await validateSession(sessionToken);
+    // FIX: Langsung revoke session TANPA validateSession(). 
+    // Mengapa? Karena validateSession() punya timeout ketat (3000ms) untuk proteksi 
+    // endpoint umum. Jika Redis lambat sedikit, validateSession akan timeout, 
+    // dan user malah jadi tidak bisa logout (terjebak).
+    // Cukup cabut tokennya, ambil userId (jika masih valid) untuk activity log.
+    const userId = await revokeSession(sessionToken);
 
-    if (!user) {
-      return res.status(401).json({ error: "Session tidak valid atau expired" });
+    if (userId) {
+      // FIX: Hapus juga mapping device_session di Redis agar tidak menjadi orphaned data 
+      // yang berpotensi memicu error/bug saat device tersebut mencoba login kembali.
+      const fingerprint = getDeviceFingerprint(req);
+      await removeSessionForDevice(userId, fingerprint);
     }
 
-    await revokeSession(sessionToken);
     res.json({ message: "Logout berhasil" });
 
-    logUserActivity({
-      userId: user.id,
-      action: "logout",
-      details: { email: user.email },
-      ip: req.normalizedIP || req.ip,
-      userAgent: req.headers["user-agent"] ?? null,
-    });
+    if (userId) {
+      logUserActivity({
+        userId,
+        action: "logout",
+        ip: req.normalizedIP || req.ip,
+        userAgent: req.headers["user-agent"] ?? null,
+      });
+    }
   } catch (err) {
     console.error("[POST /api/auth/logout] error:", err.message);
     res.status(500).json({ error: "Gagal logout", detail: err.message });
@@ -636,7 +644,15 @@ router.delete("/sessions/:fingerprint", async (req, res) => {
     const sessionUser = await validateSession(sessionToken);
     if (!sessionUser) return res.status(401).json({ error: "Session tidak valid atau expired" });
 
-    // Hapus dari Redis token aktif (apabila ada)
+    // Ambil token aktif untuk device tersebut (jika ada) dan cabut aksesnya
+    const targetToken = await getSessionByDevice(sessionUser.id, fingerprint);
+    if (targetToken) {
+      await revokeSession(targetToken);
+      // Tembak event logout via SSE supaya UI langsung merespons
+      broadcastToSession(sessionUser.id, targetToken, "logout", { reason: "revoked" });
+    }
+    
+    // Hapus dari mapping Redis
     await removeSessionForDevice(sessionUser.id, fingerprint);
     // Hapus dari Postgres user_devices binding
     await unbindDevice(sessionUser.id, fingerprint);
@@ -664,7 +680,7 @@ router.get("/me/stream", async (req, res) => {
     });
     res.write('event: connected\ndata: {"status": "ok"}\n\n');
 
-    addClient(sessionUser.id, res);
+    addClient(sessionUser.id, sessionToken, res);
   } catch (err) {
     console.error("[GET /api/auth/me/stream] error:", err.message);
     res.status(500).end();

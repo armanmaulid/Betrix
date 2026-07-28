@@ -14,7 +14,7 @@ function generateSessionToken() {
 // eksplisit yang lebih pendek di sini membuat kegagalan terdeteksi cepat dan
 // user dapat respons error dalam hitungan detik, bukan menggantung lama di
 // setiap endpoint yang butuh auth.
-const SESSION_LOOKUP_TIMEOUT_MS = parseInt(process.env.SESSION_LOOKUP_TIMEOUT_MS) || 3000;
+const SESSION_LOOKUP_TIMEOUT_MS = parseInt(process.env.SESSION_LOOKUP_TIMEOUT_MS) || 5000;
 
 function withTimeout(promise, ms, label) {
   return Promise.race([
@@ -84,6 +84,7 @@ export async function revokeSession(sessionToken) {
     await redis.srem(`user_sessions:${userId}`, sessionToken);
   }
   await redis.del(`session:${sessionToken}`);
+  return userId;
 }
 
 export async function revokeAllUserSessions(userId) {

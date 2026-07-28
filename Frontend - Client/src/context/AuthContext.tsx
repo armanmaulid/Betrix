@@ -78,6 +78,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
+    es.addEventListener('logout', () => {
+      // Sesi ini dicabut paksa (misal dari menu Revoke di browser lain).
+      // Langsung hapus state lokal dan arahkan ke login.
+      localStorage.removeItem(STORAGE_KEY);
+      setSessionToken(null);
+      setUser(null);
+    });
+
     return () => {
       es.close();
       setIsConnected(false);

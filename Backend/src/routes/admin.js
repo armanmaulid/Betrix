@@ -3,6 +3,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { requireAdmin, logAdminAction } from "../middleware/adminAuth.js";
 import { pool } from "../db/pool.js";
 import { redis } from "../db/redis.js";
+import { broadcastToUser } from "../services/sseManager.js";
 import { revokeAllUserSessions } from "../services/sessionStore.js";
 import { sendVerificationEmail, sendEmail, sendEmailChangeVerification, sendEmailChangeNotification } from "../services/emailService.js";
 import { escapeCsvField } from "../utils/csv.js";
@@ -731,7 +732,10 @@ router.put("/users/:id", async (req, res) => {
     // diubah ke banned/suspended, semua session aktif milik user itu
     // langsung dicabut.
     if (status === "banned" || status === "suspended") {
-      revokeAllUserSessions(id).catch((err) =>
+      revokeAllUserSessions(id).then(() => {
+        // Tembak event logout ke SEMUA perangkat/sesi aktif user tersebut
+        broadcastToUser(id, "logout", { reason: status });
+      }).catch((err) =>
         console.error("[PUT /api/admin/users/:id] gagal revoke session:", err.message)
       );
     }

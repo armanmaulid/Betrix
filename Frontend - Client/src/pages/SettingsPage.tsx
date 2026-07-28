@@ -40,6 +40,7 @@ export function SettingsPage() {
   // Sessions State
   const [sessions, setSessions] = useState<DeviceSession[]>([]);
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+  const [sessionToRevoke, setSessionToRevoke] = useState<string | null>(null);
 
   useEffect(() => {
     if (activeTab === "LOGIN HISTORY") {
@@ -123,15 +124,17 @@ export function SettingsPage() {
     }
   };
 
-  const handleRevokeSession = async (fingerprint: string) => {
-    if (!confirm("Cabut akses untuk perangkat ini?")) return;
-    
+  const executeRevokeSession = async (fingerprint: string) => {
+    setIsLoading(true);
     try {
       await revokeSession(sessionToken, fingerprint);
       setSessions(sessions.filter(s => s.fingerprint !== fingerprint));
       setMessage({ type: "success", text: "Sesi perangkat dicabut" });
     } catch (err: any) {
       setMessage({ type: "error", text: err.message || "Gagal mencabut sesi" });
+    } finally {
+      setIsLoading(false);
+      setSessionToRevoke(null);
     }
   };
 
@@ -402,7 +405,7 @@ export function SettingsPage() {
                 </div>
               </div>
               <button 
-                onClick={() => handleRevokeSession(session.fingerprint)}
+                onClick={() => setSessionToRevoke(session.fingerprint)}
                 className="flex items-center gap-2 text-red-500 border border-red-500/20 px-3 py-1.5 text-[11px] font-bold hover:bg-red-500 hover:text-black transition-colors"
               >
                 <Trash2 size={12} /> REVOKE
@@ -505,6 +508,37 @@ export function SettingsPage() {
         )}
 
       </div>
+      
+      {/* Custom Revoke Confirmation Modal */}
+      {sessionToRevoke && (
+        <div className="bx-modal-overlay">
+          <div className="bx-modal bx-modal-error">
+            <div className="bx-modal-header">
+              <AlertCircle size={24} />
+              <h3 className="bx-modal-title">REVOKE SESSION?</h3>
+            </div>
+            <p className="bx-modal-text">
+              Aksi ini akan mencabut akses secara permanen dari perangkat tersebut. Perangkat target akan seketika di-logout. Lanjutkan?
+            </p>
+            <div className="bx-modal-footer">
+              <button 
+                onClick={() => setSessionToRevoke(null)}
+                className="bx-modal-btn-cancel"
+                disabled={isLoading}
+              >
+                CANCEL
+              </button>
+              <button 
+                onClick={() => executeRevokeSession(sessionToRevoke)}
+                className="bx-modal-btn-confirm"
+                disabled={isLoading}
+              >
+                {isLoading ? "PROCESSING..." : "YES, REVOKE"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </TerminalShell>
   );
 }

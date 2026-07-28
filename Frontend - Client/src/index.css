@@ -220,15 +220,14 @@ textarea {
 }
 
 /* ============================================================
-   BUTTON SWEEP HIGHLIGHT — sapuan cahaya kiri -> kanan sekali lewat
-   saat tombol ditekan (:active), bukan efek hover lembut. Pasang
-   className="btn-sweep" di tombol mana pun yang ingin efek ini.
+   BUTTON SWEEP HIGHLIGHT — sapuan cahaya kiri -> kanan
+   otomatis pada semua tombol saat di-hover.
    ============================================================ */
-.btn-sweep {
+button {
   position: relative;
   overflow: hidden;
 }
-.btn-sweep::after {
+button::after {
   content: "";
   position: absolute;
   top: 0;
@@ -239,9 +238,9 @@ textarea {
   pointer-events: none;
   opacity: 0;
 }
-.btn-sweep:active::after {
+button:hover::after {
   opacity: 1;
-  animation: btn-sweep-move 250ms linear;
+  animation: btn-sweep-move 400ms linear;
 }
 @keyframes btn-sweep-move {
   from {
@@ -257,7 +256,7 @@ textarea {
   .flash-down,
   .news-highlight,
   .news-highlight::after,
-  .btn-sweep::after {
+  button::after {
     animation: none !important;
   }
 }
@@ -376,15 +375,10 @@ textarea {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  @keyframes auth-page-enter,
-  @keyframes ticker-fall,
-  @keyframes rotate-slow,
-  @keyframes particle-float,
-  @keyframes input-glow,
-  @keyframes form-expand,
-  @keyframes scanline,
-  @keyframes checkmark-draw,
-  @keyframes shake {
+  .btn-press,
+  .input-typing,
+  .animate-ticker,
+  .news-highlight::after {
     animation: none !important;
   }
 }
@@ -399,4 +393,62 @@ textarea {
   to {
     transform: translateX(0);
   }
+}
+
+/* ============================================================
+   CUSTOM MODAL DIALOGS
+   ============================================================ */
+.bx-modal-overlay {
+  @apply fixed inset-0 bg-black/80 flex items-center justify-center z-50 backdrop-blur-sm;
+}
+
+.bx-modal {
+  @apply bg-[var(--bg)] border p-6 max-w-sm w-full mx-4;
+}
+
+/* Error Modal (Red) */
+.bx-modal-error {
+  @apply border-red-500/30 shadow-[0_0_20px_rgba(255,0,0,0.1)];
+}
+.bx-modal-error .bx-modal-header {
+  @apply flex items-center gap-3 text-red-500 mb-4;
+}
+.bx-modal-error .bx-modal-btn-confirm {
+  @apply flex items-center justify-center gap-2 bg-red-500 text-black px-4 py-2 text-[11px] font-bold hover:bg-red-600 transition-colors disabled:opacity-50;
+}
+
+/* Warning Modal (Orange) */
+.bx-modal-warning {
+  @apply border-orange-500/30 shadow-[0_0_20px_rgba(255,165,0,0.1)];
+}
+.bx-modal-warning .bx-modal-header {
+  @apply flex items-center gap-3 text-orange-500 mb-4;
+}
+.bx-modal-warning .bx-modal-btn-confirm {
+  @apply flex items-center justify-center gap-2 bg-orange-500 text-black px-4 py-2 text-[11px] font-bold hover:bg-orange-600 transition-colors disabled:opacity-50;
+}
+
+/* Info Modal (Blue/Cyan) */
+.bx-modal-info {
+  @apply border-blue-500/30 shadow-[0_0_20px_rgba(0,0,255,0.1)];
+}
+.bx-modal-info .bx-modal-header {
+  @apply flex items-center gap-3 text-blue-500 mb-4;
+}
+.bx-modal-info .bx-modal-btn-confirm {
+  @apply flex items-center justify-center gap-2 bg-blue-500 text-black px-4 py-2 text-[11px] font-bold hover:bg-blue-600 transition-colors disabled:opacity-50;
+}
+
+/* Shared Modal Elements */
+.bx-modal-title {
+  @apply text-[16px] font-bold tracking-wider;
+}
+.bx-modal-text {
+  @apply text-[12px] text-[var(--text-muted)] mb-6;
+}
+.bx-modal-footer {
+  @apply flex justify-end gap-3;
+}
+.bx-modal-btn-cancel {
+  @apply px-4 py-2 text-[11px] font-bold text-[var(--text-muted)] hover:text-white transition-colors disabled:opacity-50;
 }
