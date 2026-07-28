@@ -15,10 +15,22 @@ export interface AuthUser {
   id: string;
   email: string;
   name: string | null;
+  phone?: string;
+  address?: string;
+  birthdate?: string;
+  gender?: string;
+  bio?: string;
   isAdmin: boolean;
   status?: string;
   emailVerified?: boolean;
   credits?: number;
+  createdAt?: string;
+  lastActive?: string;
+}
+
+export interface DeviceSession {
+  fingerprint: string;
+  lastSeenAt: string;
 }
 
 export interface LoginSuccess {
@@ -136,4 +148,47 @@ export async function fetchMe(sessionToken: string): Promise<{ user: AuthUser }>
   });
   if (!res.ok) return parseErrorAndThrow(res);
   return res.json();
+}
+
+export async function updateProfile(sessionToken: string, profileData: Partial<AuthUser>): Promise<AuthUser> {
+  const res = await fetch(`${BACKEND_URL}/api/auth/profile`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${sessionToken}`
+    },
+    body: JSON.stringify(profileData)
+  });
+  if (!res.ok) return parseErrorAndThrow(res);
+  const data = await res.json();
+  return data.user;
+}
+
+export async function changePassword(sessionToken: string, currentPassword: string, newPassword: string): Promise<void> {
+  const res = await fetch(`${BACKEND_URL}/api/auth/password`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${sessionToken}`
+    },
+    body: JSON.stringify({ currentPassword, newPassword })
+  });
+  if (!res.ok) return parseErrorAndThrow(res);
+}
+
+export async function getSessions(sessionToken: string): Promise<DeviceSession[]> {
+  const res = await fetch(`${BACKEND_URL}/api/auth/sessions`, {
+    headers: { Authorization: `Bearer ${sessionToken}` },
+  });
+  if (!res.ok) return parseErrorAndThrow(res);
+  const data = await res.json();
+  return data.devices;
+}
+
+export async function revokeSession(sessionToken: string, fingerprint: string): Promise<void> {
+  const res = await fetch(`${BACKEND_URL}/api/auth/sessions/${encodeURIComponent(fingerprint)}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${sessionToken}` },
+  });
+  if (!res.ok) return parseErrorAndThrow(res);
 }

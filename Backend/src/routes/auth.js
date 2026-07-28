@@ -1,10 +1,10 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { findByEmail, createUser, findById, deleteUser } from "../services/userStore.js";
+import { findByEmail, createUser, findById, deleteUser, updateUserProfile, findPasswordHashById, updateUserPassword } from "../services/userStore.js";
 import { createSession, revokeSession, revokeAllUserSessions, validateSession } from "../services/sessionStore.js";
 import { getDeviceFingerprint } from "../utils/deviceFingerprint.js";
-import { checkDeviceBinding, bindDeviceToUser } from "../services/deviceStore.js";
+import { checkDeviceBinding, bindDeviceToUser, getUserDevices, unbindDevice } from "../services/deviceStore.js";
 import { isAccountLocked, recordFailedLogin, clearFailedLogins } from "../services/loginAttemptStore.js";
 import { getSessionByDevice, removeSessionForDevice } from "../services/deviceSessionStore.js";
 import { createVerificationToken, invalidateUserTokens, verifyToken } from "../services/verificationStore.js";
@@ -471,15 +471,141 @@ router.get("/me", async (req, res) => {
         id: user.id,
         email: user.email,
         name: user.name,
+        phone: user.phone,
+        address: user.address,
+        birthdate: user.birthdate,
+        gender: user.gender,
+        bio: user.bio,
         isAdmin: user.isAdmin,
         status: user.status,
         emailVerified: user.emailVerified,
         credits: user.credits,
+        createdAt: user.createdAt,
+        lastActive: user.lastActive
       },
     });
   } catch (err) {
     console.error("[GET /api/auth/me] error:", err.message);
     res.status(500).json({ error: "Gagal validasi session", detail: err.message });
+  }
+});
+
+// PUT /api/auth/profile
+router.put("/profile", async (req, res) => {
+  const sessionToken = req.headers.authorization?.replace("Bearer ", "");
+  if (!sessionToken) return res.status(401).json({ error: "Session token required" });
+
+  try {
+    const sessionUser = await validateSession(sessionToken);
+    if (!sessionUser) return res.status(401).json({ error: "Session tidak valid atau expired" });
+
+    const user = await findById(sessionUser.id);
+    if (!user) return res.status(401).json({ error: "User tidak ditemukan" });
+
+    const updated = await updateUserProfile(user.id, {
+      name: req.body.name,
+      phone: req.body.phone,
+      address: req.body.address,
+      birthdate: req.body.birthdate,
+      gender: req.body.gender,
+      bio: req.body.bio
+    });
+
+    res.json({
+      user: {
+        id: updated.id,
+        email: updated.email,
+        name: updated.name,
+        phone: updated.phone,
+        address: updated.address,
+        birthdate: updated.birthdate,
+        gender: updated.gender,
+        bio: updated.bio,
+        isAdmin: updated.isAdmin,
+        status: updated.status,
+        emailVerified: updated.emailVerified,
+        credits: updated.credits,
+        createdAt: updated.createdAt,
+        lastActive: updated.lastActive
+      }
+    });
+  } catch (err) {
+    console.error("[PUT /api/auth/profile] error:", err.message);
+    res.status(500).json({ error: "Gagal memperbarui profil" });
+  }
+});
+
+// PUT /api/auth/password
+router.put("/password", async (req, res) => {
+  const sessionToken = req.headers.authorization?.replace("Bearer ", "");
+  if (!sessionToken) return res.status(401).json({ error: "Session token required" });
+
+  const { currentPassword, newPassword } = req.body;
+  if (!currentPassword || !newPassword) {
+    return res.status(400).json({ error: "currentPassword dan newPassword wajib diisi" });
+  }
+
+  try {
+    const sessionUser = await validateSession(sessionToken);
+    if (!sessionUser) return res.status(401).json({ error: "Session tidak valid atau expired" });
+
+    const passwordHash = await findPasswordHashById(sessionUser.id);
+    if (!passwordHash) {
+      return res.status(400).json({ error: "Gagal memverifikasi password (akun Google-only?)" });
+    }
+
+    const isValid = await bcrypt.compare(currentPassword, passwordHash);
+    if (!isValid) {
+      return res.status(401).json({ error: "Password lama salah" });
+    }
+
+    const newHash = await bcrypt.hash(newPassword, 10);
+    await updateUserPassword(sessionUser.id, newHash);
+
+    res.json({ success: true, message: "Password berhasil diubah" });
+  } catch (err) {
+    console.error("[PUT /api/auth/password] error:", err.message);
+    res.status(500).json({ error: "Gagal mengubah password" });
+  }
+});
+
+// GET /api/auth/sessions
+router.get("/sessions", async (req, res) => {
+  const sessionToken = req.headers.authorization?.replace("Bearer ", "");
+  if (!sessionToken) return res.status(401).json({ error: "Session token required" });
+
+  try {
+    const sessionUser = await validateSession(sessionToken);
+    if (!sessionUser) return res.status(401).json({ error: "Session tidak valid atau expired" });
+
+    const devices = await getUserDevices(sessionUser.id);
+    res.json({ devices });
+  } catch (err) {
+    console.error("[GET /api/auth/sessions] error:", err.message);
+    res.status(500).json({ error: "Gagal memuat sesi" });
+  }
+});
+
+// DELETE /api/auth/sessions/:fingerprint
+router.delete("/sessions/:fingerprint", async (req, res) => {
+  const sessionToken = req.headers.authorization?.replace("Bearer ", "");
+  if (!sessionToken) return res.status(401).json({ error: "Session token required" });
+
+  const fingerprint = req.params.fingerprint;
+
+  try {
+    const sessionUser = await validateSession(sessionToken);
+    if (!sessionUser) return res.status(401).json({ error: "Session tidak valid atau expired" });
+
+    // Hapus dari Redis token aktif (apabila ada)
+    await removeSessionForDevice(sessionUser.id, fingerprint);
+    // Hapus dari Postgres user_devices binding
+    await unbindDevice(sessionUser.id, fingerprint);
+
+    res.json({ success: true, message: "Sesi berhasil dicabut" });
+  } catch (err) {
+    console.error("[DELETE /api/auth/sessions/:fingerprint] error:", err.message);
+    res.status(500).json({ error: "Gagal mencabut sesi" });
   }
 });
 

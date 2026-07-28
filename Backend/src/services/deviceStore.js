@@ -48,3 +48,21 @@ export async function updateDeviceLastSeen(deviceFingerprint) {
     [deviceFingerprint]
   );
 }
+
+export async function getUserDevices(userId) {
+  const { rows } = await pool.query(
+    `SELECT device_fingerprint AS "fingerprint", last_seen_at AS "lastSeenAt" 
+     FROM user_devices 
+     WHERE user_id = $1 
+     ORDER BY last_seen_at DESC`,
+    [userId]
+  );
+  return rows;
+}
+
+export async function unbindDevice(userId, deviceFingerprint) {
+  await pool.query(
+    `DELETE FROM user_devices WHERE user_id = $1 AND device_fingerprint = $2`,
+    [userId, deviceFingerprint]
+  );
+}

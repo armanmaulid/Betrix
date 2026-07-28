@@ -1,16 +1,18 @@
 import { useState, useEffect } from "react";
 import { TerminalShell } from "../components/layout/TerminalShell";
 import { useAuth } from "../context/AuthContext";
+import { updateProfile, changePassword, getSessions, revokeSession, type DeviceSession } from "../api/authClient";
 import { 
   Settings, User, Key, Shield, Bell, Activity, Clock, 
   Users, Edit2, CheckCircle2, ShieldAlert, BadgeInfo,
-  Calendar, Lock, Save, X, AlertCircle
+  Calendar, Lock, Save, X, AlertCircle, Trash2, Smartphone
 } from "lucide-react";
 
 type SettingsTab = "PROFILE" | "API KEY" | "SECURITY" | "NOTIFICATIONS" | "USAGE" | "LOGIN HISTORY" | "ACCOUNT";
 
 export function SettingsPage() {
   const { user } = useAuth();
+  const sessionToken = localStorage.getItem("eaconsole.sessionToken") || "";
   
   // Navigation State
   const [activeTab, setActiveTab] = useState<SettingsTab>("PROFILE");
@@ -33,6 +35,28 @@ export function SettingsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  // Sessions State
+  const [sessions, setSessions] = useState<DeviceSession[]>([]);
+  const [isLoadingSessions, setIsLoadingSessions] = useState(false);
+
+  useEffect(() => {
+    if (activeTab === "LOGIN HISTORY") {
+      fetchSessions();
+    }
+  }, [activeTab]);
+
+  const fetchSessions = async () => {
+    setIsLoadingSessions(true);
+    try {
+      const data = await getSessions(sessionToken);
+      setSessions(data);
+    } catch (err: any) {
+      setMessage({ type: "error", text: err.message || "Gagal memuat history login" });
+    } finally {
+      setIsLoadingSessions(false);
+    }
+  };
+
   // Sync state if user context updates
   useEffect(() => {
     if (user && !isEditingProfile) {
@@ -51,10 +75,9 @@ export function SettingsPage() {
     setIsLoading(true);
     setMessage(null);
     try {
-      // simulate network request
-      await new Promise(resolve => setTimeout(resolve, 600));
-      setMessage({ type: "success", text: "Fitur update profil sedang dalam pengembangan." });
-      setTimeout(() => setMessage(null), 3000);
+      await updateProfile(sessionToken, { name, phone, address, birthdate, gender, bio });
+      setMessage({ type: "success", text: "Profil berhasil diperbarui. Halaman akan dimuat ulang..." });
+      setTimeout(() => window.location.reload(), 1500);
     } catch (err: any) {
       setMessage({ type: "error", text: err.message || "Terjadi kesalahan" });
     } finally {
@@ -72,8 +95,8 @@ export function SettingsPage() {
     setIsLoading(true);
     setMessage(null);
     try {
-      await new Promise(resolve => setTimeout(resolve, 600));
-      setMessage({ type: "success", text: "Fitur ganti password sedang dalam pengembangan." });
+      await changePassword(sessionToken, currentPassword, newPassword);
+      setMessage({ type: "success", text: "Password berhasil diubah!" });
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
@@ -81,6 +104,18 @@ export function SettingsPage() {
       setMessage({ type: "error", text: err.message || "Terjadi kesalahan" });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleRevokeSession = async (fingerprint: string) => {
+    if (!confirm("Cabut akses untuk perangkat ini?")) return;
+    
+    try {
+      await revokeSession(sessionToken, fingerprint);
+      setSessions(sessions.filter(s => s.fingerprint !== fingerprint));
+      setMessage({ type: "success", text: "Sesi perangkat dicabut" });
+    } catch (err: any) {
+      setMessage({ type: "error", text: err.message || "Gagal mencabut sesi" });
     }
   };
 
@@ -293,6 +328,42 @@ export function SettingsPage() {
     </div>
   );
 
+  const renderLoginHistoryView = () => (
+    <div className="mt-4 border border-[var(--border)] bg-[var(--bg)]">
+      <div className="p-6 border-b border-[var(--border)]">
+        <h2 className="text-[16px] font-bold text-[var(--accent)] mb-1">ACTIVE SESSIONS</h2>
+        <p className="text-[12px] text-[var(--text-muted)]">Lihat daftar perangkat yang pernah login ke akun Anda.</p>
+      </div>
+      <div className="divide-y divide-[var(--border)]">
+        {isLoadingSessions ? (
+          <div className="p-6 text-center text-[var(--text-muted)] text-[12px]">Memuat sesi...</div>
+        ) : sessions.length === 0 ? (
+          <div className="p-6 text-center text-[var(--text-muted)] text-[12px]">Tidak ada riwayat sesi ditemukan.</div>
+        ) : (
+          sessions.map((session, idx) => (
+            <div key={idx} className="p-4 flex items-center justify-between hover:bg-[var(--surface-alt)]">
+              <div className="flex items-center gap-4">
+                <div className="h-10 w-10 flex items-center justify-center bg-[var(--surface)] text-[var(--text-muted)] border border-[var(--border)]">
+                  <Smartphone size={20} />
+                </div>
+                <div>
+                  <div className="text-[12px] font-bold text-[var(--accent)] tracking-wider">Device ID: {session.fingerprint.substring(0, 16)}...</div>
+                  <div className="text-[11px] text-[var(--text-muted)] mt-1">Last Seen: {formatDate(session.lastSeenAt)}</div>
+                </div>
+              </div>
+              <button 
+                onClick={() => handleRevokeSession(session.fingerprint)}
+                className="flex items-center gap-2 text-red-500 border border-red-500/20 px-3 py-1.5 text-[11px] font-bold hover:bg-red-500 hover:text-black transition-colors"
+              >
+                <Trash2 size={12} /> REVOKE
+              </button>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <TerminalShell onSearchSymbol={() => {}}>
       <div className="flex flex-col flex-1 h-full overflow-y-auto bg-[var(--bg)] p-4 md:p-6 text-[var(--text-primary)] font-mono">
@@ -346,7 +417,8 @@ export function SettingsPage() {
         {/* Tab Content */}
         {activeTab === "PROFILE" && renderProfileView()}
         {activeTab === "SECURITY" && renderSecurityView()}
-        {activeTab !== "PROFILE" && activeTab !== "SECURITY" && (
+        {activeTab === "LOGIN HISTORY" && renderLoginHistoryView()}
+        {activeTab !== "PROFILE" && activeTab !== "SECURITY" && activeTab !== "LOGIN HISTORY" && (
           <div className="border border-[var(--border)] mt-4 p-8 flex justify-center items-center text-[var(--text-muted)] text-[12px]">
             {activeTab} Configuration - Coming Soon
           </div>
