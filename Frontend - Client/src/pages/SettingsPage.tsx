@@ -114,9 +114,10 @@ export function SettingsPage() {
     setIsLoading(true);
     setMessage(null);
     try {
-      await changeEmail(sessionToken, emailCurrentPassword, emailToChange);
-      setMessage({ type: "success", text: "Email berhasil diubah! Halaman akan dimuat ulang..." });
-      setTimeout(() => window.location.reload(), 1500);
+      const { pendingEmail } = await changeEmail(sessionToken, emailCurrentPassword, emailToChange);
+      setMessage({ type: "success", text: `Link konfirmasi sudah dikirim ke ${pendingEmail}. Email lama masih aktif sampai kamu klik link itu.` });
+      setEmailToChange("");
+      setEmailCurrentPassword("");
     } catch (err: any) {
       setMessage({ type: "error", text: err.message || "Terjadi kesalahan" });
     } finally {

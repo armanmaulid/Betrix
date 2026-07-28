@@ -6,7 +6,7 @@ import { validateSession } from "../services/sessionStore.js";
 
 const router = Router();
 
-const VALID_ASSETS = ["usd", "metal", "oil", "btc"];
+const VALID_ASSETS = ["usd", "metal", "oil", "btc", "eco", "global", "crypto"];
 
 router.get("/stream", async (req, res) => {
   const sessionToken = req.query.token;

@@ -109,7 +109,7 @@ export function AnalyzePage() {
         </div>
 
         {/* Right Column: AI Control Panel */}
-        <div className="flex w-[380px] flex-col overflow-y-auto bg-[var(--surface)]">
+        <div className="bx-right-sidebar overflow-y-auto bg-[var(--surface)]">
           <div className="sticky top-0 z-10 border-b border-[var(--border)] bg-[var(--surface-alt)] px-4 py-2.5">
             <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">
               AI Command Center

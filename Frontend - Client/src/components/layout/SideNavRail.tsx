@@ -10,7 +10,7 @@ const NAV_ITEMS = [
   { icon: LayoutGrid, label: "Dashboard", path: "/", anchorId: "panel-dashboard" },
   { icon: CandlestickChart, label: "Chart", path: "/", anchorId: "panel-chart" },
   { icon: Sparkles, label: "Analisa AI", path: "/analyze" },
-  { icon: Newspaper, label: "News", path: "/", anchorId: "panel-news" },
+  { icon: Newspaper, label: "News", path: "/news" },
   { icon: CalendarClock, label: "Kalender Ekonomi", path: "/", anchorId: "panel-calendar" },
 ];
 

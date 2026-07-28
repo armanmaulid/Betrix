@@ -32,12 +32,21 @@ const ASSET_COLOR: Record<string, string> = {
 };
 
 const SOURCE_COLOR: Record<string, string> = {
+  // Forex & Global
   "FXStreet": "bg-indigo-500/20 text-indigo-300",
-  "FXStreet Crypto": "bg-indigo-500/20 text-indigo-300",
-  "ForexLive": "bg-emerald-500/20 text-emerald-300",
+  "ActionForex": "bg-emerald-500/20 text-emerald-300",
   "Investing Eco": "bg-amber-500/20 text-amber-300",
   "Investing Comms": "bg-amber-500/20 text-amber-300",
-  "CNBC Finance": "bg-cyan-500/20 text-cyan-300",
+  "BabyPips": "bg-pink-500/20 text-pink-300",
+  "ForexCrunch": "bg-lime-500/20 text-lime-300",
+  "WSJ Markets": "bg-slate-300/20 text-slate-100 border border-slate-500/30",
+
+  // Crypto
+  "FXStreet Crypto": "bg-indigo-500/20 text-indigo-300",
+  "CoinTelegraph": "bg-yellow-500/20 text-yellow-300",
+  "Decrypt": "bg-violet-500/20 text-violet-300",
+  "DailyHodl": "bg-fuchsia-500/20 text-fuchsia-300",
+  "Crypto Briefing": "bg-sky-500/20 text-sky-300",
 };
 
 function formatRelativeTime(iso: string): string {
@@ -194,6 +203,16 @@ export function NewsFeed() {
             </a>
           ))
         )}
+      </div>
+
+      {/* Button To Dedicated News Page */}
+      <div className="border-t border-[var(--border)] bg-[var(--surface-alt)]">
+        <a 
+          href="/news"
+          className="flex w-full items-center justify-center gap-1.5 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] hover:text-cyan-400 hover:bg-[var(--surface)] transition-colors"
+        >
+          [ VIEW ALL NEWS HUB ]
+        </a>
       </div>
     </div>
   );

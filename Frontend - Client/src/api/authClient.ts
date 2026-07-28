@@ -176,7 +176,7 @@ export async function changePassword(sessionToken: string, currentPassword: stri
   if (!res.ok) return parseErrorAndThrow(res);
 }
 
-export async function changeEmail(sessionToken: string, currentPassword: string, newEmail: string): Promise<void> {
+export async function changeEmail(sessionToken: string, currentPassword: string, newEmail: string): Promise<{ pendingEmail: string }> {
   const res = await fetch(`${BACKEND_URL}/api/auth/email`, {
     method: "PUT",
     headers: {
@@ -186,6 +186,8 @@ export async function changeEmail(sessionToken: string, currentPassword: string,
     body: JSON.stringify({ currentPassword, newEmail })
   });
   if (!res.ok) return parseErrorAndThrow(res);
+  const data = await res.json();
+  return { pendingEmail: data.pendingEmail };
 }
 
 export async function getSessions(sessionToken: string): Promise<DeviceSession[]> {

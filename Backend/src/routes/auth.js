@@ -1,19 +1,20 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { findByEmail, createUser, findById, deleteUser, updateUserProfile, findPasswordHashById, updateUserPassword, updateUserEmail } from "../services/userStore.js";
+import { findByEmail, createUser, findById, deleteUser, updateUserProfile, findPasswordHashById, updateUserPassword } from "../services/userStore.js";
 import { createSession, revokeSession, revokeAllUserSessions, validateSession } from "../services/sessionStore.js";
 import { getDeviceFingerprint } from "../utils/deviceFingerprint.js";
 import { checkDeviceBinding, bindDeviceToUser, getUserDevices, unbindDevice } from "../services/deviceStore.js";
 import { isAccountLocked, recordFailedLogin, clearFailedLogins } from "../services/loginAttemptStore.js";
 import { getSessionByDevice, removeSessionForDevice } from "../services/deviceSessionStore.js";
 import { createVerificationToken, invalidateUserTokens, verifyToken } from "../services/verificationStore.js";
-import { sendVerificationEmail, sendEmail } from "../services/emailService.js";
+import { sendVerificationEmail, sendEmail, sendEmailChangeVerification } from "../services/emailService.js";
 import { logger } from "../utils/logger.js";
 import { isDeviceEnforcementEnabled } from "../utils/deviceEnforcement.js";
 import { logUserActivity } from "../services/activityLogger.js";
 import { establishAuthenticatedSession } from "../services/authSession.js";
 import { redis } from "../db/redis.js";
+import { pool } from "../db/pool.js";
 import passport from "../config/passport.js";
 import { addClient, broadcastToSession } from "../services/sseManager.js";
 
@@ -570,6 +571,29 @@ router.put("/password", async (req, res) => {
     const newHash = await bcrypt.hash(newPassword, 10);
     await updateUserPassword(sessionUser.id, newHash);
 
+    // FIX (security): sebelumnya ganti password tidak mencabut sesi lain
+    // sama sekali — kalau DEVICE_ENFORCEMENT mati (user bisa punya beberapa
+    // sesi aktif di device berbeda), skenario paling umum orang ganti
+    // password ("saya curiga akun saya dibobol") jadi kurang berguna,
+    // karena sesi lain (termasuk milik siapa pun yang mungkin tahu
+    // password lama) tetap hidup sampai TTL 24 jam habis sendiri. Sekarang
+    // semua sesi LAIN langsung dicabut, sesi yang sedang dipakai untuk
+    // ganti password ini sendiri tidak ikut ter-revoke.
+    await revokeAllUserSessions(sessionUser.id, { exceptToken: sessionToken }).catch((err) =>
+      console.error("[PUT /api/auth/password] gagal revoke sesi lain:", err.message)
+    );
+
+    // Minor: notifikasi "password kamu baru saja diganti" ke email akun —
+    // defense-in-depth supaya pemilik akun asli tahu kalau ini bukan dia
+    // yang ganti (mis. password lama bocor/di-phishing). Gagal kirim email
+    // tidak boleh menggagalkan permintaan ganti password itu sendiri.
+    sendEmail({
+      to: sessionUser.email,
+      subject: "Password akun kamu baru saja diubah",
+      text: `Password akun Betrix kamu (${sessionUser.email}) baru saja diubah. Kalau ini bukan kamu, segera hubungi support dan ganti password lagi.`,
+      html: `<p>Password akun Betrix kamu (<strong>${sessionUser.email}</strong>) baru saja diubah.</p><p>Kalau ini bukan kamu, segera hubungi support dan ganti password lagi.</p>`,
+    }).catch((err) => console.error("[PUT /api/auth/password] gagal kirim notif email:", err.message));
+
     res.json({ success: true, message: "Password berhasil diubah" });
   } catch (err) {
     console.error("[PUT /api/auth/password] error:", err.message);
@@ -591,8 +615,13 @@ router.put("/email", async (req, res) => {
     const sessionUser = await validateSession(sessionToken);
     if (!sessionUser) return res.status(401).json({ error: "Session tidak valid atau expired" });
 
+    const normalizedEmail = newEmail.trim().toLowerCase();
+    if (!isValidEmail(normalizedEmail)) {
+      return res.status(400).json({ error: "Format email tidak valid" });
+    }
+
     // Check existing email to prevent duplicates
-    const existing = await findByEmail(newEmail);
+    const existing = await findByEmail(normalizedEmail);
     if (existing && existing.id !== sessionUser.id) {
       return res.status(409).json({ error: "Email sudah digunakan" });
     }
@@ -607,9 +636,33 @@ router.put("/email", async (req, res) => {
       return res.status(401).json({ error: "Password salah" });
     }
 
-    await updateUserEmail(sessionUser.id, newEmail);
+    // FIX (integrity): sebelumnya UPDATE users.email langsung tanpa
+    // verifikasi apa pun — email_verified tidak direset, jadi user bisa
+    // memasukkan alamat siapa pun dan sistem tetap menganggapnya
+    // "terverifikasi" walau pemiliknya tidak pernah mengonfirmasi. Sekarang
+    // pakai alur yang SAMA dengan yang sudah dipakai admin (tabel
+    // email_verifications + link konfirmasi) — email lama tetap aktif
+    // sampai link di email baru diklik. Endpoint verifikasinya
+    // (GET /api/admin/me/verify-email) memang sudah generik per user_id,
+    // bukan admin-only, jadi bisa dipakai ulang di sini tanpa duplikasi.
+    await pool.query(
+      `UPDATE email_verifications SET used_at = CURRENT_TIMESTAMP
+       WHERE user_id = $1 AND used_at IS NULL`,
+      [sessionUser.id]
+    );
+    const token = crypto.randomBytes(32).toString("hex");
+    await pool.query(
+      `INSERT INTO email_verifications (user_id, token, expires_at, new_email)
+       VALUES ($1, $2, NOW() + INTERVAL '24 hours', $3)`,
+      [sessionUser.id, token, normalizedEmail]
+    );
+    await sendEmailChangeVerification(normalizedEmail, token);
 
-    res.json({ success: true, message: "Email berhasil diubah" });
+    res.json({
+      success: true,
+      message: "Link konfirmasi sudah dikirim ke email baru. Email lama tetap aktif sampai konfirmasi.",
+      pendingEmail: normalizedEmail,
+    });
   } catch (err) {
     console.error("[PUT /api/auth/email] error:", err.message);
     res.status(500).json({ error: "Gagal mengubah email" });

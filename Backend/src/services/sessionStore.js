@@ -87,16 +87,17 @@ export async function revokeSession(sessionToken) {
   return userId;
 }
 
-export async function revokeAllUserSessions(userId) {
+export async function revokeAllUserSessions(userId, { exceptToken } = {}) {
   const tokens = await redis.smembers(`user_sessions:${userId}`);
+  const tokensToRevoke = exceptToken ? tokens.filter((t) => t !== exceptToken) : tokens;
 
-  if (tokens.length > 0) {
-    const keysToDelete = tokens.map(token => `session:${token}`);
+  if (tokensToRevoke.length > 0) {
+    const keysToDelete = tokensToRevoke.map(token => `session:${token}`);
     await redis.del(...keysToDelete);
-    await redis.del(`user_sessions:${userId}`);
+    await redis.srem(`user_sessions:${userId}`, ...tokensToRevoke);
   }
 
-  return tokens.length;
+  return tokensToRevoke.length;
 }
 
 export async function cleanupExpiredSessions() {

@@ -7,6 +7,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { AnalyzePage } from "./pages/AnalyzePage";
 import { AuthCallbackPage } from "./pages/AuthCallbackPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { NewsPage } from "./pages/NewsPage";
 
 export function App() {
   return (
@@ -37,6 +38,14 @@ export function App() {
             element={
               <ProtectedRoute>
                 <SettingsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/news"
+            element={
+              <ProtectedRoute>
+                <NewsPage />
               </ProtectedRoute>
             }
           />

@@ -452,3 +452,32 @@ button:hover::after {
 .bx-modal-btn-cancel {
   @apply px-4 py-2 text-[11px] font-bold text-[var(--text-muted)] hover:text-white transition-colors disabled:opacity-50;
 }
+
+/* Custom Terminal Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #333 var(--bg);
+}
+
+/* Global Right Sidebar Consistency */
+.bx-right-sidebar {
+  @apply hidden w-[300px] flex-shrink-0 flex-col border-l border-[var(--border)] xl:flex;
+}
