@@ -50,10 +50,13 @@ export function SideNavRail() {
 
       <div className="flex flex-col items-center gap-1">
         <button
+          onClick={() => handleClick("/settings")}
           aria-label="Pengaturan"
-          title="Pengaturan (segera hadir)"
-          disabled
-          className="flex h-9 w-9 items-center justify-center text-[var(--text-muted)] opacity-40"
+          title="Pengaturan"
+          className={
+            "flex h-9 w-9 items-center justify-center hover:bg-[var(--surface-alt)] hover:text-[var(--accent)] " +
+            (location.pathname === "/settings" ? "text-[var(--accent)] bg-[rgba(255,170,0,0.05)]" : "text-[var(--text-muted)]")
+          }
         >
           <Settings size={17} />
         </button>

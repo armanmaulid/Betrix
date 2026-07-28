@@ -6,6 +6,7 @@ import { RegisterPage } from "./pages/RegisterPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { AnalyzePage } from "./pages/AnalyzePage";
 import { AuthCallbackPage } from "./pages/AuthCallbackPage";
+import { SettingsPage } from "./pages/SettingsPage";
 
 export function App() {
   return (
@@ -28,6 +29,14 @@ export function App() {
             element={
               <ProtectedRoute>
                 <AnalyzePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings"
+            element={
+              <ProtectedRoute>
+                <SettingsPage />
               </ProtectedRoute>
             }
           />
