@@ -37,7 +37,15 @@ export async function createSession(userId) {
   return sessionToken;
 }
 
+const sessionMemoryCache = new Map();
+
 export async function validateSession(sessionToken) {
+  const now = Date.now();
+  const cached = sessionMemoryCache.get(sessionToken);
+  if (cached && now - cached.timestamp < 5000) {
+    return cached.user;
+  }
+
   const userId = await withTimeout(
     redis.get(`session:${sessionToken}`),
     SESSION_LOOKUP_TIMEOUT_MS,
@@ -47,11 +55,27 @@ export async function validateSession(sessionToken) {
   if (!userId) return null;
 
   const { rows } = await pool.query(
-    `SELECT id, email, name FROM users WHERE id = $1`,
+    `SELECT id, email, name, status FROM users WHERE id = $1`,
     [userId]
   );
 
-  return rows[0] || null;
+  const user = rows[0];
+  if (!user) return null;
+
+  // FIX (security): sebelumnya query ini tidak mengambil/mengecek `status`
+  // sama sekali, jadi requireAuth (yang memakai fungsi ini) menganggap
+  // SEMUA session di Redis masih valid selama tokennya belum expired —
+  // termasuk milik user yang baru saja di-ban/suspend admin. Sekarang kalau
+  // ternyata akunnya sudah tidak aktif, session langsung dicabut di sini
+  // juga (self-healing) supaya token itu tidak bisa dipakai lagi sama
+  // sekali, bukan cuma menunggu revoke eksplisit dari sisi admin.
+  if (user.status !== "active") {
+    await revokeSession(sessionToken).catch(() => {});
+    return null;
+  }
+
+  sessionMemoryCache.set(sessionToken, { user, timestamp: Date.now() });
+  return user;
 }
 
 export async function revokeSession(sessionToken) {

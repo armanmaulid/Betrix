@@ -8,6 +8,9 @@ export const requireCredits = (cost, actionName) => {
     
     try {
       req.newCreditBalance = await deductCredits(req.user.id, cost, actionName);
+      // Dipakai handler untuk refund kalau aksi setelah ini gagal — lihat
+      // catatan FIX di creditStore.js/refundCredits().
+      req.creditsDeducted = { amount: cost, action: actionName };
       next();
     } catch (err) {
       if (err.message === "Insufficient credits") {

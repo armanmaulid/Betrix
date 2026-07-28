@@ -34,16 +34,17 @@ export function useTickerPrices(symbols: TickerSymbol[]): Record<string, TickerP
     let cancelled = false;
     let eventSource: EventSource | null = null;
     let baseData: Record<string, { prevClose: number }> = {};
+    const abortController = new AbortController();
 
     async function loadInitial() {
       const results = await Promise.allSettled(
         symbols.map(async ({ symbol }) => {
           // Fetch M1 for sparkline history
-          const candlesM1 = await fetchCandles(symbol, "M1", HISTORY_LENGTH + 1);
+          const candlesM1 = await fetchCandles(symbol, "M1", HISTORY_LENGTH + 1, abortController.signal);
           if (candlesM1.length < 2) throw new Error("not enough M1 candles");
           
           // Fetch D1 to calculate daily percentage change (Industry Standard)
-          const candlesD1 = await fetchCandles(symbol, "D1", 2).catch(() => []);
+          const candlesD1 = await fetchCandles(symbol, "D1", 2, abortController.signal).catch(() => []);
           
           const latest = candlesM1[candlesM1.length - 1];
           const history = candlesM1.map((c) => c.close);
@@ -144,6 +145,7 @@ export function useTickerPrices(symbols: TickerSymbol[]): Record<string, TickerP
 
     return () => {
       cancelled = true;
+      abortController.abort();
       if (eventSource) {
         eventSource.close();
       }

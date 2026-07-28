@@ -29,3 +29,13 @@ export async function createUser({ email, passwordHash, name, emailVerified, goo
   );
   return rows[0];
 }
+
+// FIX (concurrency): dipakai saat registrasi gagal setelah user row sudah
+// terlanjur dibuat — misalnya ketika dua registrasi bersamaan dari device
+// (fingerprint) yang sama sama-sama lolos checkDeviceBinding() sebelum
+// salah satunya sempat bind, sehingga yang kalah race tetap punya akun
+// "yatim" yang lolos dari device enforcement kalau tidak dihapus. Lihat
+// routes/auth.js bagian register.
+export async function deleteUser(id) {
+  await pool.query(`DELETE FROM users WHERE id = $1`, [id]);
+}

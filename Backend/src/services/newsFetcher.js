@@ -15,7 +15,7 @@ const FEEDS = [
   { url: "https://www.forexlive.com/feed/", source: "ForexLive" },
   { url: "https://www.investing.com/rss/news_14.rss", source: "Investing Eco" },
   { url: "https://www.investing.com/rss/news_11.rss", source: "Investing Comms" },
-  { url: "https://finance.yahoo.com/news/rssindex", source: "Yahoo Finance" },
+  { url: "https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=10000664", source: "CNBC Finance" },
 ];
 
 function tagAssets(title, summary, feedSource) {
@@ -33,6 +33,12 @@ function tagAssets(title, summary, feedSource) {
   }
   if (/\b(oil|wti|brent|crude)\b/.test(text)) {
     tags.add("oil");
+  }
+
+  if (tags.size === 0) {
+    if (feedSource.includes("Crypto")) tags.add("crypto");
+    else if (feedSource.includes("Investing")) tags.add("eco");
+    else tags.add("global");
   }
 
   return [...tags];

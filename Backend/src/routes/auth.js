@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { findByEmail, createUser, findById } from "../services/userStore.js";
+import { findByEmail, createUser, findById, deleteUser } from "../services/userStore.js";
 import { createSession, revokeSession, revokeAllUserSessions, validateSession } from "../services/sessionStore.js";
 import { getDeviceFingerprint } from "../utils/deviceFingerprint.js";
 import { checkDeviceBinding, bindDeviceToUser } from "../services/deviceStore.js";
@@ -87,7 +87,32 @@ router.post("/register", async (req, res) => {
 
     if (isDeviceEnforcementEnabled()) {
       const deviceFingerprint = getDeviceFingerprint(req);
-      await bindDeviceToUser(user.id, deviceFingerprint);
+      try {
+        await bindDeviceToUser(user.id, deviceFingerprint);
+      } catch (err) {
+        if (err.message === "Device_Bound_To_Other") {
+          // FIX (concurrency): checkDeviceBinding() di atas dan bindDeviceToUser()
+          // di sini punya jendela waktu di antaranya — dua registrasi bersamaan
+          // dari device yang sama bisa sama-sama lolos pengecekan awal sebelum
+          // salah satunya menang race di bindDeviceToUser (yang sudah pakai
+          // SELECT ... FOR UPDATE). Yang kalah race sampai di sini dengan user
+          // row yang SUDAH terlanjur dibuat tapi device-nya gagal di-bind —
+          // kalau dibiarkan, akun ini tetap bisa login normal tanpa pernah
+          // benar-benar lolos "1 device = 1 akun". Jadi di-rollback (dihapus)
+          // supaya registrasi ini benar-benar gagal total, bukan gagal
+          // sebagian.
+          await deleteUser(user.id).catch((delErr) =>
+            logger.error("Gagal rollback user setelah device bind gagal (race condition)", {
+              userId: user.id,
+              error: delErr.message,
+            })
+          );
+          return res.status(403).json({
+            error: "Device ini sudah terdaftar ke akun lain."
+          });
+        }
+        throw err;
+      }
     }
 
     const token = await createVerificationToken(user.id);
@@ -146,6 +171,11 @@ router.post("/login", async (req, res) => {
       await recordFailedLogin(email, clientIP);
       await bcrypt.compare(password, "$2a$10$vI8aWBnW3fID.ZQ4/zo1G.q1lRps.9cGLcZEiGDMVr5yUP1KUOYTa");
       return res.status(401).json({ error: "Email atau password salah" });
+    }
+
+    if (!user.passwordHash) {
+      await recordFailedLogin(email, clientIP);
+      return res.status(401).json({ error: "Gunakan login Google untuk akun ini" });
     }
 
     const match = await bcrypt.compare(password, user.passwordHash);
@@ -244,6 +274,10 @@ router.post("/logout-by-credentials", async (req, res) => {
     if (!user) {
       await bcrypt.compare(password, "$2a$10$vI8aWBnW3fID.ZQ4/zo1G.q1lRps.9cGLcZEiGDMVr5yUP1KUOYTa");
       return res.status(401).json({ error: "Email atau password salah" });
+    }
+
+    if (!user.passwordHash) {
+      return res.status(401).json({ error: "Gunakan login Google untuk akun ini" });
     }
 
     const match = await bcrypt.compare(password, user.passwordHash);

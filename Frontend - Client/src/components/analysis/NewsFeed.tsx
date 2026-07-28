@@ -16,6 +16,9 @@ const ASSET_LABEL: Record<string, string> = {
   metal: "GOLD",
   oil: "OIL",
   btc: "BTC",
+  crypto: "CRYPTO",
+  eco: "MACRO",
+  global: "GLOBAL",
 };
 
 const ASSET_COLOR: Record<string, string> = {
@@ -23,6 +26,9 @@ const ASSET_COLOR: Record<string, string> = {
   metal: "bg-yellow-500/20 text-yellow-400",
   oil: "bg-orange-500/20 text-orange-400",
   btc: "bg-purple-500/20 text-purple-400",
+  crypto: "bg-purple-500/20 text-purple-400",
+  eco: "bg-teal-500/20 text-teal-400",
+  global: "bg-slate-500/20 text-slate-400",
 };
 
 const SOURCE_COLOR: Record<string, string> = {
@@ -31,7 +37,7 @@ const SOURCE_COLOR: Record<string, string> = {
   "ForexLive": "bg-emerald-500/20 text-emerald-300",
   "Investing Eco": "bg-amber-500/20 text-amber-300",
   "Investing Comms": "bg-amber-500/20 text-amber-300",
-  "Yahoo Finance": "bg-violet-500/20 text-violet-300",
+  "CNBC Finance": "bg-cyan-500/20 text-cyan-300",
 };
 
 function formatRelativeTime(iso: string): string {

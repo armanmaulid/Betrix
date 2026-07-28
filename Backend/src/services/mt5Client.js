@@ -111,7 +111,8 @@ export async function fetchMt5History(symbol, timeframe, fromDate, toDate) {
   const url = `http://${MT5_URL}/v1/history/prices?symbol=${encodeURIComponent(symbol)}&time_frame=${encodeURIComponent(timeframe)}&from_date=${fromDate}&to_date=${toDate}`;
   const response = await fetch(url);
   if (!response.ok) {
-    throw new Error(`MT5 Bridge responded with ${response.status}`);
+    const errorText = await response.text().catch(() => "");
+    throw new Error(`MT5 Bridge responded with ${response.status}: ${errorText}`);
   }
   return await response.json();
 }
@@ -123,10 +124,5 @@ export async function fetchMt5Symbols() {
   if (!response.ok) {
     throw new Error(`MT5 Bridge responded with ${response.status}`);
   }
-  // MT5 EA incorrectly sends unescaped backslashes in 'path' (e.g. Forex\Major)
-  // We need to escape them before JSON parsing
-  const rawText = await response.text();
-  const fixedText = rawText.replace(/\\/g, "\\\\");
-  return JSON.parse(fixedText);
+  return await response.json();
 }
-

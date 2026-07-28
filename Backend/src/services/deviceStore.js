@@ -9,13 +9,37 @@ export async function checkDeviceBinding(deviceFingerprint) {
 }
 
 export async function bindDeviceToUser(userId, deviceFingerprint) {
-  await pool.query(
-    `INSERT INTO user_devices (user_id, device_fingerprint)
-     VALUES ($1, $2)
-     ON CONFLICT (device_fingerprint)
-     DO UPDATE SET last_seen_at = now()`,
-    [userId, deviceFingerprint]
-  );
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const { rows } = await client.query(
+      `SELECT user_id FROM user_devices WHERE device_fingerprint = $1 FOR UPDATE`,
+      [deviceFingerprint]
+    );
+    if (rows.length > 0) {
+      if (rows[0].user_id !== userId) {
+        throw new Error("Device_Bound_To_Other");
+      }
+      await client.query(
+        `UPDATE user_devices SET last_seen_at = now() WHERE device_fingerprint = $1`,
+        [deviceFingerprint]
+      );
+    } else {
+      await client.query(
+        `INSERT INTO user_devices (user_id, device_fingerprint) VALUES ($1, $2)`,
+        [userId, deviceFingerprint]
+      );
+    }
+    await client.query("COMMIT");
+  } catch (err) {
+    await client.query("ROLLBACK");
+    if (err.code === "23505") { // unique_violation
+      throw new Error("Device_Bound_To_Other");
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export async function updateDeviceLastSeen(deviceFingerprint) {

@@ -39,6 +39,16 @@ export async function deductCredits(userId, amount, action) {
   }
 }
 
+// FIX (business logic): requireCredits() di middleware/credits.js memotong
+// kredit SEBELUM aksi yang sebenarnya (panggilan ke AI gateway) dijalankan.
+// Sebelumnya tidak ada jalan untuk mengembalikan kredit itu kalau
+// panggilannya gagal (timeout, error provider, dll) — user kehilangan
+// kredit tanpa dapat hasil apa pun. refundCredits() dipakai di catch block
+// routes/chat.js untuk mengembalikan kredit yang sudah kadung dipotong.
+export async function refundCredits(userId, amount, action) {
+  return addCredits(userId, amount, action);
+}
+
 export async function addCredits(userId, amount, action) {
   const client = await pool.connect();
   try {

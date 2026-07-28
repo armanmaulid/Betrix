@@ -178,6 +178,21 @@ const server = app.listen(PORT, async () => {
   logger.info("MT5 Bridge Client initialized", { context: "MT5" });
 });
 
+// FIX (OOM/DoS hardening): default Node HTTP server tidak punya batas waktu
+// untuk koneksi yang menggantung (slowloris-style: buka koneksi, kirim
+// header pelan-pelan atau tidak sama sekali) — tiap koneksi begitu tetap
+// memakai memory & file descriptor sampai client sendiri yang menutupnya.
+// Banyak koneksi macet seperti ini bisa menghabiskan resource server.
+server.keepAliveTimeout = Number(process.env.SERVER_KEEPALIVE_TIMEOUT_MS) || 65000;
+// headersTimeout HARUS lebih besar dari keepAliveTimeout (syarat Node.js).
+server.headersTimeout = Number(process.env.SERVER_HEADERS_TIMEOUT_MS) || 66000;
+// Sengaja TIDAK set server.requestTimeout global: app ini punya endpoint
+// SSE long-lived (/api/market/stream) yang sengaja dibuka lama. requestTimeout
+// di level server bisa memutus paksa koneksi streaming yang masih aktif.
+// keepAliveTimeout & headersTimeout di atas sudah cukup untuk proteksi
+// slowloris (koneksi yang lambat/tidak pernah mengirim header lengkap)
+// tanpa mengganggu response yang memang didesain untuk tetap terbuka.
+
 
 // Graceful shutdown
 let isShuttingDown = false;

@@ -9,6 +9,7 @@ import { logUserActivity } from "../services/activityLogger.js";
 import { pool } from "../db/pool.js";
 import { escapeCsvField } from "../utils/csv.js";
 import { requireCredits } from "../middleware/credits.js";
+import { refundCredits } from "../services/creditStore.js";
 
 const router = Router();
 
@@ -21,6 +22,19 @@ function sanitizeHistory(history) {
       role: msg.role,
       content: msg.content.substring(0, 4000) // Prevent huge token payloads
     }));
+}
+
+// FIX (business logic): dipanggil dari catch block /chat dan /chat/stream —
+// kalau checkChatCredits() sudah sempat memotong kredit (req.creditsDeducted
+// ke-set) tapi panggilan AI-nya gagal, kredit itu dikembalikan supaya user
+// tidak dibebankan untuk layanan yang gagal diberikan.
+async function refundIfCharged(req, reason) {
+  if (!req.creditsDeducted) return;
+  try {
+    await refundCredits(req.user.id, req.creditsDeducted.amount, `refund_${req.creditsDeducted.action}`);
+  } catch (refundErr) {
+    console.error(`[refundIfCharged] gagal refund kredit (${reason}):`, refundErr.message);
+  }
 }
 
 const VALID_TASK_TYPES = [
@@ -106,6 +120,7 @@ router.post("/chat", requireAuth, perUserLimiter, checkChatCredits, async (req, 
     });
   } catch (err) {
     console.error("[POST /api/chat] error:", err.message);
+    await refundIfCharged(req, "POST /api/chat");
     res.status(502).json({ error: "Gagal memanggil model AI" });
   }
 });
@@ -193,6 +208,7 @@ router.post("/chat/stream", requireAuth, perUserLimiter, checkChatCredits, async
     });
   } catch (err) {
     console.error("[POST /api/chat/stream] error:", err.message);
+    await refundIfCharged(req, "POST /api/chat/stream");
     res.write(`event: error\ndata: ${JSON.stringify({ error: "Gagal memanggil model AI" })}\n\n`);
     res.end();
   }

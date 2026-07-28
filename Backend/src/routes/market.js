@@ -286,7 +286,7 @@ router.get("/candles", async (req, res) => {
           }
           // MT5 CopyRates returns -1 (500 Failed) if history is not synchronized yet.
           // It will start downloading automatically, so we wait and retry.
-          if (fetchErr.message.includes("Failed to retrieve data")) {
+          if (fetchErr.message.includes("Failed to retrieve data") || fetchErr.message.includes("500") || fetchErr.message.includes("fetch failed")) {
             retries--;
             if (retries > 0) {
               await new Promise(r => setTimeout(r, 600)); // wait 600ms before retry

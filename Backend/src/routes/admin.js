@@ -3,6 +3,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { requireAdmin, logAdminAction } from "../middleware/adminAuth.js";
 import { pool } from "../db/pool.js";
 import { redis } from "../db/redis.js";
+import { revokeAllUserSessions } from "../services/sessionStore.js";
 import { sendVerificationEmail, sendEmail, sendEmailChangeVerification, sendEmailChangeNotification } from "../services/emailService.js";
 import { escapeCsvField } from "../utils/csv.js";
 import bcrypt from "bcryptjs";
@@ -720,6 +721,19 @@ router.put("/users/:id", async (req, res) => {
 
     if (rows.length === 0) {
       return res.status(404).json({ error: "User not found" });
+    }
+
+    // FIX (security): sebelumnya cuma UPDATE kolom status di DB — session
+    // yang sudah ada di Redis tidak tersentuh, jadi user yang di-ban/suspend
+    // tetap bisa pakai token lama di endpoint non-admin (chat, market, dll)
+    // sampai TTL 24 jam habis sendiri, karena requireAuth/validateSession
+    // sebelumnya tidak pernah mengecek status akun. Sekarang begitu status
+    // diubah ke banned/suspended, semua session aktif milik user itu
+    // langsung dicabut.
+    if (status === "banned" || status === "suspended") {
+      revokeAllUserSessions(id).catch((err) =>
+        console.error("[PUT /api/admin/users/:id] gagal revoke session:", err.message)
+      );
     }
 
     await logAdminAction(req.user.id, "update_user", "user", id, { status, isAdmin }, auditContext(req));

@@ -13,17 +13,28 @@ export interface Candle {
 // candle data straight from a running MT5 terminal — no third-party
 // market-data API in the loop. Only works while the bridge + MT5 terminal
 // are running on your machine (see mt5-bridge/README.md).
-export async function fetchCandles(symbol: string, timeframe: string, count = 200): Promise<Candle[]> {
+const candleCache = new Map<string, { data: Candle[], timestamp: number }>();
+
+export async function fetchCandles(symbol: string, timeframe: string, count = 200, signal?: AbortSignal): Promise<Candle[]> {
+  const cacheKey = `${symbol}_${timeframe}_${count}`;
+  const cached = candleCache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < 30000) {
+    return cached.data;
+  }
+
   const url = `${BACKEND_URL}/api/market/candles?symbol=${encodeURIComponent(symbol)}&timeframe=${timeframe}&count=${count}`;
   const token = localStorage.getItem("eaconsole.sessionToken");
   const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
   
-  const res = await fetch(url, { headers });
+  const res = await fetch(url, { headers, signal });
   if (!res.ok) {
     const body = await res.json().catch(() => null);
     throw new Error(body?.detail || `MT5 bridge error (${res.status})`);
   }
-  return res.json();
+  
+  const data = await res.json();
+  candleCache.set(cacheKey, { data, timestamp: Date.now() });
+  return data;
 }
 
 export interface BridgeHealth {
@@ -58,7 +69,13 @@ export interface CalendarResponse {
 // this needs a separate EA instead of just another bridge endpoint: the
 // Calendar functions only exist in MQL5 running inside the terminal, not
 // in the external Python API).
+const calendarCache = { data: null as CalendarResponse | null, timestamp: 0 };
+
 export async function fetchEconomicCalendar(): Promise<CalendarResponse> {
+  if (calendarCache.data && Date.now() - calendarCache.timestamp < 60000) {
+    return calendarCache.data;
+  }
+
   const token = localStorage.getItem("eaconsole.sessionToken");
   const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
   const res = await fetch(`${BACKEND_URL}/api/market/economic-calendar`, { headers });
@@ -66,5 +83,9 @@ export async function fetchEconomicCalendar(): Promise<CalendarResponse> {
     const body = await res.json().catch(() => null);
     throw new Error(body?.detail || `MT5 bridge error (${res.status})`);
   }
-  return res.json();
+  
+  const data = await res.json();
+  calendarCache.data = data;
+  calendarCache.timestamp = Date.now();
+  return data;
 }

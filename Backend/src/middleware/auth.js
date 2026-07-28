@@ -4,7 +4,16 @@ import { logger } from "../utils/logger.js";
 
 const LAST_ACTIVE_THROTTLE_MINUTES = 5;
 
+const lastActiveMemoryCache = new Map();
+
 function touchLastActive(userId) {
+  const now = Date.now();
+  const lastTouch = lastActiveMemoryCache.get(userId);
+  if (lastTouch && now - lastTouch < 60000) { // Throttle 1 menit di memory Node
+    return;
+  }
+  lastActiveMemoryCache.set(userId, now);
+
   pool
     .query(
       `UPDATE users
