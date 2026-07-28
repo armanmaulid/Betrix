@@ -176,6 +176,18 @@ export async function changePassword(sessionToken: string, currentPassword: stri
   if (!res.ok) return parseErrorAndThrow(res);
 }
 
+export async function changeEmail(sessionToken: string, currentPassword: string, newEmail: string): Promise<void> {
+  const res = await fetch(`${BACKEND_URL}/api/auth/email`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${sessionToken}`
+    },
+    body: JSON.stringify({ currentPassword, newEmail })
+  });
+  if (!res.ok) return parseErrorAndThrow(res);
+}
+
 export async function getSessions(sessionToken: string): Promise<DeviceSession[]> {
   const res = await fetch(`${BACKEND_URL}/api/auth/sessions`, {
     headers: { Authorization: `Bearer ${sessionToken}` },

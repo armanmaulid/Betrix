@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { TerminalShell } from "../components/layout/TerminalShell";
 import { useAuth } from "../context/AuthContext";
-import { updateProfile, changePassword, getSessions, revokeSession, type DeviceSession } from "../api/authClient";
+import { updateProfile, changePassword, changeEmail, getSessions, revokeSession, type DeviceSession } from "../api/authClient";
 import { 
   Settings, User, Key, Shield, Bell, Activity, Clock, 
   Users, Edit2, CheckCircle2, ShieldAlert, BadgeInfo,
@@ -20,7 +20,6 @@ export function SettingsPage() {
 
   // Profile States (Credentials / Profile)
   const [name, setName] = useState(user?.name || "");
-  const [email, setEmail] = useState(user?.email || "");
   const [phone, setPhone] = useState((user as any)?.phone || "");
   const [address, setAddress] = useState((user as any)?.address || "");
   const [birthdate, setBirthdate] = useState((user as any)?.birthdate ? new Date((user as any).birthdate).toISOString().split('T')[0] : "");
@@ -31,6 +30,9 @@ export function SettingsPage() {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  
+  const [emailToChange, setEmailToChange] = useState("");
+  const [emailCurrentPassword, setEmailCurrentPassword] = useState("");
   
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -61,7 +63,6 @@ export function SettingsPage() {
   useEffect(() => {
     if (user && !isEditingProfile) {
       setName(user.name || "");
-      setEmail(user.email || "");
       setPhone((user as any).phone || "");
       setAddress((user as any).address || "");
       setBirthdate((user as any).birthdate ? new Date((user as any).birthdate).toISOString().split('T')[0] : "");
@@ -100,6 +101,21 @@ export function SettingsPage() {
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
+    } catch (err: any) {
+      setMessage({ type: "error", text: err.message || "Terjadi kesalahan" });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleChangeEmail = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setMessage(null);
+    try {
+      await changeEmail(sessionToken, emailCurrentPassword, emailToChange);
+      setMessage({ type: "success", text: "Email berhasil diubah! Halaman akan dimuat ulang..." });
+      setTimeout(() => window.location.reload(), 1500);
     } catch (err: any) {
       setMessage({ type: "error", text: err.message || "Terjadi kesalahan" });
     } finally {
@@ -150,13 +166,9 @@ export function SettingsPage() {
           </div>
           <form onSubmit={handleUpdateProfile} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 md:col-span-2">
                 <label className="text-[10px] text-[var(--text-muted)] tracking-wider">FULL NAME</label>
                 <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)]" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] text-[var(--text-muted)] tracking-wider">EMAIL</label>
-                <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)]" />
               </div>
               <div className="space-y-1.5">
                 <label className="text-[10px] text-[var(--text-muted)] tracking-wider">PHONE</label>
@@ -270,7 +282,7 @@ export function SettingsPage() {
 
         {/* Credits Panel */}
         <div className="border border-[var(--border)] mt-6 p-6 border-l-2 border-l-cyan-400">
-          <div className="text-[28px] font-bold text-cyan-400 leading-none mb-1">0.0</div>
+          <div className="text-[28px] font-bold text-cyan-400 leading-none mb-1">{user?.credits || 0}</div>
           <div className="text-[10px] text-[var(--text-muted)] tracking-wider">AVAILABLE CREDITS</div>
         </div>
       </>
@@ -325,6 +337,44 @@ export function SettingsPage() {
           </button>
         </div>
       </form>
+
+      <div className="mt-10 mb-6">
+        <h2 className="text-[16px] font-bold text-[var(--accent)] mb-1">CHANGE EMAIL</h2>
+        <p className="text-[12px] text-[var(--text-muted)]">Update your account email address. Requires your current password.</p>
+      </div>
+
+      <form onSubmit={handleChangeEmail} className="space-y-4 max-w-md">
+        <div className="space-y-1.5">
+          <label className="text-[10px] text-[var(--text-muted)] tracking-wider">NEW EMAIL ADDRESS</label>
+          <input
+            type="email"
+            value={emailToChange}
+            onChange={(e) => setEmailToChange(e.target.value)}
+            className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)]"
+            placeholder={user?.email}
+          />
+        </div>
+        
+        <div className="space-y-1.5">
+          <label className="text-[10px] text-[var(--text-muted)] tracking-wider">CURRENT PASSWORD</label>
+          <input
+            type="password"
+            value={emailCurrentPassword}
+            onChange={(e) => setEmailCurrentPassword(e.target.value)}
+            className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)]"
+          />
+        </div>
+
+        <div className="pt-2">
+          <button
+            type="submit"
+            disabled={isLoading || !emailCurrentPassword || !emailToChange}
+            className="flex items-center gap-2 bg-[var(--accent)] text-black px-4 py-1.5 text-[12px] font-bold hover:opacity-90 disabled:opacity-50"
+          >
+            <Lock size={14} /> UPDATE EMAIL
+          </button>
+        </div>
+      </form>
     </div>
   );
 
@@ -360,6 +410,35 @@ export function SettingsPage() {
             </div>
           ))
         )}
+      </div>
+    </div>
+  );
+
+  const renderUsageView = () => (
+    <div className="mt-4 border border-[var(--border)] bg-[var(--bg)]">
+      <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
+        <div>
+          <h2 className="text-[16px] font-bold text-[var(--accent)] mb-1">API USAGE & CREDITS</h2>
+          <p className="text-[12px] text-[var(--text-muted)]">Ringkasan penggunaan kredit AI Anda selama bulan ini.</p>
+        </div>
+        <div className="text-right">
+          <div className="text-[24px] font-bold text-cyan-400 leading-none">{user?.credits || 0}</div>
+          <div className="text-[10px] text-[var(--text-muted)] tracking-wider">REMAINING</div>
+        </div>
+      </div>
+      <div className="p-6">
+        <div className="h-48 w-full border border-[var(--border)] flex items-end gap-2 p-4 justify-between" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(255,170,0,0.02) 100%)" }}>
+          {[30, 45, 20, 60, 80, 40, 90, 50, 70, 45, 60, 30].map((h, i) => (
+            <div key={i} className="w-full bg-[var(--accent)] opacity-80 hover:opacity-100 transition-opacity" style={{ height: `${h}%` }}></div>
+          ))}
+        </div>
+        <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-2">
+          <span>Day 1</span>
+          <span>Day 30</span>
+        </div>
+      </div>
+      <div className="p-6 border-t border-[var(--border)] text-[12px] text-[var(--text-muted)]">
+        * Grafik di atas adalah pratinjau statis. Integrasi API usage sedang dikerjakan.
       </div>
     </div>
   );
@@ -417,8 +496,9 @@ export function SettingsPage() {
         {/* Tab Content */}
         {activeTab === "PROFILE" && renderProfileView()}
         {activeTab === "SECURITY" && renderSecurityView()}
+        {activeTab === "USAGE" && renderUsageView()}
         {activeTab === "LOGIN HISTORY" && renderLoginHistoryView()}
-        {activeTab !== "PROFILE" && activeTab !== "SECURITY" && activeTab !== "LOGIN HISTORY" && (
+        {activeTab !== "PROFILE" && activeTab !== "SECURITY" && activeTab !== "LOGIN HISTORY" && activeTab !== "USAGE" && (
           <div className="border border-[var(--border)] mt-4 p-8 flex justify-center items-center text-[var(--text-muted)] text-[12px]">
             {activeTab} Configuration - Coming Soon
           </div>

@@ -49,6 +49,13 @@ export async function updateUserPassword(id, passwordHash) {
   );
 }
 
+export async function updateUserEmail(id, newEmail) {
+  await pool.query(
+    `UPDATE users SET email = $1 WHERE id = $2`,
+    [newEmail, id]
+  );
+}
+
 export async function createUser({ email, passwordHash, name, emailVerified, googleId }) {
   const { rows } = await pool.query(
     `INSERT INTO users (email, password_hash, name, email_verified, google_id)

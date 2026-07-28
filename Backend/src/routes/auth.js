@@ -1,7 +1,7 @@
 import { Router } from "express";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
-import { findByEmail, createUser, findById, deleteUser, updateUserProfile, findPasswordHashById, updateUserPassword } from "../services/userStore.js";
+import { findByEmail, createUser, findById, deleteUser, updateUserProfile, findPasswordHashById, updateUserPassword, updateUserEmail } from "../services/userStore.js";
 import { createSession, revokeSession, revokeAllUserSessions, validateSession } from "../services/sessionStore.js";
 import { getDeviceFingerprint } from "../utils/deviceFingerprint.js";
 import { checkDeviceBinding, bindDeviceToUser, getUserDevices, unbindDevice } from "../services/deviceStore.js";
@@ -566,6 +566,45 @@ router.put("/password", async (req, res) => {
   } catch (err) {
     console.error("[PUT /api/auth/password] error:", err.message);
     res.status(500).json({ error: "Gagal mengubah password" });
+  }
+});
+
+// PUT /api/auth/email
+router.put("/email", async (req, res) => {
+  const sessionToken = req.headers.authorization?.replace("Bearer ", "");
+  if (!sessionToken) return res.status(401).json({ error: "Session token required" });
+
+  const { currentPassword, newEmail } = req.body;
+  if (!currentPassword || !newEmail) {
+    return res.status(400).json({ error: "currentPassword dan newEmail wajib diisi" });
+  }
+
+  try {
+    const sessionUser = await validateSession(sessionToken);
+    if (!sessionUser) return res.status(401).json({ error: "Session tidak valid atau expired" });
+
+    // Check existing email to prevent duplicates
+    const existing = await findByEmail(newEmail);
+    if (existing && existing.id !== sessionUser.id) {
+      return res.status(409).json({ error: "Email sudah digunakan" });
+    }
+
+    const passwordHash = await findPasswordHashById(sessionUser.id);
+    if (!passwordHash) {
+      return res.status(400).json({ error: "Gagal memverifikasi password (akun Google-only?)" });
+    }
+
+    const isValid = await bcrypt.compare(currentPassword, passwordHash);
+    if (!isValid) {
+      return res.status(401).json({ error: "Password salah" });
+    }
+
+    await updateUserEmail(sessionUser.id, newEmail);
+
+    res.json({ success: true, message: "Email berhasil diubah" });
+  } catch (err) {
+    console.error("[PUT /api/auth/email] error:", err.message);
+    res.status(500).json({ error: "Gagal mengubah email" });
   }
 });
 
