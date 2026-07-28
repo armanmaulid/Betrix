@@ -42,16 +42,6 @@ export async function fetchCandles(symbol: string, timeframe: string, count = 20
   return data;
 }
 
-export interface BridgeHealth {
-  connected: boolean;
-  account: number | null;
-  broker: string | null;
-}
-
-export async function checkBridgeHealth(): Promise<BridgeHealth> {
-  // Removed health check because we are not using MT5 bridge anymore
-  return { connected: true, account: 12345, broker: "Yahoo Finance API" };
-}
 
 export interface CalendarEvent {
   time: string; // ISO 8601, trade server time

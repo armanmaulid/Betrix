@@ -4,7 +4,8 @@
 // frontend attaches it as `Authorization: Bearer <token>` on every
 // subsequent request. No cookies, no refresh tokens — a single 24h-TTL
 // token per device (see sessionStore.js / deviceSessionStore.js).
-const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
+// Base URL to backend Express server. Defaults to Vite dev proxy target or local.
+const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 export function getGoogleOAuthUrl(): string {
   return `${BACKEND_URL}/api/auth/google`;

@@ -75,7 +75,8 @@ export function NewsFeed() {
       const token = localStorage.getItem("eaconsole.sessionToken");
       if (!token) throw new Error("No session token");
       
-      const res = await fetch("/api/news?limit=20", {
+      const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+      const res = await fetch(`${BACKEND_URL}/api/news?limit=20`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.status === 401) {

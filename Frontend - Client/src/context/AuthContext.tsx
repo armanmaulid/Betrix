@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!sessionToken || !user) return;
 
-    const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:3000";
+    const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
     const es = new EventSource(`${BACKEND_URL}/api/auth/me/stream?token=${sessionToken}`);
 
     es.onopen = () => setIsConnected(true);

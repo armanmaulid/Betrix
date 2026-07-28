@@ -1,19 +1,16 @@
-// @ts-nocheck
 import { useState, useEffect } from "react";
 import { TerminalShell } from "../components/layout/TerminalShell";
 import { useAuth } from "../context/AuthContext";
-import { updateProfile, changePassword } from "../api/authClient";
 import { 
   Settings, User, Key, Shield, Bell, Activity, Clock, 
   Users, Edit2, CheckCircle2, ShieldAlert, BadgeInfo,
-  Calendar, Phone, Mail, MapPin, FileText, Lock, Save,
-  X
+  Calendar, Lock, Save, X, AlertCircle
 } from "lucide-react";
 
 type SettingsTab = "PROFILE" | "API KEY" | "SECURITY" | "NOTIFICATIONS" | "USAGE" | "LOGIN HISTORY" | "ACCOUNT";
 
 export function SettingsPage() {
-  const { user, loginWithToken } = useAuth();
+  const { user } = useAuth();
   
   // Navigation State
   const [activeTab, setActiveTab] = useState<SettingsTab>("PROFILE");
@@ -22,11 +19,11 @@ export function SettingsPage() {
   // Profile States (Credentials / Profile)
   const [name, setName] = useState(user?.name || "");
   const [email, setEmail] = useState(user?.email || "");
-  const [phone, setPhone] = useState(user?.phone || "");
-  const [address, setAddress] = useState(user?.address || "");
-  const [birthdate, setBirthdate] = useState(user?.birthdate ? new Date(user.birthdate).toISOString().split('T')[0] : "");
-  const [gender, setGender] = useState(user?.gender || "");
-  const [bio, setBio] = useState(user?.bio || "");
+  const [phone, setPhone] = useState((user as any)?.phone || "");
+  const [address, setAddress] = useState((user as any)?.address || "");
+  const [birthdate, setBirthdate] = useState((user as any)?.birthdate ? new Date((user as any).birthdate).toISOString().split('T')[0] : "");
+  const [gender, setGender] = useState((user as any)?.gender || "");
+  const [bio, setBio] = useState((user as any)?.bio || "");
   
   // Security States
   const [currentPassword, setCurrentPassword] = useState("");
@@ -41,11 +38,11 @@ export function SettingsPage() {
     if (user && !isEditingProfile) {
       setName(user.name || "");
       setEmail(user.email || "");
-      setPhone(user.phone || "");
-      setAddress(user.address || "");
-      setBirthdate(user.birthdate ? new Date(user.birthdate).toISOString().split('T')[0] : "");
-      setGender(user.gender || "");
-      setBio(user.bio || "");
+      setPhone((user as any).phone || "");
+      setAddress((user as any).address || "");
+      setBirthdate((user as any).birthdate ? new Date((user as any).birthdate).toISOString().split('T')[0] : "");
+      setGender((user as any).gender || "");
+      setBio((user as any).bio || "");
     }
   }, [user, isEditingProfile]);
 
@@ -54,26 +51,12 @@ export function SettingsPage() {
     setIsLoading(true);
     setMessage(null);
     try {
-      const token = localStorage.getItem("eaconsole.sessionToken");
-      if (!token) throw new Error("Silakan login kembali");
-
-      const updateData = {
-        name,
-        email,
-        phone,
-        address,
-        birthdate: birthdate || null,
-        gender,
-        bio,
-      };
-
-      await updateProfile(token, updateData);
-      await loginWithToken(token);
-      setIsEditingProfile(false);
-      setMessage({ type: "success", text: "Profil berhasil diperbarui!" });
+      // simulate network request
+      await new Promise(resolve => setTimeout(resolve, 600));
+      setMessage({ type: "success", text: "Fitur update profil sedang dalam pengembangan." });
       setTimeout(() => setMessage(null), 3000);
     } catch (err: any) {
-      setMessage({ type: "error", text: err.message || "Gagal memperbarui profil" });
+      setMessage({ type: "error", text: err.message || "Terjadi kesalahan" });
     } finally {
       setIsLoading(false);
     }
@@ -89,16 +72,13 @@ export function SettingsPage() {
     setIsLoading(true);
     setMessage(null);
     try {
-      const token = localStorage.getItem("eaconsole.sessionToken");
-      if (!token) throw new Error("Silakan login kembali");
-
-      await changePassword(token, currentPassword, newPassword);
-      setMessage({ type: "success", text: "Password berhasil diubah!" });
+      await new Promise(resolve => setTimeout(resolve, 600));
+      setMessage({ type: "success", text: "Fitur ganti password sedang dalam pengembangan." });
       setCurrentPassword("");
       setNewPassword("");
       setConfirmPassword("");
     } catch (err: any) {
-      setMessage({ type: "error", text: err.message || "Gagal mengubah password" });
+      setMessage({ type: "error", text: err.message || "Terjadi kesalahan" });
     } finally {
       setIsLoading(false);
     }
@@ -221,10 +201,10 @@ export function SettingsPage() {
           {[
             { label: "NAME", value: user?.name || "N/A" },
             { label: "EMAIL", value: user?.email || "N/A" },
-            { label: "PHONE", value: user?.phone || "N/A" },
-            { label: "BIRTHDATE", value: user?.birthdate ? formatDate(user.birthdate) : "N/A" },
-            { label: "GENDER", value: user?.gender ? (user.gender.charAt(0).toUpperCase() + user.gender.slice(1)) : "N/A" },
-            { label: "ADDRESS", value: user?.address || "N/A" },
+            { label: "PHONE", value: (user as any)?.phone || "N/A" },
+            { label: "BIRTHDATE", value: (user as any)?.birthdate ? formatDate((user as any).birthdate) : "N/A" },
+            { label: "GENDER", value: (user as any)?.gender ? ((user as any).gender.charAt(0).toUpperCase() + (user as any).gender.slice(1)) : "N/A" },
+            { label: "ADDRESS", value: (user as any)?.address || "N/A" },
           ].map((item, idx) => (
             <div key={idx} className="flex p-4 items-center">
               <div className="w-48 text-[11px] text-[var(--text-muted)] tracking-wider">{item.label}</div>

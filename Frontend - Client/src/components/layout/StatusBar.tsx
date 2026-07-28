@@ -17,8 +17,8 @@ export function StatusBar() {
       
       const start = performance.now();
       try {
-        // Hit lightweight endpoint untuk ukur latency murni ke backend
-        await fetch("/api/news?limit=1", {
+        const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+        await fetch(`${BACKEND_URL}/api/news?limit=1`, {
           headers: { Authorization: `Bearer ${token}` }
         });
         const end = performance.now();
