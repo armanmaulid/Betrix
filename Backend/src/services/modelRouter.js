@@ -27,8 +27,8 @@ const SYSTEM_PROMPTS = {
     "NO_ACTION. Jawab hanya label kategorinya saja.",
 };
 
-export async function routeAndCall({ taskType, messages }) {
-  const model = resolveModel(taskType);
+export async function routeAndCall({ taskType, messages, tier }) {
+  const model = resolveModel(taskType, tier);
   const system = SYSTEM_PROMPTS[taskType] || SYSTEM_PROMPTS.faq;
 
   const lastMessage = messages[messages.length - 1]?.content || "";
@@ -80,8 +80,8 @@ export async function routeAndCall({ taskType, messages }) {
   };
 }
 
-export async function routeAndStream({ taskType, messages, onToken, signal }) {
-  const model = resolveModel(taskType);
+export async function routeAndStream({ taskType, messages, onToken, signal, tier }) {
+  const model = resolveModel(taskType, tier);
   const system = SYSTEM_PROMPTS[taskType] || SYSTEM_PROMPTS.faq;
 
   const start = Date.now();

@@ -124,5 +124,11 @@ export async function fetchMt5Symbols() {
   if (!response.ok) {
     throw new Error(`MT5 Bridge responded with ${response.status}`);
   }
-  return await response.json();
+  
+  const text = await response.text();
+  // Fix unescaped backslashes in JSON (MT5 EA bug where \ in paths are not escaped)
+  const sanitizedText = text.replace(/\\(?!["\\/bfnrtu])/g, '\\\\');
+  
+  const json = JSON.parse(sanitizedText);
+  return json.symbols || json;
 }

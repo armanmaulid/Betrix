@@ -28,6 +28,7 @@ import { normalizeRequestIP } from "./middleware/normalizeIP.js";
 import { logger } from "./utils/logger.js";
 import { pool } from "./db/pool.js";
 import { initializeMt5Client } from "./services/mt5Client.js";
+import { syncBrokerSymbols } from "./services/symbolStore.js";
 import "./config/passport.js";
 
 const app = express();
@@ -176,6 +177,11 @@ const server = app.listen(PORT, async () => {
 
   initializeMt5Client();
   logger.info("MT5 Bridge Client initialized", { context: "MT5" });
+  // Sync symbols dari MT5 bridge di background pas start up (dengan auto-retry)
+  // Biarkan berjalan tanpa await agar tidak mem-blokir server startup.
+  syncBrokerSymbols().catch(err => {
+    logger.error("Unexpected error in syncBrokerSymbols loop", { error: err.message, context: "System" });
+  });
 });
 
 // FIX (OOM/DoS hardening): default Node HTTP server tidak punya batas waktu

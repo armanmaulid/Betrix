@@ -25,7 +25,15 @@ export const TASK_TIER_MAP = {
   risk_narrative: "deep",
 };
 
-export function resolveModel(taskType) {
-  const tier = TASK_TIER_MAP[taskType] || "balanced";
+// tierOverride dipakai kalau user pilih manual lewat dropdown Agent
+// (Lite/Balanced/Deep) di command box dengan toggle "Optimize" dimatikan.
+// Kalau tidak ada override valid, fallback ke pemetaan otomatis per taskType.
+export function resolveTier(taskType, tierOverride) {
+  if (tierOverride && MODELS[tierOverride]) return tierOverride;
+  return TASK_TIER_MAP[taskType] || "balanced";
+}
+
+export function resolveModel(taskType, tierOverride) {
+  const tier = resolveTier(taskType, tierOverride);
   return MODELS[tier];
 }

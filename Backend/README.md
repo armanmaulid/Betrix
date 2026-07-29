@@ -57,7 +57,10 @@ Backend/
 │   │   ├── rateLimitPerUser.js
 │   │   └── requestLogger.js   # Log tiap request + request ID
 │   ├── routes/                # auth, chat, market, news, messages, admin, activity, usage, health
-│   ├── services/               # Semua business logic & akses data (session, credit, device, email, dst)
+│   ├── services/              # Semua business logic & akses data
+│   │   ├── mt5Client.js       # WebSocket & REST bridge ke EA MT5 (Market Data)
+│   │   ├── symbolStore.js     # Logic sinkronisasi & auto-retry MT5 symbol ke DB
+│   │   └── ...                # (session, credit, device, email, aiClient, dll)
 │   └── utils/                  # csv export, logger, device fingerprint, startup banner, dll
 ├── package.json
 └── README.md
@@ -152,6 +155,7 @@ Tabel utama (dibuat via `src/db/migrate.js`, migrasi bersifat idempotent/additiv
 | `message_notification_preferences` | Preferensi notifikasi email per user |
 | `news_articles` | Cache artikel berita (RSS fetcher) |
 | `credit_transactions` | Ledger mutasi credit (potong, refund, top-up admin) |
+| `broker_symbols` | Daftar semua simbol yang ditarik secara dinamis dari MT5 Bridge saat startup backend |
 
 ---
 
@@ -225,6 +229,7 @@ Dijalankan otomatis saat `server.js` start (interval, bukan cron eksternal):
 | Job | Interval | Fungsi |
 |---|---|---|
 | Cleanup expired sessions/attempts/tokens/usage records/old news | tiap 1 jam | Housekeeping data yang sudah kadaluarsa |
+| Cleanup cache symbol market (evict stale entries) | tiap 5 menit | Mencegah memory leak dari marketCache |
 | Fetch & simpan berita baru | tiap 1 menit | RSS fetcher → `news_articles`, broadcast lewat SSE ke subscriber |
 | Heartbeat SSE news | tiap 30 detik | Jaga koneksi `EventSource` tetap hidup |
 
@@ -293,6 +298,16 @@ GET /api/auth/me   (header auth)
 200 → { user: { id, email, name, isAdmin, status, emailVerified } }
 ```
 
+```
+POST /api/auth/resend-verification
+PUT  /api/auth/profile
+PUT  /api/auth/password
+PUT  /api/auth/email
+GET  /api/auth/sessions
+DELETE /api/auth/sessions/:fingerprint
+GET  /api/auth/me/stream   (EventSource)
+```
+
 ### Format Error
 Semua error non-2xx: `{ error: string, ...detailTambahan? }`. Tidak ada kode error terstruktur — cocokkan lewat status code + isi pesan (Bahasa Indonesia). Field tambahan yang kadang muncul: `accountStatus`, `needsVerification`, `hasActiveSession`.
 
@@ -309,8 +324,9 @@ history: max 20 disimpan, tiap content dipotong 4000 char
 `trade_reasoning` dan `market_insight` memotong 1 credit sebelum model dipanggil; kalau panggilan gagal (502), credit otomatis di-refund di backend.
 
 ```
-GET /api/history?limit=50&offset=0&taskType=&startDate=&endDate=
-GET /api/export?format=json|csv&taskType=&startDate=&endDate=
+GET /api/chat/history?limit=50&offset=0&taskType=&startDate=&endDate=
+GET /api/chat/export?format=json|csv&taskType=&startDate=&endDate=
+DELETE /api/chat/session/:sessionId
 ```
 
 ⚠️ Backend tidak melakukan sanitasi HTML di field manapun (lihat bagian Keamanan) — frontend wajib escape sendiri saat render.
@@ -319,6 +335,7 @@ GET /api/export?format=json|csv&taskType=&startDate=&endDate=
 ```
 GET /api/usage/me?days=30
 GET /api/usage/current-month
+GET /api/usage/stats?days=30     (Khusus admin)
 ```
 
 ### Messages (inbox internal)
@@ -343,6 +360,7 @@ GET /api/me/activity?page=&limit=&action=&from=&to=
 ```
 GET/PATCH /api/admin/me
 GET  /api/admin/users, /api/admin/users/:id, /api/admin/users/:id/chats
+GET  /api/admin/users/export?format=json|csv&search=&status=&role=&verified=
 POST /api/admin/users/:id/reset-password
 PUT  /api/admin/users/:id
 DELETE /api/admin/users/:id
@@ -353,7 +371,7 @@ POST /api/admin/broadcast   Body: { subject, body, recipients: 'all' | string[] 
 
 ### News
 ```
-GET /api/news?asset=usd|metal|oil|btc&limit=30&offset=0   (header auth)
+GET /api/news?asset=usd|metal|oil|btc|eco|global|crypto&limit=30&offset=0   (header auth)
 ```
 
 ### Endpoint Streaming (Real-time)
@@ -393,8 +411,9 @@ GET /api/market/stream              ?token= query, cap koneksi/user
 GET /api/market/candles             Histori OHLC — seed chart sekali, bukan polling
 GET /api/market/ticker              Snapshot harga terakhir (fallback kalau stream belum connect)
 GET /api/market/economic-calendar   Cache 6 jam
-GET /api/market/symbols             Daftar simbol didukung
+GET /api/market/symbols             Daftar simbol didukung (diambil dari tabel broker_symbols)
 ```
+> **Catatan MT5 Symbols:** Daftar simbol (`/api/market/symbols`) tidak lagi di-hardcode. Saat backend Node.js pertama kali menyala, ia akan otomatis menarik seluruh daftar simbol dari MT5 Bridge (melalui `GET /v1/symbol/list`) dan menyimpannya di tabel `broker_symbols`. Proses sinkronisasi ini sudah dilengkapi mekanisme anti-bug (sanitasi backslash JSON otomatis) dan optimasi bypass (jika jumlah simbol di database sama persis dengan MT5, *update* di-*skip*).
 
 ### Strategi integrasi KlineChart (real-time, tanpa polling)
 

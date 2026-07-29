@@ -43,6 +43,34 @@ export async function fetchCandles(symbol: string, timeframe: string, count = 20
 }
 
 
+export interface BrokerSymbol {
+  symbol: string;
+  description: string;
+  category: string;
+  path: string;
+  trade_mode: number;
+}
+
+const symbolsCache = { data: [] as BrokerSymbol[], timestamp: 0 };
+
+export async function fetchBrokerSymbols(): Promise<BrokerSymbol[]> {
+  if (symbolsCache.data.length > 0 && Date.now() - symbolsCache.timestamp < 300000) {
+    return symbolsCache.data;
+  }
+
+  const token = localStorage.getItem("eaconsole.sessionToken");
+  const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
+  const res = await fetch(`${BACKEND_URL}/api/market/symbols`, { headers });
+  
+  if (!res.ok) {
+     return [];
+  }
+  const data = await res.json();
+  symbolsCache.data = data.symbols || [];
+  symbolsCache.timestamp = Date.now();
+  return symbolsCache.data;
+}
+
 export interface CalendarEvent {
   time: string; // ISO 8601, trade server time
   country: string; // ISO alpha-2, e.g. "US", "EU"

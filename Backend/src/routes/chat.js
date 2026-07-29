@@ -10,6 +10,7 @@ import { pool } from "../db/pool.js";
 import { escapeCsvField } from "../utils/csv.js";
 import { requireCredits } from "../middleware/credits.js";
 import { refundCredits } from "../services/creditStore.js";
+import { TASK_TIER_MAP } from "../config/models.js";
 
 const router = Router();
 
@@ -46,17 +47,30 @@ const VALID_TASK_TYPES = [
   "classify_signal",
 ];
 
+// Biaya kredit per tier model (bukan lagi flat 1 kredit utk sebagian taskType saja).
+const TIER_CREDIT_COST = { cheap: 1, balanced: 3, deep: 5 };
+const VALID_TIERS = ["cheap", "balanced", "deep"];
+
+// FEATURE: tier bisa di-override manual dari dropdown Agent (Lite/Balanced/Deep)
+// di command box kalau toggle "Optimize" user matikan (frontend baru kirim
+// req.body.tier kalau override aktif). Kalau tidak ada override, fallback ke
+// pemetaan otomatis per taskType seperti sebelumnya. Tier yang dihitung di sini
+// disimpan di req.resolvedTier supaya handler /chat dan /chat/stream memakai
+// tier yang PERSIS SAMA buat panggil model -- jangan sampai user di-charge
+// utk tier "deep" tapi yang benar2 jalan malah "balanced".
 const checkChatCredits = (req, res, next) => {
-  const taskType = req.body.taskType || req.query.taskType;
-  if (taskType === "trade_reasoning" || taskType === "market_insight") {
-    return requireCredits(1, "chart_analysis")(req, res, next);
-  }
-  next();
+  const taskType = req.body.taskType || req.query.taskType || "faq";
+  const requestedTier = req.body.tier;
+  const tier = requestedTier && VALID_TIERS.includes(requestedTier)
+    ? requestedTier
+    : (TASK_TIER_MAP[taskType] || "balanced");
+  req.resolvedTier = tier;
+  return requireCredits(TIER_CREDIT_COST[tier], `chat_${tier}`)(req, res, next);
 };
 
 // POST /api/chat
 router.post("/chat", requireAuth, perUserLimiter, checkChatCredits, async (req, res) => {
-  const { taskType, message, history = [], sessionId } = req.body;
+  const { taskType, message, displayMessage, history = [], sessionId } = req.body;
 
   if (!message || typeof message !== "string") {
     return res.status(400).json({ error: "'message' wajib diisi (string)" });
@@ -69,7 +83,7 @@ router.post("/chat", requireAuth, perUserLimiter, checkChatCredits, async (req, 
   const messages = [...cleanHistory, { role: "user", content: message.substring(0, 4000) }];
 
   try {
-    const result = await routeAndCall({ taskType: taskType || "faq", messages });
+    const result = await routeAndCall({ taskType: taskType || "faq", messages, tier: req.resolvedTier });
 
     logMetrics({
       type: "chat_completion",
@@ -104,7 +118,7 @@ router.post("/chat", requireAuth, perUserLimiter, checkChatCredits, async (req, 
       sessionId: sessionId || null,
       taskType: taskType || "faq",
       modelUsed: result.modelUsed,
-      message,
+      message: displayMessage || message,
       reply: result.text,
       latencyMs: result.latencyMs,
       usage: result.usage,
@@ -128,7 +142,7 @@ router.post("/chat", requireAuth, perUserLimiter, checkChatCredits, async (req, 
 
 // POST /api/chat/stream
 router.post("/chat/stream", requireAuth, perUserLimiter, checkChatCredits, async (req, res) => {
-  const { taskType, message, history = [], sessionId } = req.body;
+  const { taskType, message, displayMessage, history = [], sessionId } = req.body;
 
   if (!message || typeof message !== "string") {
     return res.status(400).json({ error: "'message' wajib diisi (string)" });
@@ -152,6 +166,7 @@ router.post("/chat/stream", requireAuth, perUserLimiter, checkChatCredits, async
     const result = await routeAndStream({
       taskType: taskType || "faq",
       messages,
+      tier: req.resolvedTier,
       signal: controller.signal,
       onToken: (token) => {
         res.write(`data: ${JSON.stringify({ token })}\n\n`);
@@ -193,7 +208,7 @@ router.post("/chat/stream", requireAuth, perUserLimiter, checkChatCredits, async
       sessionId: sessionId || null,
       taskType: taskType || "faq",
       modelUsed: result.modelUsed,
-      message,
+      message: displayMessage || message,
       reply: result.text,
       latencyMs: result.latencyMs,
       usage: result.usage,

@@ -60,6 +60,8 @@ const MIGRATIONS = [
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS credits INTEGER NOT NULL DEFAULT 100;`,
   `CREATE TABLE IF NOT EXISTS credit_transactions ( id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE, amount INTEGER NOT NULL, action TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT now() );`,
   `CREATE INDEX IF NOT EXISTS idx_credit_transactions_user_id ON credit_transactions(user_id);`,
+  `CREATE TABLE IF NOT EXISTS broker_symbols ( symbol TEXT PRIMARY KEY, description TEXT, path TEXT, category TEXT, trade_mode INTEGER, is_active BOOLEAN DEFAULT true, created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now() );`,
+  `CREATE INDEX IF NOT EXISTS idx_broker_symbols_category ON broker_symbols(category);`
 ];
 
 const isTTY = Boolean(process.stdout.isTTY);

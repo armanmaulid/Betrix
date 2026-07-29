@@ -3,6 +3,7 @@ import rateLimit from "express-rate-limit";
 import { latestPrices, fetchMt5History, subscribeToSymbol, addPriceListener, removePriceListener } from "../services/mt5Client.js";
 import { requireAuth } from "../middleware/auth.js";
 import { validateSession } from "../services/sessionStore.js";
+import { getSymbolsFromDb } from "../services/symbolStore.js";
 import { logger } from "../utils/logger.js";
 
 const router = Router();
@@ -10,32 +11,14 @@ const router = Router();
 const marketCache = new Map();
 const CACHE_TTL_MS = 2000; // 2 seconds default
 
-const HARDCODED_SYMBOLS = [
-  { symbol: "EURUSD", name: "Euro vs US Dollar", category: "Forex" },
-  { symbol: "GBPUSD", name: "Great Britain Pound vs US Dollar", category: "Forex" },
-  { symbol: "USDJPY", name: "US Dollar vs Japanese Yen", category: "Forex" },
-  { symbol: "USDCHF", name: "US Dollar vs Swiss Franc", category: "Forex" },
-  { symbol: "USDCAD", name: "US Dollar vs Canadian Dollar", category: "Forex" },
-  { symbol: "AUDUSD", name: "Australian Dollar vs US Dollar", category: "Forex" },
-  { symbol: "NZDUSD", name: "New Zealand Dollar vs US Dollar", category: "Forex" },
-  { symbol: "XAUUSD", name: "Gold vs US Dollar", category: "Metals" },
-  { symbol: "XAGUSD", name: "Silver vs US Dollar", category: "Metals" },
-  { symbol: "XTIUSD", name: "WTI Crude Oil", category: "Commodities" },
-  { symbol: "USOIL", name: "US Oil", category: "Commodities" },
-  { symbol: "BTCUSD", name: "Bitcoin vs US Dollar", category: "Crypto" },
-  { symbol: "ETHUSD", name: "Ethereum vs US Dollar", category: "Crypto" }
-];
 
-async function getMt5SymbolsCached() {
-  return { count: HARDCODED_SYMBOLS.length, symbols: HARDCODED_SYMBOLS };
-}
 
 // Helper: Deteksi apakah simbol sedang libur akhir pekan
 async function isMarketClosed(symbol) {
   try {
-    const symbolsData = await getMt5SymbolsCached();
+    const symbolsData = await getSymbolsFromDb();
     const symInfo = symbolsData.symbols.find(s => s.symbol === symbol);
-    if (symInfo && symInfo.category.toLowerCase().includes("crypto")) {
+    if (symInfo && ((symInfo.category || "").toLowerCase().includes("crypto") || (symInfo.path || "").toLowerCase().includes("crypto"))) {
       return false; // Crypto buka 24/7
     }
   } catch (err) {
@@ -450,16 +433,14 @@ router.get("/economic-calendar", async (req, res) => {
 
 router.get("/symbols", async (req, res) => {
   try {
-    const symbols = await getMt5SymbolsCached();
+    const symbols = await getSymbolsFromDb();
     res.json(symbols);
   } catch (err) {
     // FIX (bug nyata): sebelumnya catch block ini mereferensikan
     // `cachedSymbols` yang TIDAK PERNAH dideklarasikan di file ini —
-    // kalau getMt5SymbolsCached() benar-benar throw, baris `if (cachedSymbols)`
+    // kalau getSymbolsFromDb() benar-benar throw, baris `if (cachedSymbols)`
     // sendiri akan throw ReferenceError (bukan fallback stale-serve yang
     // dimaksud), menutupi error asli dengan error yang membingungkan.
-    // Simbol saat ini hardcoded (tidak pernah benar-benar fetch/throw),
-    // jadi cukup log + response error yang jelas tanpa fallback semu.
     logger.error("[GET /api/market/symbols] error", { error: err.message });
     res.status(500).json({ error: "Gagal memuat katalog simbol" });
   }

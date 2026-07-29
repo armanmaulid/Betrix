@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { useEffect } from "react";
 import { AuthProvider } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { LoginPage } from "./pages/LoginPage";
@@ -10,6 +11,19 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { NewsPage } from "./pages/NewsPage";
 
 export function App() {
+  useEffect(() => {
+    const disableEvent = (e: Event) => e.preventDefault();
+    document.addEventListener("contextmenu", disableEvent);
+    document.addEventListener("copy", disableEvent);
+    document.addEventListener("paste", disableEvent);
+    
+    return () => {
+      document.removeEventListener("contextmenu", disableEvent);
+      document.removeEventListener("copy", disableEvent);
+      document.removeEventListener("paste", disableEvent);
+    };
+  }, []);
+
   return (
     <AuthProvider>
       <BrowserRouter>

@@ -2,9 +2,11 @@ const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 export async function streamChat(
   message: string,
+  displayMessage: string,
   history: any[],
   taskType: string,
   sessionId: string,
+  tier: string | undefined,
   onToken: (token: string) => void,
   onDone: (result: any) => void,
   onError: (error: string) => void
@@ -17,7 +19,7 @@ export async function streamChat(
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ message, history, taskType, sessionId })
+      body: JSON.stringify({ message, displayMessage, history, taskType, sessionId, tier })
     });
 
     if (!res.ok) {
@@ -61,7 +63,7 @@ export async function streamChat(
               const chars = data.token.split('');
               for (const char of chars) {
                 onToken(char);
-                await new Promise(r => setTimeout(r, 20)); // 20ms per char for pronounced terminal effect
+                await new Promise(r => setTimeout(r, 5)); // 5ms per char for faster terminal effect
               }
             } else if (data.error) {
               onError(data.error);

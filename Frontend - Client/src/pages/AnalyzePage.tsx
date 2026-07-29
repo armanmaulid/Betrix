@@ -8,7 +8,6 @@ import {
   Leaf, 
   Globe, 
   Sparkles, 
-  CheckSquare, 
   Paperclip, 
   ArrowRight,
   ChevronDown,
@@ -26,6 +25,113 @@ import {
 import { NewsFeed } from "../components/analysis/NewsFeed";
 import { EconomicCalendar } from "../components/analysis/EconomicCalendar";
 import { streamChat, getChatHistory, deleteChatSession } from "../api/chatClient";
+import { fetchCandles, type Candle, fetchBrokerSymbols, type BrokerSymbol } from "../api/marketClient";
+import { getNews, type NewsItem } from "../api/newsClient";
+import ReactMarkdown from "react-markdown";
+
+// Styling elemen Markdown supaya senada dengan tema terminal gelap Betrix
+// (aksen orange #ff9900, border #222/#333) alih-alih default browser polos.
+const markdownComponents = {
+  h1: (props: any) => <h3 className="text-[13px] font-bold text-[#ff9900] mt-3 mb-1.5 first:mt-0" {...props} />,
+  h2: (props: any) => <h3 className="text-[13px] font-bold text-[#ff9900] mt-3 mb-1.5 first:mt-0" {...props} />,
+  h3: (props: any) => <h4 className="text-[12px] font-bold text-[#ff9900] mt-2.5 mb-1 first:mt-0" {...props} />,
+  p: (props: any) => <p className="text-[12px] leading-relaxed text-[#eee] mb-2 last:mb-0" {...props} />,
+  strong: (props: any) => <strong className="font-bold text-white" {...props} />,
+  em: (props: any) => <em className="italic text-[#ccc]" {...props} />,
+  ul: (props: any) => <ul className="list-disc list-outside pl-4 mb-2 space-y-0.5 text-[12px] text-[#eee]" {...props} />,
+  ol: (props: any) => <ol className="list-decimal list-outside pl-4 mb-2 space-y-0.5 text-[12px] text-[#eee]" {...props} />,
+  li: (props: any) => <li className="leading-relaxed" {...props} />,
+  hr: () => <hr className="border-t border-[#333] my-3" />,
+  code: (props: any) => <code className="bg-[#1a1a1a] border border-[#333] rounded-sm px-1 py-0.5 text-[11px] text-[#ff9900]" {...props} />,
+  blockquote: (props: any) => <blockquote className="border-l-2 border-[#ff9900] pl-3 text-[#aaa] italic my-2" {...props} />,
+};
+
+// Command instrumen yang men-trigger fetch data realtime MT5 (lihat mt5Client.js
+// dan GET /api/market/candles di backend). Simbol diambil dari kata setelah command,
+// mis. "/forex xauusd analisa ..." -> symbol=XAUUSD.
+const INSTRUMENT_COMMANDS = ["forex", "crypto", "stock", "etf", "bond", "index", "futures"];
+const TIMEFRAME_PATTERN = /\b(M1|M5|M15|M30|H1|H4|D1|W1|MN1)\b/i;
+
+interface ParsedInstrumentCommand {
+  symbol: string;
+  timeframe: string;
+}
+
+function parseInstrumentCommand(text: string): ParsedInstrumentCommand | null {
+  const match = text.trim().match(/^\/(\w+)\s+(\S+)/);
+  if (!match) return null;
+  const [, cmd, symbolRaw] = match;
+  if (!INSTRUMENT_COMMANDS.includes(cmd.toLowerCase())) return null;
+  const tfMatch = text.match(TIMEFRAME_PATTERN);
+  return {
+    symbol: symbolRaw.toUpperCase(),
+    timeframe: tfMatch ? tfMatch[1].toUpperCase() : "M15", // default M15 kalau timeframe tidak disebut
+  };
+}
+
+// Susun prompt berisi data candle asli dari MT5 + instruksi format jawaban (Entry/SL/TP1-3
+// + alasan + alternate entry), supaya LLM menjawab berbasis data nyata, bukan mengarang harga.
+function buildTradeAnalysisPrompt(instrument: ParsedInstrumentCommand, candles: Candle[], originalText: string): string {
+  if (!candles || candles.length === 0) {
+    return `[DATA PASAR TIDAK TERSEDIA]\nData candle ${instrument.symbol} (${instrument.timeframe}) kosong/gagal diambil dari MT5 bridge. Beritahu user datanya sedang tidak tersedia, JANGAN mengarang harga.\n\n[PERMINTAAN USER]\n${originalText}`;
+  }
+
+  const recent = candles.slice(-100);
+  const detail = recent.slice(-20); // detail candle dibatasi supaya prompt tidak kepanjangan
+  const currentPrice = recent[recent.length - 1].close;
+  const rangeHigh = Math.max(...recent.map(c => c.high));
+  const rangeLow = Math.min(...recent.map(c => c.low));
+
+  const candleLines = detail.map(c => {
+    const t = new Date(c.time * 1000).toISOString().slice(5, 16).replace("T", " ");
+    return `${t} O:${c.open} H:${c.high} L:${c.low} C:${c.close}`;
+  }).join("\n");
+
+  return [
+    `[DATA PASAR REALTIME - MT5]`,
+    `Symbol: ${instrument.symbol} | Timeframe: ${instrument.timeframe}`,
+    `Harga terkini: ${currentPrice}`,
+    `Range ${recent.length} candle terakhir: High ${rangeHigh} / Low ${rangeLow}`,
+    `${detail.length} candle terbaru (waktu UTC, terlama -> terbaru):`,
+    candleLines,
+    ``,
+    `[INSTRUKSI FORMAT JAWABAN]`,
+    `Wajib sertakan: Entry, Stop Loss (SL), Take Profit 1/2/3 (TP1, TP2, TP3), alasan teknikal berbasis data di atas, dan alternate entry kalau entry utama gagal atau kena SL. Gunakan HANYA data di atas, jangan mengarang harga yang tidak ada di data.`,
+    ``,
+    `[PERMINTAAN USER]`,
+    originalText,
+  ].join("\n");
+}
+
+// Cermin dari TASK_TIER_MAP + TIER_CREDIT_COST di backend (config/models.js,
+// routes/chat.js) -- cuma dipakai buat nampilin estimasi biaya kredit di UI,
+// bukan sumber kebenaran (backend yang benar-benar motong kreditnya).
+const FRONTEND_TASK_TIER_MAP: Record<string, "cheap" | "balanced" | "deep"> = {
+  faq: "cheap",
+  classify_signal: "cheap",
+  quick_summary: "balanced",
+  market_insight: "balanced",
+  trade_reasoning: "deep",
+  risk_narrative: "deep",
+};
+const TIER_CREDIT_COST: Record<string, number> = { cheap: 1, balanced: 3, deep: 5 };
+const AGENT_TIER_LABEL: Record<"cheap" | "balanced" | "deep", string> = { cheap: "Lite", balanced: "Balanced", deep: "Deep" };
+// EQUITY memakai "global" sebagai proxy terdekat karena backend belum punya tag khusus
+// saham/equity. NEWS gabung usd+metal+oil sebagai proxy "USD, METAL, OIL, ENERGY" --
+// backend belum punya tag "energy" terpisah (kategori yang ada cuma: usd, metal, oil,
+// btc, eco, global, crypto -- lihat VALID_ASSETS di routes/news.js), jadi OIL dipakai
+// rangkap sebagai proxy energy juga. AUTO sengaja tidak dipetakan = tidak ada injeksi berita.
+const TAB_TO_NEWS_ASSETS: Record<string, string[] | undefined> = {
+  EQUITY: ["global"],
+  MACRO: ["eco"],
+  NEWS: ["usd", "metal", "oil"],
+};
+
+function buildNewsContextPrefix(tab: string, items: NewsItem[]): string {
+  if (items.length === 0) return "";
+  const lines = items.slice(0, 5).map(n => `- [${n.source}] ${n.title}`).join("\n");
+  return `[BERITA TERBARU - mode ${tab}]\n${lines}\n\n`;
+}
 
 export function AnalyzePage() {
   const { user } = useAuth();
@@ -42,6 +148,18 @@ export function AnalyzePage() {
   const [recentSessions, setRecentSessions] = useState<any[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
+  // Agent tier (Lite=cheap/Balanced/Deep) dipakai sebagai override manual kalau
+  // Optimize dimatikan. Default "cheap" match label "Lite" yang sebelumnya hardcoded di UI.
+  const [agentTier, setAgentTier] = useState<"cheap" | "balanced" | "deep">("cheap");
+  const [showAgentMenu, setShowAgentMenu] = useState(false);
+  const agentMenuRef = useRef<HTMLDivElement>(null);
+  // ON (default) = tier dipilih otomatis dari taskType (perilaku lama, non-breaking).
+  // OFF = paksa pakai agentTier yang dipilih manual di dropdown, apa pun taskType-nya.
+  const [optimizeEnabled, setOptimizeEnabled] = useState(true);
+  // Belum ada integrasi search provider di backend -- toggle ini disimpan
+  // tapi sengaja BELUM dikirim ke backend sampai provider-nya diputuskan.
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const [allBrokerSymbols, setAllBrokerSymbols] = useState<BrokerSymbol[]>([]);
 
   const shortcuts = [
     { cmd: "/stock", desc: "stocks" },
@@ -74,7 +192,7 @@ export function AnalyzePage() {
     }
   ];
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!inputText.trim() || isStreaming) return;
     
     const text = inputText;
@@ -82,7 +200,7 @@ export function AnalyzePage() {
     setView('chat');
     setIsStreaming(true);
 
-    // 1. Add user message and a loading agent message
+    // 1. Add user message (apa yang diketik user apa adanya) dan loading agent message
     setMessages(prev => [
       ...prev, 
       { role: 'user', content: text },
@@ -94,7 +212,88 @@ export function AnalyzePage() {
       role: m.role,
       content: m.content || ""
     }));
-    const taskType = symbol ? "market_insight" : "faq";
+
+    // 3. Deteksi command instrumen (mis. "/forex xauusd analisa... M15") -> ambil data
+    //    candle realtime dari MT5. Terpisah (tidak saling meniadakan): kalau tab
+    //    EQUITY/MACRO/NEWS lagi aktif, konteks berita kategori itu JUGA disisipkan --
+    //    jadi command instrumen + tab berita bisa jalan bareng buat analisa yang
+    //    mempertimbangkan data teknikal MT5 sekaligus sentimen berita.
+    //    Bubble chat tetap menampilkan `text` asli; yang dikirim ke backend (messageToSend)
+    //    sudah diperkaya dengan data/berita supaya jawaban LLM berbasis data nyata.
+    let taskType = symbol ? "market_insight" : "faq";
+    let messageToSend = text;
+
+    const instrument = parseInstrumentCommand(text);
+    const tabAssets = TAB_TO_NEWS_ASSETS[activeTab];
+
+    let newsPrefix = "";
+    if (tabAssets) {
+      try {
+        const token = localStorage.getItem("eaconsole.sessionToken") || "";
+        const newsLists = await Promise.all(
+          tabAssets.map(asset => getNews(token, { asset, limit: 3 }).catch(() => [] as NewsItem[]))
+        );
+        const merged = newsLists.flat().sort(
+          (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
+        );
+        newsPrefix = buildNewsContextPrefix(activeTab, merged);
+      } catch (err) {
+        // Gagal ambil berita bukan alasan buat nge-block chat -- lanjut tanpa konteks tambahan
+        console.error("Failed to fetch news context:", err);
+      }
+    }
+
+    if (instrument) {
+      taskType = "trade_reasoning";
+      let isInstrumentValid = true;
+      let invalidReason = "";
+
+      if (allBrokerSymbols.length > 0) {
+        const cmdMatch = text.trim().match(/^\/(\w+)\s/);
+        const cmd = cmdMatch ? cmdMatch[1].toLowerCase() : "";
+        let expectedCategoryTokens: string[] = [];
+        if (cmd === "forex") expectedCategoryTokens = ["forex"];
+        else if (cmd === "crypto") expectedCategoryTokens = ["crypto"];
+        else if (cmd === "stock") expectedCategoryTokens = ["stock", "equity"];
+        else if (cmd === "etf") expectedCategoryTokens = ["etf", "fund"];
+        else if (cmd === "bond") expectedCategoryTokens = ["bond"];
+        else if (cmd === "index") expectedCategoryTokens = ["index", "indices"];
+        else if (cmd === "futures") expectedCategoryTokens = ["commodity", "commodities", "futures", "energy", "metal"];
+
+        const foundSymbol = allBrokerSymbols.find(s => s.symbol.toUpperCase() === instrument.symbol);
+        
+        if (!foundSymbol) {
+          isInstrumentValid = false;
+          invalidReason = `Simbol ${instrument.symbol} tidak ditemukan di platform broker saat ini. Minta user untuk mengetik '/${cmd} ' dan melihat popover suggestion untuk daftar simbol yang didukung broker.`;
+        } else {
+          const cat = (foundSymbol.category || "").toLowerCase();
+          const path = (foundSymbol.path || "").toLowerCase();
+          const isValidCategory = expectedCategoryTokens.length === 0 || expectedCategoryTokens.some(t => cat.includes(t) || path.includes(t));
+          if (!isValidCategory) {
+            isInstrumentValid = false;
+            invalidReason = `Simbol ${instrument.symbol} memang ada di broker, tetapi itu BUKAN instrumen ${cmd} (kategori aslinya adalah '${foundSymbol.category || "Unknown"}'). Minta user untuk menggunakan command yang sesuai (misalnya /stock atau /crypto).`;
+          }
+        }
+      }
+
+      if (!isInstrumentValid) {
+        messageToSend = `[KESALAHAN INPUT USER]\nUser mencoba menggunakan command instrumen namun simbolnya tidak valid. Beritahu user: ${invalidReason}\n\n[PERMINTAAN USER]\n${text}`;
+      } else {
+        try {
+          const candles = await fetchCandles(instrument.symbol, instrument.timeframe, 100);
+          messageToSend = newsPrefix + buildTradeAnalysisPrompt(instrument, candles, text);
+        } catch (err: any) {
+          messageToSend = newsPrefix + `[DATA PASAR TIDAK TERSEDIA: ${err?.message || "gagal mengambil data MT5"}]\n\nUser meminta analisa ${instrument.symbol} (${instrument.timeframe}) tapi data MT5 gagal diambil. Beritahu user datanya sedang tidak tersedia, JANGAN mengarang harga.\n\n[PERMINTAAN USER]\n${text}`;
+        }
+      }
+    } else if (tabAssets) {
+      taskType = "market_insight";
+      messageToSend = newsPrefix + text;
+    }
+
+    // Tier override manual: cuma dikirim kalau Optimize dimatikan; kalau ON,
+    // biarkan backend pilih tier otomatis dari taskType seperti biasa.
+    const tierOverride = optimizeEnabled ? undefined : agentTier;
 
     let activeSessionId = currentSessionId;
     if (!activeSessionId) {
@@ -102,7 +301,7 @@ export function AnalyzePage() {
       setCurrentSessionId(activeSessionId);
     }
 
-    // 3. Optimistically update RECENT SESSIONS immediately
+    // 4. Optimistically update RECENT SESSIONS immediately
     setRecentSessions(prev => {
       if (prev.find(s => s.session_id === activeSessionId)) return prev;
       return [
@@ -116,12 +315,14 @@ export function AnalyzePage() {
       ].slice(0, 5);
     });
 
-    // 4. Connect to backend stream
+    // 5. Connect to backend stream
     streamChat(
-      text, 
+      messageToSend, 
+      text,
       chatHistory, 
       taskType,
       activeSessionId,
+      tierOverride,
       (token) => {
         // Append token to the last message (must clone object for React to re-render)
         setMessages(prev => {
@@ -146,7 +347,7 @@ export function AnalyzePage() {
             ...last,
             thinkingTime: `${(result.latencyMs / 1000).toFixed(1)}s`,
             tools: result.modelUsed,
-            cost: taskType === "market_insight" ? "-1.0 CRD" : undefined
+            cost: `-${TIER_CREDIT_COST[tierOverride || FRONTEND_TASK_TIER_MAP[taskType] || "balanced"]}.0 CRD`
           };
           return newMsgs;
         });
@@ -176,6 +377,17 @@ export function AnalyzePage() {
     }
   }, [messages, view]);
 
+  useEffect(() => {
+    if (!showAgentMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (agentMenuRef.current && !agentMenuRef.current.contains(e.target as Node)) {
+        setShowAgentMenu(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showAgentMenu]);
+
   const fetchHistory = () => {
     getChatHistory(5).then(res => {
       if (res && res.data) {
@@ -189,6 +401,10 @@ export function AnalyzePage() {
       fetchHistory();
     }
   }, [view]);
+
+  useEffect(() => {
+    fetchBrokerSymbols().then(setAllBrokerSymbols).catch(console.error);
+  }, []);
 
   const loadSession = (session: any) => {
     setCurrentSessionId(session.session_id);
@@ -248,10 +464,47 @@ export function AnalyzePage() {
     return `${days}d ago`;
   };
 
-  const showCommands = inputText.startsWith('/');
-  const filteredShortcuts = inputText.length > 1 
+  const showCommands = inputText.startsWith('/') && !inputText.includes(' ');
+  const filteredShortcuts = inputText.length > 1 && showCommands
     ? shortcuts.filter(s => s.cmd.toLowerCase().includes(inputText.toLowerCase().trim()))
     : shortcuts;
+
+  // Autocomplete simbol MT5
+  let suggestedSymbols: BrokerSymbol[] = [];
+  let symbolSearchPrefix = "";
+  const symbolMatch = inputText.match(/^\/(\w+)\s+(\S*)$/);
+  if (symbolMatch && INSTRUMENT_COMMANDS.includes(symbolMatch[1].toLowerCase())) {
+    const cmd = symbolMatch[1].toLowerCase();
+    const query = symbolMatch[2].toLowerCase();
+    symbolSearchPrefix = `/${cmd} `;
+    
+    // Mapping command ke kategori/path MT5
+    let expectedCategoryTokens: string[] = [];
+    if (cmd === "forex") expectedCategoryTokens = ["forex"];
+    else if (cmd === "crypto") expectedCategoryTokens = ["crypto"];
+    else if (cmd === "stock") expectedCategoryTokens = ["stock", "equity"];
+    else if (cmd === "etf") expectedCategoryTokens = ["etf", "fund"];
+    else if (cmd === "bond") expectedCategoryTokens = ["bond"];
+    else if (cmd === "index") expectedCategoryTokens = ["index", "indices"];
+    else if (cmd === "futures") expectedCategoryTokens = ["commodity", "commodities", "futures", "energy", "metal"];
+
+    const categoryFiltered = allBrokerSymbols.filter(s => {
+      const cat = (s.category || "").toLowerCase();
+      const path = (s.path || "").toLowerCase();
+      return expectedCategoryTokens.length === 0 || expectedCategoryTokens.some(t => cat.includes(t) || path.includes(t));
+    });
+
+    if (query) {
+      suggestedSymbols = categoryFiltered
+        .filter(s => 
+          s.symbol.toLowerCase().includes(query) || 
+          (s.description && s.description.toLowerCase().includes(query))
+        )
+        .slice(0, 10);
+    } else {
+      suggestedSymbols = categoryFiltered.slice(0, 10);
+    }
+  }
 
   const renderCommandBox = (isChat = false) => (
     <div 
@@ -301,6 +554,31 @@ export function AnalyzePage() {
           </div>
         )}
 
+        {/* SYMBOL POPOVER */}
+        {symbolSearchPrefix && suggestedSymbols.length > 0 && (
+          <div className="absolute bottom-full left-10 mb-2 w-72 bg-[#0a0a0a] border border-[#333] shadow-2xl rounded-sm overflow-hidden z-50">
+            <div className="px-3 py-1.5 bg-[#111] border-b border-[#222] text-[9px] font-bold text-[#777] uppercase tracking-wider">
+              Suggested Symbols
+            </div>
+            <div className="flex flex-col max-h-48 overflow-y-auto">
+              {suggestedSymbols.map((s, i) => (
+                <button 
+                  key={s.symbol}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setInputText(symbolSearchPrefix + s.symbol + " ");
+                    inputRef.current?.focus();
+                  }}
+                  className={`flex items-center justify-between px-3 py-2 text-left hover:bg-[#1a1a1a] transition-colors ${i !== suggestedSymbols.length - 1 ? 'border-b border-[#111]' : ''}`}
+                >
+                  <span className="text-[#00ffff] font-bold text-[11px]">{s.symbol}</span>
+                  <span className="text-[#666] text-[10px] truncate max-w-[140px] text-right" title={s.description}>{s.description}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <span className="text-[#ff9900] font-bold text-lg leading-none mt-1">{'>'}</span>
         <textarea 
           ref={inputRef}
@@ -323,10 +601,18 @@ export function AnalyzePage() {
           className="flex-1 bg-transparent outline-none ring-0 border-none focus:outline-none focus:ring-0 focus:border-transparent text-[#eee] placeholder-[#555] text-[14px] resize-none overflow-y-auto min-h-[24px] max-h-[120px] leading-relaxed py-1 disabled:opacity-40 disabled:cursor-not-allowed"
         />
         <div className="flex items-center gap-1.5 self-end pb-1">
-          <button className="p-1 bg-[#00ff99] text-black hover:opacity-80 rounded-sm transition-opacity">
+          <button
+            onClick={() => { setAgentTier("cheap"); setOptimizeEnabled(false); }}
+            title="Mode Lite (respons cepat, kredit paling murah)"
+            className={`p-1 rounded-sm transition-opacity hover:opacity-80 ${!optimizeEnabled && agentTier === "cheap" ? "bg-[#00ff99] text-black" : "bg-[#00ff99]/30 text-[#00ff99]"}`}
+          >
             <Leaf size={14} />
           </button>
-          <button className="p-1 bg-[#00ffff] text-black hover:opacity-80 rounded-sm transition-opacity">
+          <button
+            onClick={() => setWebSearchEnabled(v => !v)}
+            title="Search Web (belum aktif di backend, lihat catatan tim)"
+            className={`p-1 rounded-sm transition-opacity hover:opacity-80 ${webSearchEnabled ? "bg-[#00ffff] text-black" : "bg-[#00ffff]/30 text-[#00ffff]"}`}
+          >
             <Globe size={14} />
           </button>
         </div>
@@ -337,18 +623,38 @@ export function AnalyzePage() {
         <span className="text-[10px] text-[#555]">Type <span className="text-[#888]">/</span> for commands</span>
         
         <div className="flex items-center gap-1.5">
-          <button className="flex items-center gap-1 border border-[#333] px-2 py-0.5 text-[10px] text-[#888] hover:text-[#ccc] hover:border-[#555] rounded-sm transition-colors">
+          <button
+            onClick={() => setOptimizeEnabled(v => !v)}
+            title={optimizeEnabled ? "Optimize aktif: tier model dipilih otomatis" : "Optimize mati: pakai tier manual dari dropdown Agent"}
+            className={`flex items-center gap-1 border px-2 py-0.5 text-[10px] rounded-sm transition-colors ${optimizeEnabled ? "border-[#ff9900] text-[#ff9900]" : "border-[#333] text-[#888] hover:text-[#ccc] hover:border-[#555]"}`}
+          >
             <Sparkles size={11} />
             Optimize
           </button>
-          <button className="flex items-center gap-1 border border-[#333] px-2 py-0.5 text-[10px] text-[#888] hover:text-[#ccc] hover:border-[#555] rounded-sm transition-colors">
-            <CheckSquare size={11} />
-            Approve Trades
-          </button>
-          <button className="flex items-center gap-1 border border-[#333] px-2 py-0.5 text-[10px] text-[#888] hover:text-[#ccc] hover:border-[#555] rounded-sm transition-colors">
-            Agent : <span className="text-[#00ffff]">Lite</span>
-            <ChevronDown size={10} className="ml-0.5" />
-          </button>
+          <div className="relative" ref={agentMenuRef}>
+            <button
+              onClick={() => setShowAgentMenu(v => !v)}
+              title={optimizeEnabled ? "Optimize aktif -- matikan dulu untuk pakai tier manual ini" : "Pilih tier model manual"}
+              className="flex items-center gap-1 border border-[#333] px-2 py-0.5 text-[10px] text-[#888] hover:text-[#ccc] hover:border-[#555] rounded-sm transition-colors"
+            >
+              Agent : <span className={optimizeEnabled ? "text-[#666]" : "text-[#00ffff]"}>{AGENT_TIER_LABEL[agentTier]}</span>
+              <ChevronDown size={10} className="ml-0.5" />
+            </button>
+            {showAgentMenu && (
+              <div className="absolute bottom-full right-0 mb-1 w-36 bg-[#111] border border-[#333] rounded-sm shadow-lg z-10 overflow-hidden">
+                {(["cheap", "balanced", "deep"] as const).map(tier => (
+                  <button
+                    key={tier}
+                    onClick={() => { setAgentTier(tier); setOptimizeEnabled(false); setShowAgentMenu(false); }}
+                    className={`flex w-full items-center justify-between px-2 py-1.5 text-[10px] hover:bg-[#1a1a1a] transition-colors ${agentTier === tier ? "text-[#00ffff]" : "text-[#888]"}`}
+                  >
+                    {AGENT_TIER_LABEL[tier]}
+                    <span className="text-[#555]">{TIER_CREDIT_COST[tier]} CRD</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <button className="p-1 text-[#666] hover:text-[#ccc] transition-colors ml-1">
             <Paperclip size={14} />
           </button>
@@ -530,12 +836,12 @@ export function AnalyzePage() {
                           <ChevronRight size={12} className="text-[#ff9900]" /> Agent Thinking
                         </div>
                         <span className="text-[#555] text-[10px] font-bold">
-                          {msg.thinkingTime} • {msg.tools} 
+                          {msg.thinkingTime} 
                           {msg.cost && <span className="ml-2 text-[#ff4444]">{msg.cost}</span>}
                         </span>
                       </div>
                       <div className="px-5 py-4 text-[#eee] leading-relaxed text-[12px]">
-                        {msg.content}
+                        <ReactMarkdown components={markdownComponents}>{msg.content}</ReactMarkdown>
                       </div>
                       <div className="flex justify-end gap-2 px-4 py-2 border-t border-[#111]">
                         <button className="flex items-center gap-1.5 border border-[#333] px-2 py-1 text-[9px] font-bold text-[#888] hover:text-white rounded-sm transition-colors">
