@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { TerminalShell } from "../components/layout/TerminalShell";
 import { useAuth } from "../context/AuthContext";
 import { updateProfile, changePassword, changeEmail, getSessions, revokeSession, type DeviceSession } from "../api/authClient";
+import { fetchUsageMe, type UsageSummary } from "../api/usageClient";
 import { 
   Settings, User, Key, Shield, Bell, Activity, Clock, 
   Users, Edit2, CheckCircle2, ShieldAlert, BadgeInfo,
@@ -11,7 +12,7 @@ import {
 type SettingsTab = "PROFILE" | "API KEY" | "SECURITY" | "NOTIFICATIONS" | "USAGE" | "LOGIN HISTORY" | "ACCOUNT";
 
 export function SettingsPage() {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const sessionToken = localStorage.getItem("eaconsole.sessionToken") || "";
   
   // Navigation State
@@ -20,11 +21,11 @@ export function SettingsPage() {
 
   // Profile States (Credentials / Profile)
   const [name, setName] = useState(user?.name || "");
-  const [phone, setPhone] = useState((user as any)?.phone || "");
-  const [address, setAddress] = useState((user as any)?.address || "");
-  const [birthdate, setBirthdate] = useState((user as any)?.birthdate ? new Date((user as any).birthdate).toISOString().split('T')[0] : "");
-  const [gender, setGender] = useState((user as any)?.gender || "");
-  const [bio, setBio] = useState((user as any)?.bio || "");
+  const [phone, setPhone] = useState(user?.phone || "");
+  const [address, setAddress] = useState(user?.address || "");
+  const [birthdate, setBirthdate] = useState(user?.birthdate ? new Date(user.birthdate).toISOString().split('T')[0] : "");
+  const [gender, setGender] = useState(user?.gender || "");
+  const [bio, setBio] = useState(user?.bio || "");
   
   // Security States
   const [currentPassword, setCurrentPassword] = useState("");
@@ -42,11 +43,29 @@ export function SettingsPage() {
   const [isLoadingSessions, setIsLoadingSessions] = useState(false);
   const [sessionToRevoke, setSessionToRevoke] = useState<string | null>(null);
 
+  // Usage State
+  const [usageSummary, setUsageSummary] = useState<UsageSummary | null>(null);
+  const [isLoadingUsage, setIsLoadingUsage] = useState(false);
+
   useEffect(() => {
     if (activeTab === "LOGIN HISTORY") {
       fetchSessions();
+    } else if (activeTab === "USAGE") {
+      fetchUsageData();
     }
   }, [activeTab]);
+
+  const fetchUsageData = async () => {
+    setIsLoadingUsage(true);
+    try {
+      const data = await fetchUsageMe(30);
+      setUsageSummary(data);
+    } catch (err: any) {
+      console.error(err);
+    } finally {
+      setIsLoadingUsage(false);
+    }
+  };
 
   const fetchSessions = async () => {
     setIsLoadingSessions(true);
@@ -64,11 +83,11 @@ export function SettingsPage() {
   useEffect(() => {
     if (user && !isEditingProfile) {
       setName(user.name || "");
-      setPhone((user as any).phone || "");
-      setAddress((user as any).address || "");
-      setBirthdate((user as any).birthdate ? new Date((user as any).birthdate).toISOString().split('T')[0] : "");
-      setGender((user as any).gender || "");
-      setBio((user as any).bio || "");
+      setPhone(user.phone || "");
+      setAddress(user.address || "");
+      setBirthdate(user.birthdate ? new Date(user.birthdate).toISOString().split('T')[0] : "");
+      setGender(user.gender || "");
+      setBio(user.bio || "");
     }
   }, [user, isEditingProfile]);
 
@@ -77,9 +96,9 @@ export function SettingsPage() {
     setIsLoading(true);
     setMessage(null);
     try {
-      await updateProfile(sessionToken, { name, phone, address, birthdate, gender, bio });
-      setMessage({ type: "success", text: "Profil berhasil diperbarui. Halaman akan dimuat ulang..." });
-      setTimeout(() => window.location.reload(), 1500);
+      const updatedUser = await updateProfile(sessionToken, { name, phone, address, birthdate, gender, bio });
+      if (setUser) setUser(updatedUser);
+      setMessage({ type: "success", text: "Profil berhasil diperbarui." });
     } catch (err: any) {
       setMessage({ type: "error", text: err.message || "Terjadi kesalahan" });
     } finally {
@@ -160,7 +179,9 @@ export function SettingsPage() {
       return (
         <div className="border border-[var(--border)] p-4 bg-[var(--bg)] mt-4">
           <div className="flex justify-between items-center mb-6">
-            <h3 className="text-[var(--accent)] font-bold">EDIT PROFILE</h3>
+            <div className="bx-section-tag">
+              EDIT PROFILE
+            </div>
             <button 
               onClick={() => setIsEditingProfile(false)}
               className="text-[var(--text-muted)] hover:text-[var(--text-primary)]"
@@ -169,7 +190,7 @@ export function SettingsPage() {
             </button>
           </div>
           <form onSubmit={handleUpdateProfile} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5 md:col-span-2">
                 <label className="text-[10px] text-[var(--text-muted)] tracking-wider">FULL NAME</label>
                 <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)]" />
@@ -214,21 +235,21 @@ export function SettingsPage() {
       <>
         {/* Status Panels */}
         <div className="flex flex-col md:flex-row gap-0 border border-[var(--border)] mt-4">
-          <div className="flex-1 p-4 border-l-2 border-green-500 md:border-r md:border-[var(--border)]">
-            <div className="text-[10px] text-[var(--text-muted)] tracking-wider mb-2">VERIFICATION</div>
-            <div className="flex items-center gap-1.5 text-green-500 font-bold text-[12px]">
+          <div className="bx-stat-card flex-1 border-l-2 border-green-500">
+            <div className="bx-stat-card-title">VERIFICATION</div>
+            <div className="flex items-center gap-1.5 text-green-500 font-bold text-[14px]">
               <CheckCircle2 size={14} /> {user?.emailVerified ? "VERIFIED" : "UNVERIFIED"}
             </div>
           </div>
-          <div className="flex-1 p-4 border-l-2 border-[var(--accent)] md:border-r md:border-[var(--border)]">
-            <div className="text-[10px] text-[var(--text-muted)] tracking-wider mb-2">TWO-FACTOR AUTH</div>
-            <div className="flex items-center gap-1.5 text-[var(--accent)] font-bold text-[12px]">
+          <div className="bx-stat-card flex-1 border-l-2 border-[var(--accent)]">
+            <div className="bx-stat-card-title">TWO-FACTOR AUTH</div>
+            <div className="flex items-center gap-1.5 text-[var(--accent)] font-bold text-[14px]">
               <ShieldAlert size={14} /> DISABLED
             </div>
           </div>
-          <div className="flex-1 p-4 border-l-2 border-cyan-400">
-            <div className="text-[10px] text-[var(--text-muted)] tracking-wider mb-2">ACCOUNT TYPE</div>
-            <div className="flex items-center gap-1.5 text-cyan-400 font-bold text-[12px]">
+          <div className="bx-stat-card flex-1 border-r-0 border-l-2 border-cyan-400">
+            <div className="bx-stat-card-title">ACCOUNT TYPE</div>
+            <div className="flex items-center gap-1.5 text-cyan-400 font-bold text-[14px]">
               <BadgeInfo size={14} /> FREE
             </div>
           </div>
@@ -236,7 +257,7 @@ export function SettingsPage() {
 
         {/* User Information Label */}
         <div className="flex justify-between items-center mt-6 mb-0">
-          <div className="bg-[var(--accent)] text-black px-3 py-1 text-[11px] font-bold tracking-wider inline-block">
+          <div className="bx-section-tag">
             USER INFORMATION
           </div>
           <button 
@@ -248,212 +269,320 @@ export function SettingsPage() {
         </div>
 
         {/* User Info Table */}
-        <div className="border border-[var(--border)] bg-[var(--bg)] mt-0 divide-y divide-[var(--border)]">
+        <div className="border border-[var(--border)] border-b-0 bg-[var(--bg)] mt-0">
           {[
             { label: "NAME", value: user?.name || "N/A" },
             { label: "EMAIL", value: user?.email || "N/A" },
-            { label: "PHONE", value: (user as any)?.phone || "N/A" },
-            { label: "BIRTHDATE", value: (user as any)?.birthdate ? formatDate((user as any).birthdate) : "N/A" },
-            { label: "GENDER", value: (user as any)?.gender ? ((user as any).gender.charAt(0).toUpperCase() + (user as any).gender.slice(1)) : "N/A" },
-            { label: "ADDRESS", value: (user as any)?.address || "N/A" },
+            { label: "PHONE", value: user?.phone || "N/A" },
+            { label: "BIRTHDATE", value: user?.birthdate ? formatDate(user.birthdate) : "N/A" },
+            { label: "GENDER", value: user?.gender ? (user.gender.charAt(0).toUpperCase() + user.gender.slice(1)) : "N/A" },
+            { label: "ADDRESS", value: user?.address || "N/A" },
           ].map((item, idx) => (
-            <div key={idx} className="flex p-4 items-center">
-              <div className="w-48 text-[11px] text-[var(--text-muted)] tracking-wider">{item.label}</div>
-              <div className="text-[12px] text-[var(--accent)]">{item.value}</div>
+            <div key={idx} className="bx-table-row">
+              <div className="bx-table-cell w-48 text-[var(--text-muted)]">{item.label}</div>
+              <div className="bx-table-cell font-bold text-[var(--accent)]">{item.value}</div>
             </div>
           ))}
         </div>
 
         {/* Bottom Panels */}
         <div className="flex flex-col md:flex-row gap-0 mt-6 border border-[var(--border)]">
-          <div className="flex-1 p-4 border-b md:border-b-0 md:border-r border-[var(--border)]">
-            <div className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)] tracking-wider mb-2">
-              <Calendar size={12} /> MEMBER SINCE
+          <div className="bx-stat-card flex-1">
+            <div className="bx-stat-card-title">
+              <Calendar size={12} className="text-[var(--text-muted)]" /> MEMBER SINCE
             </div>
-            <div className="text-green-500 font-bold text-[14px]">
-              {formatDate((user as any)?.createdAt || new Date().toISOString())}
+            <div className="bx-stat-card-value text-green-500">
+              {formatDate(user?.createdAt || new Date().toISOString())}
             </div>
           </div>
-          <div className="flex-1 p-4">
-            <div className="flex items-center gap-1.5 text-[10px] text-[var(--text-muted)] tracking-wider mb-2">
-              <Clock size={12} /> LAST LOGIN
+          <div className="bx-stat-card flex-1 border-r-0">
+            <div className="bx-stat-card-title">
+              <Clock size={12} className="text-[var(--text-muted)]" /> LAST LOGIN
             </div>
-            <div className="text-[var(--accent)] font-bold text-[14px]">
-              {formatDate((user as any)?.lastActive || new Date().toISOString())}
+            <div className="bx-stat-card-value text-[var(--accent)]">
+              {formatDate(user?.lastActive || new Date().toISOString())}
             </div>
           </div>
         </div>
 
         {/* Credits Panel */}
-        <div className="border border-[var(--border)] mt-6 p-6 border-l-2 border-l-cyan-400">
-          <div className="text-[28px] font-bold text-cyan-400 leading-none mb-1">{user?.credits || 0}</div>
-          <div className="text-[10px] text-[var(--text-muted)] tracking-wider">AVAILABLE CREDITS</div>
+        <div className="bx-stat-card mt-6 border-l-2 border-l-cyan-400">
+          <div className="bx-stat-card-value text-cyan-400 mb-1">{user?.credits || 0}</div>
+          <div className="bx-stat-card-title m-0">AVAILABLE CREDITS</div>
         </div>
       </>
     );
   };
 
   const renderSecurityView = () => (
-    <div className="mt-4 border border-[var(--border)] p-6 bg-[var(--bg)]">
-      <div className="mb-6">
-        <h2 className="text-[16px] font-bold text-[var(--accent)] mb-1">CHANGE PASSWORD</h2>
-        <p className="text-[12px] text-[var(--text-muted)]">Ensure your account is using a long, random password to stay secure.</p>
+    <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Change Password Panel */}
+      <div className="border border-[var(--border)] p-4 bg-[var(--bg)]">
+        <div className="mb-4 pb-2 border-b border-[var(--border)]">
+          <div className="bx-section-tag mb-2">CHANGE PASSWORD</div>
+          <p className="text-[11px] text-[var(--text-muted)]">Ensure your account is using a long, random password to stay secure.</p>
+        </div>
+
+        <form onSubmit={handleChangePassword} className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-[10px] text-[var(--text-muted)] tracking-wider">CURRENT PASSWORD</label>
+            <input
+              type="password"
+              value={currentPassword}
+              onChange={(e) => setCurrentPassword(e.target.value)}
+              className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)]"
+            />
+          </div>
+          
+          <div className="space-y-1.5">
+            <label className="text-[10px] text-[var(--text-muted)] tracking-wider">NEW PASSWORD</label>
+            <input
+              type="password"
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)]"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-[10px] text-[var(--text-muted)] tracking-wider">CONFIRM NEW PASSWORD</label>
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)]"
+            />
+          </div>
+
+          <div className="pt-2">
+            <button
+              type="submit"
+              disabled={isLoading || !currentPassword || !newPassword || !confirmPassword}
+              className="flex items-center gap-2 bg-[var(--accent)] text-black px-4 py-1.5 text-[12px] font-bold hover:opacity-90 disabled:opacity-50"
+            >
+              <Lock size={14} /> UPDATE PASSWORD
+            </button>
+          </div>
+        </form>
       </div>
 
-      <form onSubmit={handleChangePassword} className="space-y-4 max-w-md">
-        <div className="space-y-1.5">
-          <label className="text-[10px] text-[var(--text-muted)] tracking-wider">CURRENT PASSWORD</label>
-          <input
-            type="password"
-            value={currentPassword}
-            onChange={(e) => setCurrentPassword(e.target.value)}
-            className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)]"
-          />
-        </div>
-        
-        <div className="space-y-1.5">
-          <label className="text-[10px] text-[var(--text-muted)] tracking-wider">NEW PASSWORD</label>
-          <input
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-            className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)]"
-          />
+      {/* Change Email Panel */}
+      <div className="border border-[var(--border)] p-4 bg-[var(--bg)]">
+        <div className="mb-4 pb-2 border-b border-[var(--border)]">
+          <div className="bx-section-tag mb-2">CHANGE EMAIL</div>
+          <p className="text-[11px] text-[var(--text-muted)]">Update your account email address. Requires your current password.</p>
         </div>
 
-        <div className="space-y-1.5">
-          <label className="text-[10px] text-[var(--text-muted)] tracking-wider">CONFIRM NEW PASSWORD</label>
-          <input
-            type="password"
-            value={confirmPassword}
-            onChange={(e) => setConfirmPassword(e.target.value)}
-            className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)]"
-          />
-        </div>
+        <form onSubmit={handleChangeEmail} className="space-y-4">
+          <div className="space-y-1.5">
+            <label className="text-[10px] text-[var(--text-muted)] tracking-wider">NEW EMAIL ADDRESS</label>
+            <input
+              type="email"
+              value={emailToChange}
+              onChange={(e) => setEmailToChange(e.target.value)}
+              className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)]"
+              placeholder={user?.email}
+            />
+          </div>
+          
+          <div className="space-y-1.5">
+            <label className="text-[10px] text-[var(--text-muted)] tracking-wider">CURRENT PASSWORD</label>
+            <input
+              type="password"
+              value={emailCurrentPassword}
+              onChange={(e) => setEmailCurrentPassword(e.target.value)}
+              className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)]"
+            />
+          </div>
 
-        <div className="pt-2">
-          <button
-            type="submit"
-            disabled={isLoading || !currentPassword || !newPassword || !confirmPassword}
-            className="flex items-center gap-2 bg-[var(--accent)] text-black px-4 py-1.5 text-[12px] font-bold hover:opacity-90 disabled:opacity-50"
-          >
-            <Lock size={14} /> UPDATE PASSWORD
-          </button>
-        </div>
-      </form>
-
-      <div className="mt-10 mb-6">
-        <h2 className="text-[16px] font-bold text-[var(--accent)] mb-1">CHANGE EMAIL</h2>
-        <p className="text-[12px] text-[var(--text-muted)]">Update your account email address. Requires your current password.</p>
+          <div className="pt-2">
+            <button
+              type="submit"
+              disabled={isLoading || !emailCurrentPassword || !emailToChange}
+              className="flex items-center gap-2 bg-[var(--accent)] text-black px-4 py-1.5 text-[12px] font-bold hover:opacity-90 disabled:opacity-50"
+            >
+              <Lock size={14} /> UPDATE EMAIL
+            </button>
+          </div>
+        </form>
       </div>
-
-      <form onSubmit={handleChangeEmail} className="space-y-4 max-w-md">
-        <div className="space-y-1.5">
-          <label className="text-[10px] text-[var(--text-muted)] tracking-wider">NEW EMAIL ADDRESS</label>
-          <input
-            type="email"
-            value={emailToChange}
-            onChange={(e) => setEmailToChange(e.target.value)}
-            className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)]"
-            placeholder={user?.email}
-          />
-        </div>
-        
-        <div className="space-y-1.5">
-          <label className="text-[10px] text-[var(--text-muted)] tracking-wider">CURRENT PASSWORD</label>
-          <input
-            type="password"
-            value={emailCurrentPassword}
-            onChange={(e) => setEmailCurrentPassword(e.target.value)}
-            className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)]"
-          />
-        </div>
-
-        <div className="pt-2">
-          <button
-            type="submit"
-            disabled={isLoading || !emailCurrentPassword || !emailToChange}
-            className="flex items-center gap-2 bg-[var(--accent)] text-black px-4 py-1.5 text-[12px] font-bold hover:opacity-90 disabled:opacity-50"
-          >
-            <Lock size={14} /> UPDATE EMAIL
-          </button>
-        </div>
-      </form>
     </div>
   );
 
   const renderLoginHistoryView = () => (
     <div className="mt-4 border border-[var(--border)] bg-[var(--bg)]">
-      <div className="p-6 border-b border-[var(--border)]">
-        <h2 className="text-[16px] font-bold text-[var(--accent)] mb-1">ACTIVE SESSIONS</h2>
-        <p className="text-[12px] text-[var(--text-muted)]">Lihat daftar perangkat yang pernah login ke akun Anda.</p>
+      <div className="p-4 border-b border-[var(--border)]">
+        <div className="bx-section-tag mb-2">
+          ACTIVE SESSIONS
+        </div>
+        <p className="text-[11px] text-[var(--text-muted)]">Lihat daftar perangkat yang pernah login ke akun Anda.</p>
       </div>
-      <div className="divide-y divide-[var(--border)]">
+      <div>
         {isLoadingSessions ? (
-          <div className="p-6 text-center text-[var(--text-muted)] text-[12px]">Memuat sesi...</div>
+          <div className="p-4 text-center text-[var(--text-muted)] text-[12px]">Memuat sesi...</div>
         ) : sessions.length === 0 ? (
-          <div className="p-6 text-center text-[var(--text-muted)] text-[12px]">Tidak ada riwayat sesi ditemukan.</div>
+          <div className="p-4 text-center text-[var(--text-muted)] text-[12px]">Tidak ada riwayat sesi ditemukan.</div>
         ) : (
-          sessions.map((session, idx) => (
-            <div key={idx} className="p-4 flex items-center justify-between hover:bg-[var(--surface-alt)]">
-              <div className="flex items-center gap-4">
-                <div className="h-10 w-10 flex items-center justify-center bg-[var(--surface)] text-[var(--text-muted)] border border-[var(--border)]">
-                  <Smartphone size={20} />
-                </div>
-                <div>
-                  <div className="text-[12px] font-bold text-[var(--accent)] tracking-wider">Device ID: {session.fingerprint.substring(0, 16)}...</div>
-                  <div className="text-[11px] text-[var(--text-muted)] mt-1">Last Seen: {formatDate(session.lastSeenAt)}</div>
+          <div className="w-full">
+            <div className="bx-table-header px-4 border-t-0">
+              <div className="bx-table-cell flex-[2]">DEVICE ID</div>
+              <div className="bx-table-cell flex-[2]">LAST SEEN</div>
+              <div className="bx-table-cell flex-[1] text-right">ACTION</div>
+            </div>
+            {sessions.map((session, idx) => (
+              <div key={idx} className="bx-table-row px-4">
+                <div className="bx-table-cell flex-[2] text-cyan-400 font-mono">{session.fingerprint.substring(0, 16)}...</div>
+                <div className="bx-table-cell flex-[2] text-[var(--text-muted)]">{formatDate(session.lastSeenAt)}</div>
+                <div className="bx-table-cell flex-[1] flex justify-end">
+                  <button 
+                    onClick={() => setSessionToRevoke(session.fingerprint)}
+                    className="flex items-center gap-2 text-red-500 hover:text-red-400 transition-colors"
+                  >
+                    <Trash2 size={12} /> REVOKE
+                  </button>
                 </div>
               </div>
-              <button 
-                onClick={() => setSessionToRevoke(session.fingerprint)}
-                className="flex items-center gap-2 text-red-500 border border-red-500/20 px-3 py-1.5 text-[11px] font-bold hover:bg-red-500 hover:text-black transition-colors"
-              >
-                <Trash2 size={12} /> REVOKE
-              </button>
-            </div>
-          ))
+            ))}
+          </div>
         )}
       </div>
     </div>
   );
 
-  const renderUsageView = () => (
-    <div className="mt-4 border border-[var(--border)] bg-[var(--bg)]">
-      <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
-        <div>
-          <h2 className="text-[16px] font-bold text-[var(--accent)] mb-1">API USAGE & CREDITS</h2>
-          <p className="text-[12px] text-[var(--text-muted)]">Ringkasan penggunaan kredit AI Anda selama bulan ini.</p>
+  const renderUsageView = () => {
+    if (isLoadingUsage) {
+      return (
+        <div className="mt-4 border border-[var(--border)] bg-[var(--bg)] p-12 flex justify-center items-center text-[var(--text-muted)] text-[12px]">
+          Memuat data usage...
         </div>
-        <div className="text-right">
-          <div className="text-[24px] font-bold text-cyan-400 leading-none">{user?.credits || 0}</div>
-          <div className="text-[10px] text-[var(--text-muted)] tracking-wider">REMAINING</div>
+      );
+    }
+
+    if (!usageSummary) {
+      return (
+        <div className="mt-4 border border-[var(--border)] bg-[var(--bg)] p-12 flex justify-center items-center text-[var(--text-muted)] text-[12px]">
+          Gagal memuat ringkasan usage atau tidak ada data.
         </div>
+      );
+    }
+
+    const maxTaskTokens = usageSummary.byTaskType.length > 0 
+      ? Math.max(...usageSummary.byTaskType.map(t => t.totalTokens)) 
+      : 1;
+
+    // Calculate Input vs Output Ratio
+    const inputT = usageSummary.summary.totalInputTokens || 0;
+    const outputT = usageSummary.summary.totalOutputTokens || 0;
+    const totalT = inputT + outputT;
+    const inputPercent = totalT > 0 ? (inputT / totalT) * 100 : 0;
+    const outputPercent = totalT > 0 ? (outputT / totalT) * 100 : 0;
+
+    return (
+      <div className="mt-4 border border-[var(--border)] bg-[var(--bg)]">
+        <div className="p-4 border-b border-[var(--border)] flex justify-between items-center">
+          <div>
+            <div className="bx-section-tag mb-2">
+              API USAGE & CREDITS
+            </div>
+            <p className="text-[11px] text-[var(--text-muted)] tracking-wider">PERIOD: LAST 30 DAYS</p>
+          </div>
+        </div>
+
+        {/* 3 Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-0 border-b border-[var(--border)]">
+          {/* Requests Card */}
+          <div className="bx-stat-card border-l-2 border-l-cyan-400">
+            <div className="bx-stat-card-title">
+              <Activity size={12} className="text-cyan-400"/> REQUESTS
+            </div>
+            <div className="bx-stat-card-value text-cyan-400">
+              {usageSummary.summary.requestCount.toLocaleString()}
+            </div>
+            <div className="bx-stat-card-subtitle">Total API calls</div>
+          </div>
+          
+          {/* Tokens Used Card */}
+          <div className="bx-stat-card border-l-2 border-l-orange-400">
+            <div className="bx-stat-card-title">
+              <Activity size={12} className="text-orange-400"/> TOKENS USED
+            </div>
+            <div className="bx-stat-card-value text-orange-400">
+              {usageSummary.summary.totalTokens.toLocaleString()}
+            </div>
+            <div className="bx-stat-card-subtitle">Tokens consumed</div>
+          </div>
+          
+          {/* Balance Card */}
+          <div className="bx-stat-card border-r-0 border-l-2 border-l-green-400">
+            <div className="bx-stat-card-title">
+              <span className="text-green-400 font-bold">$</span> BALANCE
+            </div>
+            <div className="bx-stat-card-value text-green-400">
+              {user?.credits || 0}
+            </div>
+            <div className="bx-stat-card-subtitle">Credits remaining</div>
+          </div>
+        </div>
+
+        {/* Input vs Output Tokens Ratio */}
+        <div className="p-4 border-b border-[var(--border)]">
+          <div className="flex justify-between text-[11px] tracking-wider mb-2">
+            <div className="text-cyan-400">{inputT.toLocaleString()} Input Tokens</div>
+            <div className="text-[var(--text-muted)]">{totalT > 0 ? totalT.toLocaleString() : 0} Total Tokens</div>
+            <div className="text-orange-400">{outputT.toLocaleString()} Output Tokens</div>
+          </div>
+          <div className="h-4 w-full bg-[var(--surface-alt)] border border-[var(--border)] flex">
+            <div className="h-full bg-cyan-400 transition-all" style={{ width: `${inputPercent}%` }}></div>
+            <div className="h-full bg-orange-400 transition-all" style={{ width: `${outputPercent}%` }}></div>
+          </div>
+          <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-2">
+            <span>{inputPercent.toFixed(1)}% Input</span>
+            <span>{outputPercent.toFixed(1)}% Output</span>
+          </div>
+        </div>
+
+        {/* Top Endpoints Table */}
+        <div className="p-4">
+          <div className="bx-section-tag-sm mb-2">
+            TOP TASKS (30 DAYS)
+          </div>
+          
+          <div className="w-full mt-4">
+            <div className="bx-table-header">
+              <div className="bx-table-cell flex-[3]">ENDPOINT / TASK</div>
+              <div className="bx-table-cell flex-1 text-right">CALLS</div>
+              <div className="bx-table-cell flex-1 text-right">TOKENS</div>
+              <div className="bx-table-cell flex-[3] text-right">USAGE</div>
+            </div>
+            {usageSummary.byTaskType.map((task, idx) => (
+              <div key={idx} className="bx-table-row">
+                <div className="bx-table-cell flex-[3] text-cyan-400 font-mono tracking-wide truncate pr-4">{task.taskType}</div>
+                <div className="bx-table-cell flex-1 text-right font-bold text-[var(--text-primary)]">{task.requestCount.toLocaleString()}</div>
+                <div className="bx-table-cell flex-1 text-right font-bold text-[var(--accent)]">{task.totalTokens.toLocaleString()}</div>
+                <div className="bx-table-cell flex-[3] flex justify-end items-center pl-4">
+                  <div className="h-2 bg-[var(--accent)] transition-all" style={{ width: `${(task.totalTokens / maxTaskTokens) * 100}%` }}></div>
+                </div>
+              </div>
+            ))}
+            {usageSummary.byTaskType.length === 0 && (
+              <div className="py-4 text-center text-[12px] text-[var(--text-muted)]">
+                Belum ada data penggunaan selama 30 hari terakhir.
+              </div>
+            )}
+          </div>
+        </div>
+
       </div>
-      <div className="p-6">
-        <div className="h-48 w-full border border-[var(--border)] flex items-end gap-2 p-4 justify-between" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0) 0%, rgba(255,170,0,0.02) 100%)" }}>
-          {[30, 45, 20, 60, 80, 40, 90, 50, 70, 45, 60, 30].map((h, i) => (
-            <div key={i} className="w-full bg-[var(--accent)] opacity-80 hover:opacity-100 transition-opacity" style={{ height: `${h}%` }}></div>
-          ))}
-        </div>
-        <div className="flex justify-between text-[10px] text-[var(--text-muted)] mt-2">
-          <span>Day 1</span>
-          <span>Day 30</span>
-        </div>
-      </div>
-      <div className="p-6 border-t border-[var(--border)] text-[12px] text-[var(--text-muted)]">
-        * Grafik di atas adalah pratinjau statis. Integrasi API usage sedang dikerjakan.
-      </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <TerminalShell onSearchSymbol={() => {}}>
-      <div className="flex flex-col flex-1 h-full overflow-y-auto bg-[var(--bg)] p-4 md:p-6 text-[var(--text-primary)] font-mono">
+      <div className="flex flex-col flex-1 h-full overflow-y-auto bg-[var(--bg)] p-4 md:p-4 text-[var(--text-primary)] font-mono">
         
         {/* Page Header */}
         <div className="mb-4">
-          <div className="inline-flex items-center gap-2 bg-[var(--accent)] text-black px-3 py-1 text-[12px] font-bold tracking-wider">
+          <div className="bx-section-tag text-[12px]">
             <Settings size={14} /> SYSTEM SETTINGS
           </div>
         </div>
@@ -503,7 +632,7 @@ export function SettingsPage() {
         {activeTab === "USAGE" && renderUsageView()}
         {activeTab === "LOGIN HISTORY" && renderLoginHistoryView()}
         {activeTab !== "PROFILE" && activeTab !== "SECURITY" && activeTab !== "LOGIN HISTORY" && activeTab !== "USAGE" && (
-          <div className="border border-[var(--border)] mt-4 p-8 flex justify-center items-center text-[var(--text-muted)] text-[12px]">
+          <div className="border border-[var(--border)] mt-4 p-6 flex justify-center items-center text-[var(--text-muted)] text-[12px]">
             {activeTab} Configuration - Coming Soon
           </div>
         )}

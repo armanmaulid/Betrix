@@ -10,6 +10,7 @@ const STORAGE_KEY = "eaconsole.sessionToken";
 
 interface AuthContextValue {
   user: AuthUser | null;
+  setUser: React.Dispatch<React.SetStateAction<AuthUser | null>>;
   isLoading: boolean;
   isConnected: boolean;
   login: (email: string, password: string) => Promise<void>;
@@ -118,7 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, isLoading, isConnected, login, loginWithToken, logout }}>
+    <AuthContext.Provider value={{ user, setUser, isLoading, isConnected, login, loginWithToken, logout }}>
       {children}
     </AuthContext.Provider>
   );

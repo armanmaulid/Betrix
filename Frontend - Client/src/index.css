@@ -685,3 +685,81 @@ button:hover::after {
 .animate-slide-up-fade {
   animation: slideUpFade 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* ============================================================
+   TERMINAL DATA TABLES
+   Standardize row sizes for a dense Bloomberg Terminal feel
+   ============================================================ */
+.bx-table-header {
+  @apply flex border-b border-[var(--border)] py-1.5 text-[10px] font-bold text-[var(--accent)] tracking-wider items-center bg-[var(--surface-alt)];
+}
+
+.bx-table-row {
+  @apply flex border-b border-[var(--border)] py-1 items-center text-[11px] hover:bg-[var(--surface-alt)] transition-colors;
+}
+
+.bx-table-cell {
+  @apply px-2;
+}
+
+/* ============================================================
+   TERMINAL STAT CARDS
+   Standardize summary cards padding and font sizes for density
+   ============================================================ */
+.bx-stat-card {
+  @apply py-3 px-4 border-b md:border-b-0 md:border-r border-[var(--border)];
+}
+
+.bx-stat-card-title {
+  @apply text-[10px] text-[var(--text-muted)] tracking-wider mb-1 flex items-center gap-1.5;
+}
+
+.bx-stat-card-value {
+  @apply text-[24px] font-bold leading-none;
+}
+
+.bx-stat-card-subtitle {
+  @apply text-[10px] text-[var(--text-muted)] mt-1 tracking-wider;
+}
+
+/* ============================================================
+   TERMINAL SECTION TAGS
+   Standardize the orange highlight boxes used for section titles
+   with an organic wind-blown flag (parallax) animation
+   ============================================================ */
+@keyframes wave-flag {
+  0% { 
+    background-position: 200% 0%, 300% 0%; 
+  }
+  100% { 
+    background-position: -50% 0%, -100% 0%; 
+  }
+}
+
+.bx-section-tag {
+  @apply inline-flex items-center gap-2 text-black px-3 py-1 text-[11px] font-bold tracking-wider;
+  background-color: var(--accent);
+  background-image: 
+    linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.45) 50%, transparent 70%),
+    linear-gradient(75deg, transparent 20%, rgba(0, 0, 0, 0.15) 50%, transparent 80%);
+  background-size: 200% 100%, 350% 100%;
+  animation: wave-flag 4s ease-in-out infinite alternate;
+}
+
+.bx-section-tag-sm {
+  @apply inline-flex items-center gap-1.5 text-black px-2 py-0.5 text-[10px] font-bold tracking-wider;
+  background-color: var(--accent);
+  background-image: 
+    linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.45) 50%, transparent 70%),
+    linear-gradient(75deg, transparent 20%, rgba(0, 0, 0, 0.15) 50%, transparent 80%);
+  background-size: 200% 100%, 350% 100%;
+  animation: wave-flag 4s ease-in-out infinite alternate;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bx-section-tag,
+  .bx-section-tag-sm {
+    animation: none;
+    background: var(--accent);
+  }
+}

@@ -222,7 +222,22 @@ router.post("/login", async (req, res) => {
 
     res.json({
       sessionToken: result.sessionToken,
-      user: { id: user.id, email: user.email, name: user.name, isAdmin: user.isAdmin, credits: user.credits },
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        phone: user.phone,
+        address: user.address,
+        birthdate: user.birthdate,
+        gender: user.gender,
+        bio: user.bio,
+        isAdmin: user.isAdmin,
+        status: user.status,
+        emailVerified: user.emailVerified,
+        credits: user.credits,
+        createdAt: user.createdAt,
+        lastActive: user.lastActive
+      },
     });
   } catch (err) {
     console.error("[POST /api/auth/login] error:", err.message);
