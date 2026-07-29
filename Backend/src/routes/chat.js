@@ -56,7 +56,7 @@ const checkChatCredits = (req, res, next) => {
 
 // POST /api/chat
 router.post("/chat", requireAuth, perUserLimiter, checkChatCredits, async (req, res) => {
-  const { taskType, message, history = [] } = req.body;
+  const { taskType, message, history = [], sessionId } = req.body;
 
   if (!message || typeof message !== "string") {
     return res.status(400).json({ error: "'message' wajib diisi (string)" });
@@ -217,7 +217,7 @@ router.post("/chat/stream", requireAuth, perUserLimiter, checkChatCredits, async
 });
 
 // GET /api/chat/history (endpoint utama — dipakai frontend)
-router.get("/history", requireAuth, perUserLimiter, async (req, res) => {
+router.get("/chat/history", requireAuth, perUserLimiter, async (req, res) => {
   try {
     const limit = Math.min(parseInt(req.query.limit) || 50, 100);
     const offset = parseInt(req.query.offset) || 0;
@@ -287,8 +287,38 @@ router.get("/history", requireAuth, perUserLimiter, async (req, res) => {
   }
 });
 
+// DELETE /api/chat/session/:sessionId
+router.delete("/chat/session/:sessionId", requireAuth, perUserLimiter, async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+
+    // session_id dipakai untuk chat baru; fallback ke id untuk baris lama
+    // yang belum punya session_id (lihat COALESCE(session_id, id) di /chat/history).
+    // Cast eksplisit ::uuid supaya tidak bergantung ke type-inference Postgres.
+    const { rowCount } = await pool.query(
+      `DELETE FROM chat_logs WHERE user_id = $1 AND (session_id = $2::uuid OR id = $2::uuid)`,
+      [req.user.id, sessionId]
+    );
+
+    logger.info("[DELETE /api/chat/session] hasil hapus", {
+      userId: req.user.id,
+      sessionId,
+      rowsDeleted: rowCount,
+    });
+
+    if (rowCount === 0) {
+      return res.status(404).json({ error: "Sesi chat tidak ditemukan" });
+    }
+
+    res.json({ message: "Sesi chat berhasil dihapus", deleted: rowCount });
+  } catch (err) {
+    logger.error("[DELETE /api/chat/session] error", { error: err.message, sessionId: req.params.sessionId });
+    res.status(500).json({ error: "Gagal menghapus sesi chat" });
+  }
+});
+
 // GET /api/chat/export
-router.get("/export", requireAuth, async (req, res) => {
+router.get("/chat/export", requireAuth, async (req, res) => {
   try {
     const { format = "json", taskType, startDate, endDate } = req.query;
 

@@ -77,6 +77,19 @@ export async function streamChat(
   }
 }
 
+export async function deleteChatSession(sessionId: string) {
+  const token = localStorage.getItem("eaconsole.sessionToken");
+  const res = await fetch(`${BACKEND_URL}/api/chat/session/${sessionId}`, {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` }
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || "Failed to delete chat session");
+  }
+  return res.json();
+}
+
 export async function getChatHistory(limit = 10, offset = 0) {
   const token = localStorage.getItem("eaconsole.sessionToken");
   const res = await fetch(`${BACKEND_URL}/api/chat/history?limit=${limit}&offset=${offset}`, {

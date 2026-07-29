@@ -25,7 +25,7 @@ import {
 } from "lucide-react";
 import { NewsFeed } from "../components/analysis/NewsFeed";
 import { EconomicCalendar } from "../components/analysis/EconomicCalendar";
-import { streamChat, getChatHistory } from "../api/chatClient";
+import { streamChat, getChatHistory, deleteChatSession } from "../api/chatClient";
 
 export function AnalyzePage() {
   const { user } = useAuth();
@@ -41,6 +41,7 @@ export function AnalyzePage() {
   const [messages, setMessages] = useState<any[]>([]);
   const [recentSessions, setRecentSessions] = useState<any[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [isStreaming, setIsStreaming] = useState(false);
 
   const shortcuts = [
     { cmd: "/stock", desc: "stocks" },
@@ -74,11 +75,12 @@ export function AnalyzePage() {
   ];
 
   const handleSubmit = () => {
-    if (!inputText.trim()) return;
+    if (!inputText.trim() || isStreaming) return;
     
     const text = inputText;
     setInputText("");
     setView('chat');
+    setIsStreaming(true);
 
     // 1. Add user message and a loading agent message
     setMessages(prev => [
@@ -148,6 +150,7 @@ export function AnalyzePage() {
           };
           return newMsgs;
         });
+        setIsStreaming(false);
       },
       (error) => {
         // Handle error state
@@ -162,6 +165,7 @@ export function AnalyzePage() {
           };
           return newMsgs;
         });
+        setIsStreaming(false);
       }
     );
   };
@@ -214,6 +218,24 @@ export function AnalyzePage() {
       ]);
     }
     setView('chat');
+  };
+
+  const handleDeleteSession = (e: any, sessionId: string) => {
+    e.stopPropagation();
+    // Optimistic removal; kalau request gagal, kembalikan sesi ke daftar
+    const prevSessions = recentSessions;
+    setRecentSessions(prev => prev.filter(s => (s.session_id || s.id) !== sessionId));
+    deleteChatSession(sessionId)
+      .then(() => {
+        // Re-sync dengan server (bukan cuma percaya state optimistic) supaya
+        // kalau ternyata masih ada baris tersisa di server, langsung kelihatan
+        // sekarang juga — bukan baru ketahuan setelah user refresh manual.
+        fetchHistory();
+      })
+      .catch(err => {
+        console.error("Failed to delete chat session:", err);
+        setRecentSessions(prevSessions);
+      });
   };
 
   const timeAgo = (dateStr: string) => {
@@ -284,6 +306,7 @@ export function AnalyzePage() {
           ref={inputRef}
           rows={1}
           value={inputText}
+          disabled={isStreaming}
           onChange={(e) => {
             setInputText(e.target.value);
             e.target.style.height = 'auto';
@@ -296,8 +319,8 @@ export function AnalyzePage() {
               e.currentTarget.style.height = 'auto';
             }
           }}
-          placeholder={isChat ? "Follow up..." : "Ask your Agent to start your workflow"}
-          className="flex-1 bg-transparent outline-none ring-0 border-none focus:outline-none focus:ring-0 focus:border-transparent text-[#eee] placeholder-[#555] text-[14px] resize-none overflow-y-auto min-h-[24px] max-h-[120px] leading-relaxed py-1"
+          placeholder={isStreaming ? "Waiting for agent to reply..." : isChat ? "Follow up..." : "Ask your Agent to start your workflow"}
+          className="flex-1 bg-transparent outline-none ring-0 border-none focus:outline-none focus:ring-0 focus:border-transparent text-[#eee] placeholder-[#555] text-[14px] resize-none overflow-y-auto min-h-[24px] max-h-[120px] leading-relaxed py-1 disabled:opacity-40 disabled:cursor-not-allowed"
         />
         <div className="flex items-center gap-1.5 self-end pb-1">
           <button className="p-1 bg-[#00ff99] text-black hover:opacity-80 rounded-sm transition-opacity">
@@ -331,7 +354,8 @@ export function AnalyzePage() {
           </button>
           <button 
             onClick={(e) => { e.stopPropagation(); handleSubmit(); }} 
-            className="p-1 bg-[#ff9900] text-black hover:opacity-80 rounded-sm transition-opacity ml-1"
+            disabled={isStreaming}
+            className="p-1 bg-[#ff9900] text-black hover:opacity-80 rounded-sm transition-opacity ml-1 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:opacity-40"
           >
             <ArrowRight size={14} />
           </button>
@@ -442,7 +466,12 @@ export function AnalyzePage() {
                         <span>{timeAgo(session.created_at)}</span>
                       </div>
                       <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button className="hover:text-[#ff4444] transition-colors"><Trash2 size={12} /></button>
+                        <button
+                          onClick={(e) => handleDeleteSession(e, session.session_id || session.id)}
+                          className="hover:text-[#ff4444] transition-colors"
+                        >
+                          <Trash2 size={12} />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -457,7 +486,7 @@ export function AnalyzePage() {
             {/* TOP BAR */}
             <div className="flex items-center justify-between border-b border-[#222] bg-[#0a0a0a] px-8 py-2 shrink-0">
               <div className="flex items-center gap-4">
-                <button onClick={() => setView('landing')} className="flex items-center gap-1.5 text-[9px] font-bold text-[#888] hover:text-white transition-colors border border-[#333] px-2 py-1 rounded-sm">
+                <button onClick={() => {setMessages([]); setView('landing'); setCurrentSessionId(null);}} className="flex items-center gap-1.5 text-[9px] font-bold text-[#888] hover:text-white transition-colors border border-[#333] px-2 py-1 rounded-sm">
                   <ArrowLeft size={10} /> BACK
                 </button>
                 <div className="flex items-center">
