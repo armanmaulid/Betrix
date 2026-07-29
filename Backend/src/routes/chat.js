@@ -101,6 +101,7 @@ router.post("/chat", requireAuth, perUserLimiter, checkChatCredits, async (req, 
 
     logChat({
       userId: req.user?.id,
+      sessionId: sessionId || null,
       taskType: taskType || "faq",
       modelUsed: result.modelUsed,
       message,
@@ -127,7 +128,7 @@ router.post("/chat", requireAuth, perUserLimiter, checkChatCredits, async (req, 
 
 // POST /api/chat/stream
 router.post("/chat/stream", requireAuth, perUserLimiter, checkChatCredits, async (req, res) => {
-  const { taskType, message, history = [] } = req.body;
+  const { taskType, message, history = [], sessionId } = req.body;
 
   if (!message || typeof message !== "string") {
     return res.status(400).json({ error: "'message' wajib diisi (string)" });
@@ -189,6 +190,7 @@ router.post("/chat/stream", requireAuth, perUserLimiter, checkChatCredits, async
 
     logChat({
       userId: req.user?.id,
+      sessionId: sessionId || null,
       taskType: taskType || "faq",
       modelUsed: result.modelUsed,
       message,
@@ -242,31 +244,33 @@ router.get("/history", requireAuth, perUserLimiter, async (req, res) => {
       paramIndex++;
     }
 
-    const countQuery = `SELECT COUNT(*) as total FROM chat_logs ${baseWhere}`;
+    const countQuery = `SELECT COUNT(DISTINCT COALESCE(session_id, id)) as total FROM chat_logs ${baseWhere}`;
     const { rows: countRows } = await pool.query(countQuery, params);
     const total = parseInt(countRows[0].total);
 
     const query = `
-      SELECT id, task_type, message, reply, model_used, latency_ms,
-             input_tokens, output_tokens, created_at
+      SELECT COALESCE(session_id, id) as session_id,
+             MIN(created_at) as session_start,
+             MAX(created_at) as created_at,
+             (array_agg(message ORDER BY created_at ASC))[1] as title,
+             json_agg(
+               json_build_object(
+                 'message', message,
+                 'reply', reply,
+                 'model_used', model_used,
+                 'latency_ms', latency_ms
+               ) ORDER BY created_at ASC
+             ) as turns
       FROM chat_logs
       ${baseWhere}
-      ORDER BY created_at DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+      GROUP BY COALESCE(session_id, id)
+      ORDER BY MAX(created_at) DESC LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
     `;
     params.push(limit, offset);
 
     const { rows } = await pool.query(query, params);
 
-    const data = rows.map((row) => {
-      const { input_tokens, output_tokens, ...rest } = row;
-      return {
-        ...rest,
-        usage: {
-          input_tokens: input_tokens || 0,
-          output_tokens: output_tokens || 0,
-        },
-      };
-    });
+    const data = rows;
 
     res.json({
       data,

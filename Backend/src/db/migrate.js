@@ -17,6 +17,8 @@ const MIGRATIONS = [
   `DO $$ BEGIN IF NOT EXISTS ( SELECT 1 FROM pg_constraint WHERE conname = 'users_status_check' ) THEN ALTER TABLE users ADD CONSTRAINT users_status_check CHECK (status IN ('active', 'banned', 'suspended')); END IF; END $$;`,
   `CREATE INDEX IF NOT EXISTS idx_users_status ON users(status);`,
   `CREATE TABLE IF NOT EXISTS chat_logs ( id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID REFERENCES users(id) ON DELETE SET NULL, task_type TEXT NOT NULL, model_used TEXT NOT NULL, message TEXT NOT NULL, reply TEXT NOT NULL, latency_ms INTEGER, input_tokens INTEGER, output_tokens INTEGER, created_at TIMESTAMPTZ DEFAULT now() );`,
+  `ALTER TABLE chat_logs ADD COLUMN IF NOT EXISTS session_id UUID;`,
+  `CREATE INDEX IF NOT EXISTS idx_chat_logs_session_id ON chat_logs(session_id);`,
   `CREATE INDEX IF NOT EXISTS idx_chat_logs_user_id ON chat_logs(user_id);`,
   `CREATE INDEX IF NOT EXISTS idx_chat_logs_created_at ON chat_logs(created_at);`,
   `CREATE TABLE IF NOT EXISTS admin_actions ( id UUID PRIMARY KEY DEFAULT gen_random_uuid(), admin_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE, action TEXT NOT NULL, target_type TEXT, target_id TEXT, details JSONB, created_at TIMESTAMPTZ DEFAULT now() );`,
