@@ -22,11 +22,20 @@ const consoleFormat = printf(({ level, message, timestamp, context, ...meta }) =
 
   const contextStr = context ? chalk.yellow(`[${context}] `) : "";
   
-  let msg = `${appName} ${pid}  - ${dateStr}, ${timeStr}     ${levelStr} ${contextStr}${chalk.green(message)}`;
+  let finalMessage = message;
+  const tagMatch = typeof message === 'string' && message.match(/^(\[[^\]]+\])\s+(.*)/);
+  if (tagMatch) {
+    finalMessage = `${chalk.yellow(tagMatch[1])} ${chalk.green(tagMatch[2])}`;
+  } else {
+    finalMessage = chalk.green(message);
+  }
+  
+  let msg = `${appName} ${pid}  - ${dateStr}, ${timeStr}     ${levelStr} ${contextStr}${finalMessage}`;
   
   if (meta.stack) {
     msg += `\n${chalk.red(meta.stack)}`;
   }
+
   return msg;
 });
 
@@ -63,5 +72,5 @@ export const logger = winston.createLogger({
 });
 
 export function logMetrics(data) {
-  logger.info("metrics", data);
+  logger.info("Replying...", { context: "AI", ...data });
 }
