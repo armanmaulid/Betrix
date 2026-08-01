@@ -35,6 +35,18 @@ import "./config/passport.js";
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Status penanda server sedang proses mati
+let isShuttingDown = false;
+
+// Middleware Graceful Shutdown: Tolak "tamu baru" jika restoran mau tutup
+app.use((req, res, next) => {
+  if (isShuttingDown) {
+    res.set('Connection', 'close'); // Beritahu client agar tidak me-reuse koneksi TCP
+    return res.status(503).json({ error: "Server is shutting down, please try again later" });
+  }
+  next();
+});
+
 app.set("trust proxy", Number(process.env.TRUST_PROXY_HOPS) || 1);
 
 // Security headers
@@ -158,7 +170,7 @@ const server = app.listen(PORT, async () => {
     ]).then((results) => {
       const total = results.reduce((sum, r) =>
         sum + (r.status === "fulfilled" ? r.value : 0), 0);
-      if (total > 0) logger.info(`[cleanup] removed ${total} expired record(s)`);
+      if (total > 0) logger.info(`removed ${total} expired record(s)`, { context: "Cleanup" });
     });
   }, 60 * 60 * 1000);
 
@@ -181,8 +193,16 @@ const server = app.listen(PORT, async () => {
   // Sync symbols dari MT5 bridge di background pas start up (dengan auto-retry)
   // Biarkan berjalan tanpa await agar tidak mem-blokir server startup.
   syncBrokerSymbols().catch(err => {
-    logger.error("Unexpected error in syncBrokerSymbols loop", { error: err.message, context: "System" });
+    logger.error("Unexpected error in syncBrokerSymbols startup", { error: err.message, context: "System" });
   });
+
+  // Jadwalkan sync ulang setiap 24 jam di background (Pola Background Job)
+  // Sehingga jika broker menambah koin/saham baru, sistem ter-update tanpa restart
+  setInterval(() => {
+    syncBrokerSymbols().catch(err => {
+      logger.error("Unexpected error in syncBrokerSymbols background job", { error: err.message, context: "System" });
+    });
+  }, 24 * 60 * 60 * 1000);
 
   // Sync economic calendar ke Postgres pas startup - idempotent, cuma
   // benar-benar nge-hit MT5 kalau bulan ini+depan belum ada di DB (lihat
@@ -216,14 +236,25 @@ server.headersTimeout = Number(process.env.SERVER_HEADERS_TIMEOUT_MS) || 66000;
 
 
 // Graceful shutdown
-let isShuttingDown = false;
+// (Variabel isShuttingDown sudah dipindahkan ke atas untuk dipakai oleh middleware)
 
 async function gracefulShutdown(signal) {
   if (isShuttingDown) return;
+  
+  // Mengubah flag ini akan membuat middleware di atas mulai menolak koneksi/request baru
+  // dengan header Connection: close dan status 503.
   isShuttingDown = true;
 
   logger.info(`${signal} received, starting graceful shutdown`, { context: "Shutdown" });
 
+  // Putus seketika semua koneksi TCP yang sedang "nganggur" (idle keep-alive).
+  // Ini seperti mengusir tamu yang sudah selesai makan tapi masih duduk ngobrol,
+  // sehingga restoran bisa lebih cepat tutup. (Fitur Node.js >= 18.20)
+  if (server.closeIdleConnections) {
+    server.closeIdleConnections();
+  }
+
+  // Berhenti menerima tamu baru. Tapi tunggu tamu yang "masih ngunyah" (request aktif) sampai selesai.
   server.close(async () => {
     logger.info("HTTP server closed", { context: "Server" });
 

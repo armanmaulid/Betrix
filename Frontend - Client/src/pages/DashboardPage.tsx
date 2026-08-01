@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { LineChart } from "lucide-react";
 import { TerminalShell } from "../components/layout/TerminalShell";
 import { TradingViewWidget } from "../components/analysis/TradingViewWidget";
@@ -24,10 +24,20 @@ const DEFAULT_SYMBOL = "XAUUSD";
 export function DashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [symbol, setSymbol] = useState(DEFAULT_SYMBOL);
+  const [searchParams] = useSearchParams();
+  const [symbol, setSymbol] = useState(searchParams.get('symbol') || DEFAULT_SYMBOL);
+
+  useEffect(() => {
+    const urlSymbol = searchParams.get('symbol');
+    if (urlSymbol && urlSymbol !== symbol) {
+      setSymbol(urlSymbol.toUpperCase());
+    }
+  }, [searchParams]);
 
   function handleSearchSymbol(rawSymbol: string) {
-    setSymbol(rawSymbol);
+    const s = rawSymbol.toUpperCase();
+    setSymbol(s);
+    navigate(`/?symbol=${s}`);
   }
 
   return (

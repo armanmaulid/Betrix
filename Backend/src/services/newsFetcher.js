@@ -84,12 +84,12 @@ export async function fetchAndStoreNews() {
         if (rows.length > 0) newArticles.push(rows[0]);
       }
     } catch (err) {
-      logger.error(`[newsFetcher] gagal fetch feed dari ${feed.source} (${feed.url}): ${err.message}`);
+      logger.error(`gagal fetch feed dari ${feed.source} (${feed.url}): ${err.message}`, { context: "NEWS" });
     }
   }
 
   if (newArticles.length > 0) {
-    logger.info(`[newsFetcher] ${newArticles.length} artikel baru disimpan`);
+    logger.info(`${newArticles.length} artikel baru disimpan`, { context: "NEWS" });
 
     broadcastNews(
       newArticles.map((r) => ({

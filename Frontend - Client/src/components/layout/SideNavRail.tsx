@@ -1,3 +1,4 @@
+import React from "react";
 import { LayoutGrid, CandlestickChart, Sparkles, Newspaper, CalendarClock, Settings, LogOut } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
@@ -14,7 +15,7 @@ const NAV_ITEMS = [
   { icon: CalendarClock, label: "Kalender Ekonomi", path: "/", anchorId: "panel-calendar" },
 ];
 
-export function SideNavRail() {
+export const SideNavRail = React.memo(function SideNavRail() {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
@@ -71,4 +72,4 @@ export function SideNavRail() {
       </div>
     </div>
   );
-}
+});

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useTickerPrices, MARKET_SYMBOLS, type TickerSymbol } from "../../hooks/useTickerPrices";
 
 const FLASH_DURATION_MS = 350; // harus sama dengan durasi animasi flash-up/flash-down di index.css
@@ -12,7 +12,7 @@ const FLASH_DURATION_MS = 350; // harus sama dengan durasi animasi flash-up/flas
 // masuk dari kanan, keluar ke kiri, sama seperti ticker bursa sungguhan.
 // Animasi didefinisikan di index.css (.animate-ticker) termasuk fallback
 // prefers-reduced-motion.
-export function TickerStrip({ symbols = MARKET_SYMBOLS }: { symbols?: TickerSymbol[] }) {
+export const TickerStrip = React.memo(function TickerStrip({ symbols = MARKET_SYMBOLS }: { symbols?: TickerSymbol[] }) {
   const prices = useTickerPrices(symbols);
   const [flashing, setFlashing] = useState<Record<string, "up" | "down">>({});
   const timeoutsRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
@@ -95,4 +95,4 @@ export function TickerStrip({ symbols = MARKET_SYMBOLS }: { symbols?: TickerSymb
       </div>
     </div>
   );
-}
+});

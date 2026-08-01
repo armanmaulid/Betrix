@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { CalendarClock, RefreshCw, Info, Filter, X } from "lucide-react";
 import { fetchEconomicCalendar, type CalendarEvent } from "../../api/marketClient";
 
@@ -102,7 +102,7 @@ function formatValue(val: string | null): string {
 }
 
 // Bloomberg Terminal style: filter toolbar + expandable detail panel + data columns
-export function EconomicCalendar() {
+export const EconomicCalendar = React.memo(function EconomicCalendar() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -122,7 +122,7 @@ export function EconomicCalendar() {
   const [filter, setFilter] = useState<FilterState>({
     countries: new Set(),
     currencies: new Set(),
-    impacts: new Set(["high", "medium", "low"]),
+    impacts: new Set(["high", "medium"]),
     showOnlyWithData: false,
     period: "this_week",
   });
@@ -146,25 +146,23 @@ export function EconomicCalendar() {
       setAvailableCountries(countries);
       setAvailableCurrencies(currencies);
 
-      // Default: semua negara & semua currency dicentang (biar nggak
-      // ilang data kayak kejadian kemarin) - cuma dijalankan sekali.
+      // Default: semua negara dicentang, tapi currency hanya USD.
+      // Cuma dijalankan sekali saat mount pertama kali.
       if (!didInitFilters.current) {
         didInitFilters.current = true;
         setFilter((prev) => ({
           ...prev,
           countries: new Set(countries),
-          currencies: new Set(currencies),
+          currencies: new Set(currencies.filter((c) => c === "USD")),
         }));
       } else {
-        // Kalau ada negara/currency BARU muncul dari refresh berikutnya
-        // (mis. bulan baru ke-seed), otomatis ikut dicentang juga -
-        // supaya data baru nggak diam-diam ketutup filter lama.
+        // Kalau ada negara BARU muncul dari refresh berikutnya
+        // otomatis ikut dicentang agar tidak diam-diam ketutup filter lama.
+        // (Currency baru tidak otomatis dicentang karena default hanya USD).
         setFilter((prev) => {
           const nextCountries = new Set(prev.countries);
-          const nextCurrencies = new Set(prev.currencies);
           countries.forEach((c) => nextCountries.add(c));
-          currencies.forEach((c) => nextCurrencies.add(c));
-          return { ...prev, countries: nextCountries, currencies: nextCurrencies };
+          return { ...prev, countries: nextCountries };
         });
       }
     } catch (err) {
@@ -235,7 +233,13 @@ export function EconomicCalendar() {
 
     const el = listContainerRef.current.querySelector(`[data-date-key="${CSS.escape(todayKey)}"]`);
     if (el) {
-      el.scrollIntoView({ block: "start", behavior: "auto" });
+      // FIX: Gunakan scrollBy pada container alih-alih scrollIntoView agar tidak nge-scroll halaman utama
+      const containerRect = listContainerRef.current.getBoundingClientRect();
+      const elRect = el.getBoundingClientRect();
+      listContainerRef.current.scrollBy({
+        top: elRect.top - containerRect.top,
+        behavior: "auto"
+      });
       scrolledForKeyRef.current = scrollKey;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -265,8 +269,8 @@ export function EconomicCalendar() {
   function resetFilters() {
     setFilter({
       countries: new Set(availableCountries),
-      currencies: new Set(availableCurrencies),
-      impacts: new Set(["high", "medium", "low"]),
+      currencies: new Set(availableCurrencies.filter(c => c === "USD")),
+      impacts: new Set(["high", "medium"]),
       showOnlyWithData: false,
       period: "this_week",
     });
@@ -570,4 +574,4 @@ export function EconomicCalendar() {
       )}
     </div>
   );
-}
+});

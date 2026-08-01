@@ -23,7 +23,8 @@ function touchLastActive(userId) {
       [userId, LAST_ACTIVE_THROTTLE_MINUTES]
     )
     .catch((err) =>
-      logger.error("[touchLastActive] gagal update last_active", {
+      logger.error("gagal update last_active", {
+        context: "Auth",
         error: err.message,
         userId,
       })
@@ -54,7 +55,8 @@ export async function requireAuth(req, res, next) {
     // (Redis/Postgres/DNS) bermasalah, insiden ini tidak ke-capture di log
     // terstruktur yang biasa dipantau, cuma kelihatan di raw console kalau
     // kebetulan sedang dilihat langsung.
-    logger.error("[requireAuth] gagal validasi session", {
+    logger.error("gagal validasi session", {
+      context: "Auth",
       error: err.message,
       requestId: req.id,
     });

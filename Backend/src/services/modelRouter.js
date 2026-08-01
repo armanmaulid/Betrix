@@ -37,7 +37,7 @@ export async function routeAndCall({ taskType, messages, tier }) {
   if (isCacheable) {
     const cached = getCached(taskType, lastMessage);
     if (cached) {
-      logger.debug(`[modelRouter] cache HIT task=${taskType}`);
+      logger.debug(`cache HIT task=${taskType}`, { context: "Router" });
       return {
         text: cached.text,
         modelUsed: cached.modelUsed,
@@ -58,10 +58,11 @@ export async function routeAndCall({ taskType, messages, tier }) {
   const latencyMs = Date.now() - start;
 
   logger.debug(
-    `[modelRouter] task=${taskType} model=${model.id} latency=${latencyMs}ms ` +
+    `task=${taskType} model=${model.id} latency=${latencyMs}ms ` +
       `tokens_in=${result.usage?.input_tokens ?? "?"} tokens_out=${
         result.usage?.output_tokens ?? "?"
-      }`
+      }`,
+    { context: "Router" }
   );
 
   if (isCacheable) {
@@ -96,10 +97,11 @@ export async function routeAndStream({ taskType, messages, onToken, signal, tier
   const latencyMs = Date.now() - start;
 
   logger.debug(
-    `[modelRouter:stream] task=${taskType} model=${model.id} latency=${latencyMs}ms ` +
+    `task=${taskType} model=${model.id} latency=${latencyMs}ms ` +
       `tokens_in=${result.usage?.input_tokens ?? "?"} tokens_out=${
         result.usage?.output_tokens ?? "?"
-      }`
+      }`,
+    { context: "RouterStream" }
   );
 
   return {

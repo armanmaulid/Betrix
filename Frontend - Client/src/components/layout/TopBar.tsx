@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from "react";
+import React, { useEffect, useState, type FormEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { Maximize2, Search, Zap } from "lucide-react";
@@ -19,7 +19,7 @@ interface TopBarProps {
 //
 // NOTE: indikator "LIVE" cuma ada DI SINI (sejajar jam), TIDAK ada lagi di
 // TickerStrip — sebelumnya sempat ada di dua tempat sekaligus (dobel).
-export function TopBar({ onSearchSymbol }: TopBarProps) {
+export const TopBar = React.memo(function TopBar({ onSearchSymbol }: TopBarProps) {
   const [now, setNow] = useState(new Date());
   const [query, setQuery] = useState("");
   const { user, isConnected } = useAuth();
@@ -135,4 +135,4 @@ export function TopBar({ onSearchSymbol }: TopBarProps) {
       </div>
     </div>
   );
-}
+});

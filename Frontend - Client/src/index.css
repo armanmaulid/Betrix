@@ -48,7 +48,19 @@
 }
 
 * {
+  margin: 0;
+  padding: 0;
   box-sizing: border-box;
+}
+
+@keyframes ai-glow-finish {
+  0% { box-shadow: 0 0 0px rgba(0, 255, 136, 0); border-color: #222; }
+  30% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.5); border-color: var(--success); }
+  100% { box-shadow: 0 0 0px rgba(0, 255, 136, 0); border-color: #222; }
+}
+
+.animate-ai-glow {
+  animation: ai-glow-finish 1.5s ease-out;
 }
 
 html,
@@ -134,6 +146,8 @@ textarea {
   animation-name: ticker-scroll;
   animation-timing-function: linear;
   animation-iteration-count: infinite;
+  will-change: transform;
+  transform: translateZ(0);
 }
 
 @media (prefers-reduced-motion: reduce) {

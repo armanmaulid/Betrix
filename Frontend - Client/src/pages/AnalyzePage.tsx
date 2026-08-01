@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { TerminalShell } from "../components/layout/TerminalShell";
 import { useAuth } from "../context/AuthContext";
 import { 
@@ -20,7 +20,8 @@ import {
   Plus,
   Copy,
   FileText,
-  ChevronRight
+  ChevronRight,
+  Check
 } from "lucide-react";
 import { NewsFeed } from "../components/analysis/NewsFeed";
 import { EconomicCalendar } from "../components/analysis/EconomicCalendar";
@@ -133,9 +134,95 @@ function buildNewsContextPrefix(tab: string, items: NewsItem[]): string {
   return `[BERITA TERBARU - mode ${tab}]\n${lines}\n\n`;
 }
 
+const ChatMessageItem = React.memo(({ msg }: { msg: any }) => {
+  const [isCopied, setIsCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(msg.content);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
+  };
+
+  const handleSave = () => {
+    const blob = new Blob([msg.content], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `betrix-analysis-${Date.now()}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  if (msg.role === 'user') {
+    return (
+      <div className="flex justify-end group" style={{ contain: 'layout' }}>
+        <button 
+          onClick={handleCopy}
+          className="opacity-0 group-hover:opacity-100 p-1.5 text-[#555] hover:text-[#fff] transition-all mr-1 self-center"
+          title="Copy"
+        >
+          {isCopied ? <Check size={14} className="text-[#00ff99]" /> : <Copy size={14} />}
+        </button>
+        <div className="bg-[#ff9900] text-black font-bold px-4 py-2 rounded-sm max-w-[80%] text-[12px] whitespace-pre-wrap shadow-lg">
+          {msg.content}
+        </div>
+      </div>
+    );
+  }
+
+  if (msg.isTyping) {
+    return (
+      <div className="flex flex-col w-full max-w-4xl gap-3" style={{ contain: 'layout' }}>
+        <div className="flex flex-col border border-[#333] bg-[#0a0a0a] rounded-sm p-5 shadow-lg">
+          <div className="flex items-center gap-3 text-[#ff9900] font-bold text-[11px] animate-pulse">
+            <Globe size={14} className="animate-spin" /> 
+            <span>Agent is analyzing market data and executing tools...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col w-full max-w-4xl gap-3" style={{ contain: 'layout' }}>
+      <div className={`flex flex-col border border-[#333] bg-[#0a0a0a] rounded-sm shadow-lg ${msg.isFinishedGlow ? 'animate-ai-glow' : ''}`}>
+        <div className="flex items-center justify-between px-4 py-2 border-b border-[#222]">
+          <div className="flex items-center gap-2 text-[#eee] font-bold text-[11px]">
+            <ChevronRight size={12} className="text-[#ff9900]" /> Agent Thinking
+          </div>
+          <span className="text-[#555] text-[10px] font-bold">
+            {msg.thinkingTime} 
+            {msg.cost && <span className="ml-2 text-[#ff4444]">{msg.cost}</span>}
+          </span>
+        </div>
+        <div className="px-5 py-4 text-[#eee] leading-relaxed text-[12px]">
+          <ReactMarkdown components={markdownComponents}>{msg.content}</ReactMarkdown>
+        </div>
+        <div className="flex justify-end gap-2 px-4 py-2 border-t border-[#111]">
+          <button 
+            onClick={handleCopy}
+            className="flex items-center gap-1.5 border border-[#333] px-2 py-1 text-[9px] font-bold text-[#888] hover:text-[#00ff99] hover:border-[#00ff99] rounded-sm transition-colors"
+          >
+            {isCopied ? <Check size={10} /> : <Copy size={10} />} 
+            {isCopied ? 'COPIED' : 'COPY'}
+          </button>
+          <button 
+            onClick={handleSave}
+            className="flex items-center gap-1.5 border border-[#333] px-2 py-1 text-[9px] font-bold text-[#888] hover:text-white rounded-sm transition-colors"
+            title="Save as Markdown (.md)"
+          >
+            <FileText size={10} /> SAVE
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+});
+
 export function AnalyzePage() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const symbol = searchParams.get('symbol');
   const [activeTab, setActiveTab] = useState("AUTO");
   const [inputText, setInputText] = useState("");
@@ -315,6 +402,33 @@ export function AnalyzePage() {
       ].slice(0, 5);
     });
 
+    // Penampung token (buffer) 40ms (sekitar 25 FPS).
+    // Kenapa? Jika pesan AI menjadi SANGAT panjang, merender ulang teks utuh 
+    // dengan ReactMarkdown 50x-100x per detik (kecepatan token masuk) 
+    // akan membebani "Main Thread" browser dan membuat seluruh CSS animasi (seperti TickerStrip) tersendat.
+    let pendingTokens = "";
+    let lastRenderTime = Date.now();
+    let flushTimeout: any = null;
+
+    const flushTokens = () => {
+      if (!pendingTokens) return;
+      const toFlush = pendingTokens;
+      pendingTokens = "";
+      
+      setMessages(prev => {
+        const newMsgs = [...prev];
+        const lastIndex = newMsgs.length - 1;
+        const last = newMsgs[lastIndex];
+        newMsgs[lastIndex] = {
+          ...last,
+          content: last.content + toFlush,
+          isTyping: false
+        };
+        return newMsgs;
+      });
+      lastRenderTime = Date.now();
+    };
+
     // 5. Connect to backend stream
     streamChat(
       messageToSend, 
@@ -324,20 +438,21 @@ export function AnalyzePage() {
       activeSessionId,
       tierOverride,
       (token) => {
-        // Append token to the last message (must clone object for React to re-render)
-        setMessages(prev => {
-          const newMsgs = [...prev];
-          const lastIndex = newMsgs.length - 1;
-          const last = newMsgs[lastIndex];
-          newMsgs[lastIndex] = {
-            ...last,
-            content: last.content + token,
-            isTyping: false // Remove loading pulse once tokens arrive
-          };
-          return newMsgs;
-        });
+        pendingTokens += token;
+        const now = Date.now();
+        // Render tiap 40ms (25 FPS) — super mulus di mata, sangat ringan di CPU.
+        if (now - lastRenderTime > 40) {
+          if (flushTimeout) clearTimeout(flushTimeout);
+          flushTokens();
+        } else {
+          if (flushTimeout) clearTimeout(flushTimeout);
+          flushTimeout = setTimeout(flushTokens, 40);
+        }
       },
       (result) => {
+        if (flushTimeout) clearTimeout(flushTimeout);
+        flushTokens();
+        
         // Add final metadata (latency, credits, etc)
         setMessages(prev => {
           const newMsgs = [...prev];
@@ -347,13 +462,17 @@ export function AnalyzePage() {
             ...last,
             thinkingTime: `${(result.latencyMs / 1000).toFixed(1)}s`,
             tools: result.modelUsed,
-            cost: `-${TIER_CREDIT_COST[tierOverride || FRONTEND_TASK_TIER_MAP[taskType] || "balanced"]}.0 CRD`
+            cost: `-${TIER_CREDIT_COST[tierOverride || FRONTEND_TASK_TIER_MAP[taskType] || "balanced"]}.0 CRD`,
+            isFinishedGlow: true
           };
           return newMsgs;
         });
         setIsStreaming(false);
       },
       (error) => {
+        if (flushTimeout) clearTimeout(flushTimeout);
+        flushTokens();
+        
         // Handle error state
         setMessages(prev => {
           const newMsgs = [...prev];
@@ -372,10 +491,14 @@ export function AnalyzePage() {
   };
 
   useEffect(() => {
+    // Autoscroll dimatikan sepenuhnya atas permintaan user untuk menghindari 
+    // efek berkedut (jitter) saat teks AI di-render.
+    /*
     if (view === 'chat') {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      messagesEndRef.current?.scrollIntoView({ behavior: isStreaming ? "auto" : "smooth" });
     }
-  }, [messages, view]);
+    */
+  }, [view]);
 
   useEffect(() => {
     if (!showAgentMenu) return;
@@ -670,9 +793,37 @@ export function AnalyzePage() {
     </div>
   );
 
+  const handleExport = () => {
+    if (messages.length === 0) return;
+    
+    let content = "# Betrix AI Agent - Analysis Session\n\n";
+    content += `Date: ${new Date().toLocaleString()}\n`;
+    content += `Symbol Context: ${symbol || 'N/A'}\n\n---\n\n`;
+    
+    messages.forEach((msg) => {
+      if (msg.role === 'user') {
+        content += `### You:\n${msg.content}\n\n`;
+      } else {
+        content += `### Agent:\n${msg.content}\n\n`;
+      }
+    });
+
+    const blob = new Blob([content], { type: 'text/markdown' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `betrix-session-export-${Date.now()}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleSearchSymbol = useCallback((s: string) => {
+    navigate(`/?symbol=${s.toUpperCase()}`);
+  }, [navigate]);
+
   return (
     <TerminalShell
-      onSearchSymbol={() => {}}
+      onSearchSymbol={handleSearchSymbol}
       rightPanel={
         <>
           <div id="panel-news">
@@ -801,7 +952,7 @@ export function AnalyzePage() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button className="flex items-center gap-1.5 text-[9px] font-bold text-[#888] hover:text-white transition-colors border border-[#333] px-2 py-1 rounded-sm">
+                <button onClick={handleExport} className="flex items-center gap-1.5 text-[9px] font-bold text-[#888] hover:text-white transition-colors border border-[#333] px-2 py-1 rounded-sm">
                   <Download size={10} /> EXPORT
                 </button>
                 <button onClick={() => {setMessages([]); setView('landing'); setCurrentSessionId(null);}} className="flex items-center gap-1.5 text-[9px] font-bold text-black bg-[#ff9900] hover:opacity-80 transition-opacity px-2 py-1 rounded-sm">
@@ -809,66 +960,10 @@ export function AnalyzePage() {
                 </button>
               </div>
             </div>
-
             {/* MESSAGES */}
             <div className="flex flex-col flex-1 overflow-y-auto px-8 py-6 gap-6">
               {messages.map((msg: any, idx) => (
-                msg.role === 'user' ? (
-                  <div key={idx} className="flex justify-end">
-                    <div className="bg-[#ff9900] text-black font-bold px-4 py-2 rounded-sm max-w-[80%] text-[12px] whitespace-pre-wrap shadow-lg">
-                      {msg.content}
-                    </div>
-                  </div>
-                ) : msg.isTyping ? (
-                  <div key={idx} className="flex flex-col w-full max-w-4xl gap-3">
-                    <div className="flex flex-col border border-[#333] bg-[#0a0a0a] rounded-sm p-5 shadow-lg">
-                      <div className="flex items-center gap-3 text-[#ff9900] font-bold text-[11px] animate-pulse">
-                        <Globe size={14} className="animate-spin" /> 
-                        <span>Agent is analyzing market data and executing tools...</span>
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <div key={idx} className="flex flex-col w-full max-w-4xl gap-3">
-                    <div className="flex flex-col border border-[#333] bg-[#0a0a0a] rounded-sm shadow-lg">
-                      <div className="flex items-center justify-between px-4 py-2 border-b border-[#222]">
-                        <div className="flex items-center gap-2 text-[#eee] font-bold text-[11px]">
-                          <ChevronRight size={12} className="text-[#ff9900]" /> Agent Thinking
-                        </div>
-                        <span className="text-[#555] text-[10px] font-bold">
-                          {msg.thinkingTime} 
-                          {msg.cost && <span className="ml-2 text-[#ff4444]">{msg.cost}</span>}
-                        </span>
-                      </div>
-                      <div className="px-5 py-4 text-[#eee] leading-relaxed text-[12px]">
-                        <ReactMarkdown components={markdownComponents}>{msg.content}</ReactMarkdown>
-                      </div>
-                      <div className="flex justify-end gap-2 px-4 py-2 border-t border-[#111]">
-                        <button className="flex items-center gap-1.5 border border-[#333] px-2 py-1 text-[9px] font-bold text-[#888] hover:text-white rounded-sm transition-colors">
-                          <Copy size={10} /> COPY
-                        </button>
-                        <button className="flex items-center gap-1.5 border border-[#333] px-2 py-1 text-[9px] font-bold text-[#888] hover:text-white rounded-sm transition-colors">
-                          <FileText size={10} />
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* SUGGESTED FOLLOWUPS (only show after last message) */}
-                    {idx === messages.length - 1 && (
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        <button className="border border-[#333] text-[#888] hover:text-[#ccc] hover:border-[#555] px-3 py-1.5 text-[10px] rounded-sm transition-colors bg-[#080808]">
-                          What is the price target and valuation for AI?
-                        </button>
-                        <button className="border border-[#333] text-[#888] hover:text-[#ccc] hover:border-[#555] px-3 py-1.5 text-[10px] rounded-sm transition-colors bg-[#080808]">
-                          What are the key risks facing AI?
-                        </button>
-                        <button className="border border-[#333] text-[#888] hover:text-[#ccc] hover:border-[#555] px-3 py-1.5 text-[10px] rounded-sm transition-colors bg-[#080808]">
-                          What is the current macro environment impact on this sector?
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )
+                <ChatMessageItem key={idx} msg={msg} />
               ))}
               <div ref={messagesEndRef} />
             </div>

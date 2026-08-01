@@ -22,9 +22,18 @@ const MT5_URL = process.env.MT5_BRIDGE_URL || "127.0.0.1:8890";
  * ±1 bulan lalu s/d ±1 bulan depan, lihat mt5-bridge/CommandCore.mqh) dan
  * simpan semuanya ke DB sekaligus (termasuk bulan lalu, sekalian aja).
  */
+let lastSeededMonthKey = null;
+
 export async function syncCalendarIfNeeded() {
   try {
     const now = new Date();
+    const currentMonthKey = `${now.getFullYear()}-${now.getMonth()}`;
+
+    // Cek di memori Backend: Apakah bulan ini sudah sukses diverifikasi/sync?
+    if (lastSeededMonthKey === currentMonthKey) {
+      return; // Langsung return, bypass query DB dan MT5 sepenuhnya!
+    }
+
     const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
     const endOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 2, 0, 23, 59, 59, 999);
 
@@ -38,6 +47,7 @@ export async function syncCalendarIfNeeded() {
       logger.info(`Calendar bulan ini+depan sudah ada di DB (${existingCount} events). Skip sync ke MT5.`, {
         context: "Calendar",
       });
+      lastSeededMonthKey = currentMonthKey; // Simpan status sukses ke memori
       return;
     }
 
@@ -52,6 +62,8 @@ export async function syncCalendarIfNeeded() {
 
     const saved = await upsertEvents(events);
     logger.info(`Calendar synced dari MT5: ${saved} events disimpan/diupdate ke DB.`, { context: "Calendar" });
+    
+    lastSeededMonthKey = currentMonthKey; // Simpan status sukses ke memori
   } catch (err) {
     logger.error(`Gagal sync calendar dari MT5: ${err.message}`, { context: "Calendar" });
     // Sengaja tidak throw - biar server tetap start meski MT5 lagi mati.

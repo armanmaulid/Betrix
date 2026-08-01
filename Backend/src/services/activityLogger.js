@@ -9,7 +9,7 @@ export async function logUserActivity({ userId, action, details = null, ip = nul
       [userId, action, details ? JSON.stringify(details) : null, ip, userAgent]
     );
   } catch (err) {
-    logger.error("[logUserActivity] error:", { error: err.message, userId, action });
+    logger.error("error:", { context: "Activity", error: err.message, userId, action });
   }
 }
 

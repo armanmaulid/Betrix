@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Newspaper, RefreshCw } from "lucide-react";
 
 interface NewsItem {
@@ -66,7 +66,7 @@ function formatRelativeTime(iso: string): string {
 // Data dari backend /api/news via Vite proxy (localhost:3000).
 // Auto-polling tiap 30 detik untuk update realtime.
 // Nanti bisa diganti pakai EventSource(/api/news/stream) setelah ada login.
-export function NewsFeed() {
+export const NewsFeed = React.memo(function NewsFeed() {
   const [items, setItems] = useState<NewsItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -205,15 +205,7 @@ export function NewsFeed() {
         )}
       </div>
 
-      {/* Button To Dedicated News Page */}
-      <div className="border-t border-[var(--border)] bg-[var(--surface-alt)]">
-        <a 
-          href="/news"
-          className="flex w-full items-center justify-center gap-1.5 py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)] hover:text-cyan-400 hover:bg-[var(--surface)] transition-colors"
-        >
-          [ VIEW ALL NEWS HUB ]
-        </a>
-      </div>
+
     </div>
   );
-}
+});

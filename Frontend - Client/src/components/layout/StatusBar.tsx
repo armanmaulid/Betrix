@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Activity, Server, Clock, Database, User } from "lucide-react";
 
 const POLL_MS = 10_000; // Tiap 10 detik hitung ping
 
-export function StatusBar() {
+export const StatusBar = React.memo(function StatusBar() {
   const { user, isConnected } = useAuth();
   const [ping, setPing] = useState<number | null>(null);
 
@@ -91,4 +91,4 @@ export function StatusBar() {
       </div>
     </div>
   );
-}
+});
