@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CalendarClock, RefreshCw, Info, Filter, X } from "lucide-react";
 import { fetchEconomicCalendar, type CalendarEvent } from "../../api/marketClient";
 
@@ -11,14 +11,75 @@ const IMPACT_DOT: Record<CalendarEvent["importance"], string> = {
 
 const IMPACTS: Array<CalendarEvent["importance"]> = ["high", "medium", "low"];
 
+type PeriodKey = "last_week" | "this_week" | "next_week" | "last_month" | "this_month" | "next_month";
+
+const PERIOD_LABELS: Record<PeriodKey, string> = {
+  last_week: "Minggu Lalu",
+  this_week: "Minggu Ini",
+  next_week: "Minggu Depan",
+  last_month: "Bulan Lalu",
+  this_month: "Bulan Ini",
+  next_month: "Bulan Depan",
+};
+const PERIOD_ORDER: PeriodKey[] = ["last_week", "this_week", "next_week", "last_month", "this_month", "next_month"];
+
+// Label negara yang umum dipakai - fallback ke kode ISO-nya sendiri kalau
+// nggak ada di daftar (daftar ini sengaja nggak lengkap, cuma buat mempercantik
+// tampilan filter, bukan sumber data).
+const COUNTRY_NAMES: Record<string, string> = {
+  US: "United States", EU: "Euro Zone", GB: "United Kingdom", JP: "Japan",
+  AU: "Australia", NZ: "New Zealand", CA: "Canada", CH: "Switzerland",
+  CN: "China", DE: "Germany", FR: "France", IT: "Italy", ES: "Spain",
+  SG: "Singapore", ZA: "South Africa", IN: "India", ID: "Indonesia",
+  KR: "South Korea", HK: "Hong Kong", MX: "Mexico", BR: "Brazil", RU: "Russia",
+};
+
+function countryLabel(code: string): string {
+  return COUNTRY_NAMES[code] || code;
+}
+
+// ISO alpha-2 -> flag emoji, murni dari Unicode regional indicator symbols,
+// nggak butuh asset gambar apapun. "EU" juga didukung Unicode sebagai
+// pengecualian resmi (flag Uni Eropa).
+function flagEmoji(code: string): string {
+  if (!code || code.length !== 2) return "🏳️";
+  const points = [...code.toUpperCase()].map((c) => 127397 + c.charCodeAt(0));
+  return String.fromCodePoint(...points);
+}
+
 interface FilterState {
   countries: Set<string>;
+  currencies: Set<string>;
   impacts: Set<CalendarEvent["importance"]>;
   showOnlyWithData: boolean;
+  period: PeriodKey;
+}
+
+function getPeriodRange(period: PeriodKey): { from: Date; to: Date } {
+  const now = new Date();
+
+  if (period === "last_week" || period === "this_week" || period === "next_week") {
+    const day = now.getDay(); // 0=Minggu..6=Sabtu
+    const diffToMonday = (day === 0 ? -6 : 1) - day; // minggu mulai Senin
+    const weekOffset = period === "last_week" ? -1 : period === "next_week" ? 1 : 0;
+    const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday + weekOffset * 7, 0, 0, 0, 0);
+    const to = new Date(from);
+    to.setDate(to.getDate() + 7);
+    to.setMilliseconds(to.getMilliseconds() - 1); // Minggu 23:59:59.999
+    return { from, to };
+  }
+
+  const monthOffset = period === "last_month" ? -1 : period === "next_month" ? 1 : 0;
+  const from = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1, 0, 0, 0, 0);
+  const to = new Date(now.getFullYear(), now.getMonth() + monthOffset + 1, 0, 23, 59, 59, 999);
+  return { from, to };
 }
 
 function formatTime(iso: string): string {
   const d = new Date(iso);
+  // Backend ngirim ISO-8601 UTC ("...Z") - timeZone sengaja nggak di-set
+  // eksplisit di sini, jadi Intl otomatis pakai timezone lokal device/
+  // browser user buat nampilin jamnya.
   return d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 }
 
@@ -28,9 +89,11 @@ function formatDate(iso: string): string {
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
 
-  if (d.toDateString() === now.toDateString()) return "HARI INI";
-  if (d.toDateString() === tomorrow.toDateString()) return "BESOK";
-  return d.toLocaleDateString("id-ID", { day: "numeric", month: "short" }).toUpperCase();
+  const withYear = d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }).toUpperCase();
+
+  if (d.toDateString() === now.toDateString()) return `HARI INI · ${withYear}`;
+  if (d.toDateString() === tomorrow.toDateString()) return `BESOK · ${withYear}`;
+  return withYear;
 }
 
 function formatValue(val: string | null): string {
@@ -46,14 +109,22 @@ export function EconomicCalendar() {
   const [error, setError] = useState<string | null>(null);
   const [filterPanelOpen, setFilterPanelOpen] = useState(false);
 
-  // Available currencies - dynamically extracted from backend response
-  const [availableCurrencies, setAvailableCurrencies] = useState<Array<{ code: string; country: string }>>([]);
+  const [availableCountries, setAvailableCountries] = useState<string[]>([]);
+  const [availableCurrencies, setAvailableCurrencies] = useState<string[]>([]);
 
-  // Default: USD high+medium (backward compatible dengan filter lama)
+  // Auto-select-all cuma dilakukan sekali di load pertama - biar pilihan
+  // user nggak ke-reset tiap kali data di-refresh (manual reload / SSE
+  // calendar_update).
+  const didInitFilters = useRef(false);
+  const scrolledForKeyRef = useRef<string | null>(null);
+  const listContainerRef = useRef<HTMLDivElement>(null);
+
   const [filter, setFilter] = useState<FilterState>({
-    countries: new Set(["US"]),
-    impacts: new Set(["high", "medium"]),
+    countries: new Set(),
+    currencies: new Set(),
+    impacts: new Set(["high", "medium", "low"]),
     showOnlyWithData: false,
+    period: "this_week",
   });
 
   async function load() {
@@ -64,22 +135,37 @@ export function EconomicCalendar() {
       setEvents(data.events);
       setGeneratedAt(data.generatedAt);
 
-      // Extract unique currencies/countries dari response
-      const currencyMap = new Map<string, string>();
+      const countrySet = new Set<string>();
+      const currencySet = new Set<string>();
       for (const ev of data.events) {
-        if (!currencyMap.has(ev.currency)) {
-          currencyMap.set(ev.currency, ev.country);
-        }
+        countrySet.add(ev.country);
+        currencySet.add(ev.currency);
       }
-      const currencies = Array.from(currencyMap.entries())
-        .map(([code, country]) => ({ code, country }))
-        .sort((a, b) => a.code.localeCompare(b.code));
+      const countries = Array.from(countrySet).sort();
+      const currencies = Array.from(currencySet).sort();
+      setAvailableCountries(countries);
       setAvailableCurrencies(currencies);
 
-      // First load default: USD + high/medium only (kalau belum pernah diubah user)
-      if (filter.countries.size === 1 && filter.countries.has("US") && filter.impacts.size === 2) {
-        // Keep default USD + high/medium, no auto-select all
-        // User already has the right default, do nothing
+      // Default: semua negara & semua currency dicentang (biar nggak
+      // ilang data kayak kejadian kemarin) - cuma dijalankan sekali.
+      if (!didInitFilters.current) {
+        didInitFilters.current = true;
+        setFilter((prev) => ({
+          ...prev,
+          countries: new Set(countries),
+          currencies: new Set(currencies),
+        }));
+      } else {
+        // Kalau ada negara/currency BARU muncul dari refresh berikutnya
+        // (mis. bulan baru ke-seed), otomatis ikut dicentang juga -
+        // supaya data baru nggak diam-diam ketutup filter lama.
+        setFilter((prev) => {
+          const nextCountries = new Set(prev.countries);
+          const nextCurrencies = new Set(prev.currencies);
+          countries.forEach((c) => nextCountries.add(c));
+          currencies.forEach((c) => nextCurrencies.add(c));
+          return { ...prev, countries: nextCountries, currencies: nextCurrencies };
+        });
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal memuat calendar");
@@ -93,21 +179,80 @@ export function EconomicCalendar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Live update: dengerin event calendar_update dari backend (yang relay
+  // dari mt5-bridge tiap ada actual value baru rilis / revisi forecast).
+  // Debounce ringan karena beberapa event bisa datang beruntun sekaligus.
+  useEffect(() => {
+    const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+    const token = localStorage.getItem("eaconsole.sessionToken") || "";
+    if (!token) return;
+
+    const es = new EventSource(`${BACKEND_URL}/api/market/stream?calendar=1&token=${token}`);
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+
+    es.addEventListener("calendar_update", () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => load(), 500);
+    });
+
+    es.onerror = () => {
+      // EventSource sudah auto-reconnect bawaan browser, cukup diamkan.
+    };
+
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      es.close();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const periodRange = getPeriodRange(filter.period);
+
   // Apply filters
   const filtered = events.filter((ev) => {
     if (!filter.countries.has(ev.country)) return false;
+    if (!filter.currencies.has(ev.currency)) return false;
     if (!filter.impacts.has(ev.importance)) return false;
     if (filter.showOnlyWithData && ev.actual === null && ev.forecast === null && ev.previous === null) {
       return false;
     }
+    const evMs = new Date(ev.time).getTime();
+    if (evMs < periodRange.from.getTime() || evMs > periodRange.to.getTime()) return false;
     return true;
   });
 
-  function toggleCountry(countryCode: string) {
+  // Auto-scroll ke grup "hari ini" begitu data (ter-filter) siap - sekali
+  // per kombinasi data+filter, bukan tiap render, biar nggak ganggu kalau
+  // user lagi scroll manual.
+  useEffect(() => {
+    if (isLoading || filtered.length === 0) return;
+    const todayKey = new Date().toDateString();
+    const scrollKey = `${todayKey}|${filtered.length}`;
+    if (scrolledForKeyRef.current === scrollKey) return;
+
+    const hasToday = filtered.some((ev) => new Date(ev.time).toDateString() === todayKey);
+    if (!hasToday || !listContainerRef.current) return;
+
+    const el = listContainerRef.current.querySelector(`[data-date-key="${CSS.escape(todayKey)}"]`);
+    if (el) {
+      el.scrollIntoView({ block: "start", behavior: "auto" });
+      scrolledForKeyRef.current = scrollKey;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading, filtered.length, filter.period]);
+
+  function toggleCountry(code: string) {
     const next = new Set(filter.countries);
-    if (next.has(countryCode)) next.delete(countryCode);
-    else next.add(countryCode);
+    if (next.has(code)) next.delete(code);
+    else next.add(code);
     setFilter({ ...filter, countries: next });
+  }
+
+  function toggleCurrency(code: string) {
+    const next = new Set(filter.currencies);
+    if (next.has(code)) next.delete(code);
+    else next.add(code);
+    setFilter({ ...filter, currencies: next });
   }
 
   function toggleImpact(impact: CalendarEvent["importance"]) {
@@ -119,9 +264,11 @@ export function EconomicCalendar() {
 
   function resetFilters() {
     setFilter({
-      countries: new Set(["US"]),
-      impacts: new Set(["high", "medium"]),
+      countries: new Set(availableCountries),
+      currencies: new Set(availableCurrencies),
+      impacts: new Set(["high", "medium", "low"]),
       showOnlyWithData: false,
+      period: "this_week",
     });
   }
 
@@ -134,6 +281,18 @@ export function EconomicCalendar() {
           Economic Calendar
         </span>
         <div className="flex items-center gap-2">
+          <select
+            value={filter.period}
+            onChange={(e) => setFilter({ ...filter, period: e.target.value as PeriodKey })}
+            aria-label="Pilih periode tanggal"
+            className="border border-[var(--border)] bg-[var(--surface)] px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-primary)] hover:border-[var(--accent)] focus:border-[var(--accent)] focus:outline-none"
+          >
+            {PERIOD_ORDER.map((p) => (
+              <option key={p} value={p}>
+                {PERIOD_LABELS[p]}
+              </option>
+            ))}
+          </select>
           <button
             onClick={() => setFilterPanelOpen(!filterPanelOpen)}
             aria-label="Toggle filter panel"
@@ -158,9 +317,8 @@ export function EconomicCalendar() {
         </div>
       </div>
 
-
       {/* Calendar List */}
-      <div className="flex-1 overflow-y-auto px-3 py-2">
+      <div ref={listContainerRef} className="flex-1 overflow-y-auto px-3 py-2">
         {isLoading ? (
           <p className="text-xs text-[var(--text-muted)]">Memuat...</p>
         ) : error ? (
@@ -170,7 +328,9 @@ export function EconomicCalendar() {
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center">
-            <p className="text-xs text-[var(--text-muted)]">Tidak ada event dengan filter ini</p>
+            <p className="text-xs text-[var(--text-muted)]">
+              Tidak ada event di {PERIOD_LABELS[filter.period]} dengan filter ini
+            </p>
             <button onClick={resetFilters} className="mt-2 text-[10px] text-[var(--accent)] hover:underline">
               Reset filter
             </button>
@@ -183,7 +343,7 @@ export function EconomicCalendar() {
               (groups[key] ??= []).push(ev);
             }
             return Object.entries(groups).map(([dateKey, groupEvents]) => (
-              <div key={dateKey} className="mb-3">
+              <div key={dateKey} data-date-key={dateKey} className="mb-3">
                 <div className="sticky top-0 mb-1 border-b border-[var(--border)] bg-[var(--surface)] pb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">
                   {formatDate(dateKey)}
                 </div>
@@ -197,6 +357,11 @@ export function EconomicCalendar() {
                       {/* Time */}
                       <span className="tabular w-7 flex-shrink-0 text-[10px] text-[var(--text-primary)]">
                         {formatTime(ev.time)}
+                      </span>
+
+                      {/* Country flag */}
+                      <span className="flex-shrink-0 text-[11px]" title={countryLabel(ev.country)}>
+                        {flagEmoji(ev.country)}
                       </span>
 
                       {/* Currency badge */}
@@ -253,7 +418,7 @@ export function EconomicCalendar() {
       {/* Footer */}
       {generatedAt && !isLoading && (
         <div className="border-t border-[var(--border)] px-3 py-1 text-[9px] text-[var(--text-muted)]">
-          Data dari Forex Factory · {new Date(generatedAt).toLocaleString("id-ID")} · {filtered.length} events
+          Data dari MT5 · {new Date(generatedAt).toLocaleString("id-ID")} · {filtered.length} events
         </div>
       )}
 
@@ -275,31 +440,10 @@ export function EconomicCalendar() {
 
             {/* Panel Content */}
             <div className="flex-1 overflow-y-auto px-3 py-3">
-              {/* Countries */}
+              {/* Priority */}
               <div className="mb-4">
-                <div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
-                  Countries
-                </div>
-                <div className="space-y-1">
-                  {availableCurrencies.map((curr) => (
-                    <label key={curr.code} className="flex cursor-pointer items-center gap-2 text-[11px] hover:text-[var(--accent)]">
-                      <input
-                        type="checkbox"
-                        checked={filter.countries.has(curr.country)}
-                        onChange={() => toggleCountry(curr.country)}
-                        className="h-3 w-3 accent-[var(--accent)]"
-                      />
-                      <span className="font-semibold">{curr.code}</span>
-                      <span className="text-[var(--text-muted)]">({curr.country})</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Impact Levels */}
-              <div className="mb-4">
-                <div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
-                  Impact Level
+                <div className="mb-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                  <span>Priority</span>
                 </div>
                 <div className="space-y-1">
                   {IMPACTS.map((imp) => (
@@ -314,6 +458,82 @@ export function EconomicCalendar() {
                       <span className="font-semibold capitalize">{imp}</span>
                     </label>
                   ))}
+                </div>
+              </div>
+
+              {/* Currency */}
+              <div className="mb-4">
+                <div className="mb-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                  <span>Currency</span>
+                  <span className="flex gap-2 normal-case">
+                    <button
+                      onClick={() => setFilter({ ...filter, currencies: new Set(availableCurrencies) })}
+                      className="text-[var(--accent)] hover:underline"
+                    >
+                      Semua
+                    </button>
+                    <button
+                      onClick={() => setFilter({ ...filter, currencies: new Set() })}
+                      className="text-[var(--text-muted)] hover:underline"
+                    >
+                      Kosongkan
+                    </button>
+                  </span>
+                </div>
+                <div className="max-h-32 space-y-1 overflow-y-auto">
+                  {availableCurrencies.map((code) => (
+                    <label key={code} className="flex cursor-pointer items-center gap-2 text-[11px] hover:text-[var(--accent)]">
+                      <input
+                        type="checkbox"
+                        checked={filter.currencies.has(code)}
+                        onChange={() => toggleCurrency(code)}
+                        className="h-3 w-3 accent-[var(--accent)]"
+                      />
+                      <span className="font-semibold">{code}</span>
+                    </label>
+                  ))}
+                  {availableCurrencies.length === 0 && (
+                    <p className="text-[10px] text-[var(--text-muted)]">Belum ada data</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Country */}
+              <div className="mb-4">
+                <div className="mb-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
+                  <span>Country</span>
+                  <span className="flex gap-2 normal-case">
+                    <button
+                      onClick={() => setFilter({ ...filter, countries: new Set(availableCountries) })}
+                      className="text-[var(--accent)] hover:underline"
+                    >
+                      Semua
+                    </button>
+                    <button
+                      onClick={() => setFilter({ ...filter, countries: new Set() })}
+                      className="text-[var(--text-muted)] hover:underline"
+                    >
+                      Kosongkan
+                    </button>
+                  </span>
+                </div>
+                <div className="max-h-40 space-y-1 overflow-y-auto">
+                  {availableCountries.map((code) => (
+                    <label key={code} className="flex cursor-pointer items-center gap-2 text-[11px] hover:text-[var(--accent)]">
+                      <input
+                        type="checkbox"
+                        checked={filter.countries.has(code)}
+                        onChange={() => toggleCountry(code)}
+                        className="h-3 w-3 accent-[var(--accent)]"
+                      />
+                      <span>{flagEmoji(code)}</span>
+                      <span className="font-semibold">{code}</span>
+                      <span className="truncate text-[var(--text-muted)]">{countryLabel(code)}</span>
+                    </label>
+                  ))}
+                  {availableCountries.length === 0 && (
+                    <p className="text-[10px] text-[var(--text-muted)]">Belum ada data</p>
+                  )}
                 </div>
               </div>
 

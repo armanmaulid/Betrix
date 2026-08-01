@@ -20,8 +20,14 @@ export async function syncBrokerSymbols(retries = 5, delayMs = 3000) {
         throw new Error("Invalid response from MT5 symbols list");
       }
 
-    // Ambil jumlah simbol saat ini di DB untuk optimasi (skip jika sama)
-    const { rows: countRows } = await pool.query("SELECT COUNT(*) FROM broker_symbols");
+    // Ambil jumlah simbol AKTIF saat ini di DB untuk optimasi (skip jika sama).
+    // PENTING: harus filter is_active=true - broker_symbols nyimpen histori
+    // simbol yang pernah delisted (is_active=false, tapi row-nya nggak
+    // dihapus). Kalau COUNT(*) tanpa filter ini, begitu ada 1 simbol yang
+    // pernah di-delist broker, dbCount jadi > mt5Symbols.length SELAMANYA,
+    // jadi "skip kalau sama" itu nggak akan pernah kena, maksa full sync
+    // terus tiap startup padahal datanya udah sama persis.
+    const { rows: countRows } = await pool.query("SELECT COUNT(*) FROM broker_symbols WHERE is_active = true");
     const dbCount = parseInt(countRows[0].count);
 
     if (dbCount === mt5Symbols.length) {

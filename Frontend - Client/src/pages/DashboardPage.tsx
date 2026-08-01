@@ -9,7 +9,7 @@ import { EconomicCalendar } from "../components/analysis/EconomicCalendar";
 import { useAuth } from "../context/AuthContext";
 
 // Simbol MT5 — ini yang jadi "sumber kebenaran" symbol di app (dipakai
-// TickerStrip, WatchlistPanel, dan diteruskan ke AnalyzePage). Chart di
+// TickerStrip, dan diteruskan ke AnalyzePage). Chart di
 // halaman ini sendiri pakai TradingView, jadi symbol MT5-nya diterjemahkan
 // dulu lewat toTradingViewSymbol() sebelum dikirim ke widget.
 

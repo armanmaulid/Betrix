@@ -61,7 +61,16 @@ const MIGRATIONS = [
   `CREATE TABLE IF NOT EXISTS credit_transactions ( id UUID PRIMARY KEY DEFAULT gen_random_uuid(), user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE, amount INTEGER NOT NULL, action TEXT NOT NULL, created_at TIMESTAMPTZ DEFAULT now() );`,
   `CREATE INDEX IF NOT EXISTS idx_credit_transactions_user_id ON credit_transactions(user_id);`,
   `CREATE TABLE IF NOT EXISTS broker_symbols ( symbol TEXT PRIMARY KEY, description TEXT, path TEXT, category TEXT, trade_mode INTEGER, is_active BOOLEAN DEFAULT true, created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now() );`,
-  `CREATE INDEX IF NOT EXISTS idx_broker_symbols_category ON broker_symbols(category);`
+  `CREATE INDEX IF NOT EXISTS idx_broker_symbols_category ON broker_symbols(category);`,
+  // calendar_events: cache lokal economic calendar dari mt5-bridge, biar histori
+  // nggak hilang tiap restart backend & nggak perlu re-fetch MT5 tiap request.
+  // value_id = ID unik per RILIS (bukan per definisi event - event yang sama
+  // berulang tiap bulan/minggu dengan value_id beda-beda tiap rilis).
+  `CREATE TABLE IF NOT EXISTS calendar_events ( value_id BIGINT PRIMARY KEY, event_id BIGINT NOT NULL, event_time TIMESTAMPTZ NOT NULL, country TEXT NOT NULL, currency TEXT NOT NULL, event_name TEXT NOT NULL, importance TEXT NOT NULL DEFAULT 'none', actual TEXT, forecast TEXT, previous TEXT, created_at TIMESTAMPTZ DEFAULT now(), updated_at TIMESTAMPTZ DEFAULT now() );`,
+  `CREATE INDEX IF NOT EXISTS idx_calendar_events_time ON calendar_events(event_time);`,
+  `CREATE INDEX IF NOT EXISTS idx_calendar_events_country ON calendar_events(country);`,
+  `CREATE INDEX IF NOT EXISTS idx_calendar_events_currency ON calendar_events(currency);`,
+  `CREATE INDEX IF NOT EXISTS idx_calendar_events_importance ON calendar_events(importance);`
 ];
 
 const isTTY = Boolean(process.stdout.isTTY);

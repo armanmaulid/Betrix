@@ -192,8 +192,8 @@ textarea {
 
 /* ============================================================
    FLASH ON PRICE UPDATE — background cell nge-flash hijau/merah
-   sekilas tiap kali harga berubah (dipakai WatchlistPanel &
-   TickerStrip). Class ditambah lewat JS sesaat lalu dilepas oleh
+   sekilas tiap kali harga berubah (dipakai TickerStrip). Class
+   ditambah lewat JS sesaat lalu dilepas oleh
    komponen setelah durasi animasi selesai.
    ============================================================ */
 @keyframes flash-up {

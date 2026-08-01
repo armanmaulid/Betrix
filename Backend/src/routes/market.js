@@ -1,6 +1,15 @@
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
-import { latestPrices, fetchMt5History, subscribeToSymbol, addPriceListener, removePriceListener } from "../services/mt5Client.js";
+import {
+  latestPrices,
+  fetchMt5History,
+  subscribeToSymbol,
+  addPriceListener,
+  removePriceListener,
+  addCalendarListener,
+  removeCalendarListener,
+} from "../services/mt5Client.js";
+import { getCalendarEventsFromDb, syncCalendarIfNeeded } from "../services/calendarStore.js";
 import { requireAuth } from "../middleware/auth.js";
 import { validateSession } from "../services/sessionStore.js";
 import { getSymbolsFromDb } from "../services/symbolStore.js";
@@ -104,9 +113,13 @@ router.get("/stream", async (req, res) => {
 
   const { symbol } = req.query;
   const symbolsToTrack = symbol ? symbol.toUpperCase().split(",") : null;
+  const wantsCalendar = req.query.calendar === "1" || req.query.calendar === "true";
 
   if (symbolsToTrack) {
     symbolsToTrack.forEach(s => subscribeToSymbol(s));
+  }
+  if (wantsCalendar) {
+    syncCalendarIfNeeded(); // no-op kalau bulan ini+depan udah ada di DB
   }
 
   // Send initial data immediately
@@ -133,8 +146,22 @@ router.get("/stream", async (req, res) => {
 
   addPriceListener(listener);
 
+  // Kirim event calendar_update tiap kali mt5Client menerima perubahan
+  // (rilis actual value baru, revisi forecast, dst). Filter country/
+  // currency/importance sengaja tidak diterapkan di sini - biar frontend
+  // (atau GET /economic-calendar) yang atur, listener ini cuma nge-relay
+  // apa saja yang berubah supaya frontend bisa auto-refresh.
+  let calendarListener = null;
+  if (wantsCalendar) {
+    calendarListener = (changedEvents) => {
+      res.write(`event: calendar_update\ndata: ${JSON.stringify({ events: changedEvents })}\n\n`);
+    };
+    addCalendarListener(calendarListener);
+  }
+
   req.on("close", () => {
     removePriceListener(listener);
+    if (calendarListener) removeCalendarListener(calendarListener);
 
     const remaining = (activeStreamsByUser.get(user.id) || 1) - 1;
     if (remaining <= 0) {
@@ -348,86 +375,66 @@ router.get("/ticker", (req, res) => {
   return res.json(latestPrices);
 });
 
-// Cache untuk kalender ekonomi.
-let calendarCache = null;
-let calendarCacheTime = 0;
-const CALENDAR_TTL_MS = 6 * 60 * 60 * 1000;
-
-const CURRENCY_TO_COUNTRY = {
-  "USD": "US", "EUR": "EU", "GBP": "GB", "JPY": "JP",
-  "AUD": "AU", "NZD": "NZ", "CAD": "CA", "CHF": "CH",
-  "CNY": "CN", "SGD": "SG", "ZAR": "ZA"
-};
-
+// Data kalender ekonomi sekarang bersumber dari MT5, disimpan permanen di
+// Postgres (lihat services/calendarStore.js) - bukan lagi scraping Forex
+// Factory, dan bukan lagi Map in-memory yang hilang tiap restart. Endpoint
+// ini query DB langsung dan menerapkan filter query param di layer backend.
 router.get("/economic-calendar", async (req, res) => {
   try {
-    if (calendarCache && Date.now() - calendarCacheTime < CALENDAR_TTL_MS) {
-      return res.json(calendarCache);
+    // Idempotent - kalau bulan ini+depan udah ada di DB, ini langsung
+    // return tanpa nge-hit MT5. Safety-net kalau sync pas startup gagal
+    // (mis. MT5 lagi mati pas backend baru nyala).
+    await syncCalendarIfNeeded();
+
+    const { country, currency, importance, days } = req.query;
+
+    const countryFilter = country
+      ? country.toUpperCase().split(",").map(s => s.trim()).filter(Boolean)
+      : null;
+    const currencyFilter = currency
+      ? currency.toUpperCase().split(",").map(s => s.trim()).filter(Boolean)
+      : null;
+    const importanceFilter = importance
+      ? importance.toLowerCase().split(",").map(s => s.trim()).filter(Boolean)
+      : null;
+
+    let fromMs, toMs;
+    if (days) {
+      // Override eksplisit: window presisi ±N hari dari sekarang.
+      const daysNum = Math.min(Math.max(parseInt(days) || 30, 1), 90);
+      const now = Date.now();
+      fromMs = now - daysNum * 24 * 60 * 60 * 1000;
+      toMs = now + daysNum * 24 * 60 * 60 * 1000;
+    } else {
+      // Default: batas KALENDER BULAN (bukan "N hari dari sekarang" yang
+      // kepotong di tengah bulan) - sama seperti mode default EA-nya,
+      // supaya kalau tanggal hari ini 15, "bulan lalu" tetap dapat penuh
+      // dari tanggal 1, bukan cuma sampai tanggal 15 bulan lalu.
+      const now = new Date();
+      const fromDate = new Date(now.getFullYear(), now.getMonth() - 1, 1, 0, 0, 0, 0);
+      const toDate = new Date(now.getFullYear(), now.getMonth() + 2, 0, 23, 59, 59, 999); // hari terakhir bulan depan
+      fromMs = fromDate.getTime();
+      toMs = toDate.getTime();
     }
 
-    const response = await fetch("https://nfs.faireconomy.media/ff_calendar_thisweek.json", {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; EconCalendarBot/1.0)",
-        "Accept": "application/json",
-      },
+    const events = await getCalendarEventsFromDb({
+      fromMs,
+      toMs,
+      countries: countryFilter,
+      currencies: currencyFilter,
+      importances: importanceFilter,
     });
+    // Filter (country/currency/importance/waktu) dan sort (ORDER BY
+    // event_time ASC) udah dikerjakan di query SQL getCalendarEventsFromDb,
+    // jadi di sini tinggal langsung pakai hasilnya.
 
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-    const contentType = response.headers.get("content-type") || "";
-    if (!contentType.includes("json")) {
-      throw new Error("Response bukan JSON (kemungkinan rate-limited)");
-    }
-
-    const eventsRaw = await response.json();
-
-    if (!Array.isArray(eventsRaw) || eventsRaw.length === 0) {
-      if (calendarCache) return res.json(calendarCache);
-      return res.json({ generatedAt: new Date().toISOString(), events: [] });
-    }
-
-    const events = eventsRaw
-      .filter(ev => ev.impact !== "Holiday")
-      .map(ev => {
-        let importance = "none";
-        const imp = (ev.impact || "").toLowerCase();
-        if (imp === "high") importance = "high";
-        else if (imp === "medium") importance = "medium";
-        else if (imp === "low") importance = "low";
-
-        const isoTime = ev.date || new Date().toISOString();
-
-        const currency = (ev.country || "USD").toUpperCase();
-        const countryCode = CURRENCY_TO_COUNTRY[currency] || currency.slice(0, 2).toUpperCase();
-
-        return {
-          time: isoTime,
-          country: countryCode,
-          currency: currency,
-          event: ev.title || "Unknown Event",
-          importance: importance,
-          actual: ev.actual === "" ? null : (ev.actual ?? null),
-          forecast: ev.forecast === "" ? null : (ev.forecast ?? null),
-          previous: ev.previous === "" ? null : (ev.previous ?? null)
-        };
-      });
-
-    calendarCache = {
+    res.json({
       generatedAt: new Date().toISOString(),
-      events: events
-    };
-    calendarCacheTime = Date.now();
-
-    res.json(calendarCache);
+      events: events.map(({ value_id, event_id, ...rest }) => rest), // internal ids tidak perlu diekspos
+    });
   } catch (err) {
-    logger.warn("[GET /api/market/economic-calendar] error", { error: err.message });
-
-    if (calendarCache) {
-      logger.warn("[economic-calendar] Serving stale cache karena fetch gagal");
-      return res.json(calendarCache);
-    }
-
-    res.json({ generatedAt: new Date().toISOString(), events: [] });
+    logger.error("[GET /api/market/economic-calendar] error", { error: err.message });
+    res.status(500).json({ generatedAt: new Date().toISOString(), events: [], error: "Gagal memuat kalender ekonomi dari MT5" });
   }
 });
 

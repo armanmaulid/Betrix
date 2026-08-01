@@ -15,15 +15,14 @@ export interface TickerPrice {
   // class flash-up/flash-down sesaat.
   direction: "up" | "down" | null;
   // N harga close terakhir (urut lama->baru), buat render micro-sparkline
-  // di WatchlistPanel tanpa request terpisah.
+  // tanpa request terpisah.
   history: number[];
 }
 
 
 const HISTORY_LENGTH = 20;
 
-// Kedua tempat harga live ditampilkan (TickerStrip di atas, WatchlistPanel
-// di kanan) butuh data yang sama persis: "harga terakhir + %change vs candle
+// TickerStrip butuh data yang sama persis: "harga terakhir + %change vs candle
 // M1 sebelumnya" untuk sekumpulan simbol. Logic fetch+poll-nya disatukan di
 // sini supaya tidak dobel antara dua komponen.
 // Global State for Market Stream Multiplexer

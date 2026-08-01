@@ -29,6 +29,7 @@ import { logger } from "./utils/logger.js";
 import { pool } from "./db/pool.js";
 import { initializeMt5Client } from "./services/mt5Client.js";
 import { syncBrokerSymbols } from "./services/symbolStore.js";
+import { syncCalendarIfNeeded, cleanupOldCalendarEvents } from "./services/calendarStore.js";
 import "./config/passport.js";
 
 const app = express();
@@ -182,6 +183,20 @@ const server = app.listen(PORT, async () => {
   syncBrokerSymbols().catch(err => {
     logger.error("Unexpected error in syncBrokerSymbols loop", { error: err.message, context: "System" });
   });
+
+  // Sync economic calendar ke Postgres pas startup - idempotent, cuma
+  // benar-benar nge-hit MT5 kalau bulan ini+depan belum ada di DB (lihat
+  // calendarStore.syncCalendarIfNeeded). Juga jadwalkan cleanup harian
+  // buat hapus event yang lebih dari 1 tahun.
+  syncCalendarIfNeeded().catch(err => {
+    logger.error("Unexpected error in syncCalendarIfNeeded", { error: err.message, context: "System" });
+  });
+  cleanupOldCalendarEvents().catch(() => {});
+  setInterval(() => {
+    cleanupOldCalendarEvents().catch(err => {
+      logger.error("Unexpected error in cleanupOldCalendarEvents", { error: err.message, context: "System" });
+    });
+  }, 24 * 60 * 60 * 1000);
 });
 
 // FIX (OOM/DoS hardening): default Node HTTP server tidak punya batas waktu
