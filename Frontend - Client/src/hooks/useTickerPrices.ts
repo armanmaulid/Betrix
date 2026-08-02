@@ -14,17 +14,12 @@ export interface TickerPrice {
   // load pertama (belum ada pembanding), dipakai komponen buat trigger
   // class flash-up/flash-down sesaat.
   direction: "up" | "down" | null;
-  // N harga close terakhir (urut lama->baru), buat render micro-sparkline
-  // tanpa request terpisah.
-  history: number[];
 }
 
-
-const HISTORY_LENGTH = 20;
-
-// TickerStrip butuh data yang sama persis: "harga terakhir + %change vs candle
-// M1 sebelumnya" untuk sekumpulan simbol. Logic fetch+poll-nya disatukan di
-// sini supaya tidak dobel antara dua komponen.
+// TickerStrip butuh data yang sama persis: "harga terakhir + %change vs open
+// candle D1 hari ini" untuk sekumpulan simbol. Logic fetch+stream-nya
+// disatukan di sini supaya tidak dobel antar komponen yang pakai simbol
+// sama secara bersamaan (lihat multiplexer di bawah).
 // Global State for Market Stream Multiplexer
 let globalEventSource: EventSource | null = null;
 let activeSymbolRefs: Record<string, number> = {}; // { "EURUSD": 3 }
@@ -67,18 +62,12 @@ function updateGlobalStream() {
       const prevClose = globalBaseData[sym]?.prevClose || current.price;
       const changePct = prevClose > 0 ? ((newPrice - prevClose) / prevClose) * 100 : 0;
 
-      const newHistory = [...current.history];
-      if (newHistory.length > 0) {
-        newHistory[newHistory.length - 1] = newPrice;
-      }
-
       currentPrices = {
         ...currentPrices,
         [sym]: {
           price: newPrice,
           changePct,
           direction,
-          history: newHistory,
         },
       };
       
@@ -102,24 +91,44 @@ export function useTickerPrices(symbols: TickerSymbol[]): Record<string, TickerP
     let cancelled = false;
     const abortController = new AbortController();
 
+    // Registrasi symbol & jadwalkan koneksi stream SEGERA saat mount —
+    // supaya subscribe ke MT5 bridge (lewat updateGlobalStream ->
+    // /api/market/stream) mulai berjalan PARALEL dengan fetch harga awal
+    // di bawah, bukan menunggunya selesai dulu. Sebelumnya urutannya
+    // sekuensial (fetch dulu, baru connect stream +100ms debounce di
+    // belakangnya), jadi realtime tick terasa "antre" di awal load.
+    // Debounce 100ms tetap dipertahankan supaya kalau beberapa komponen
+    // mount hampir bersamaan dengan simbol berbeda, stream-nya digabung
+    // jadi 1 koneksi (bukan buka-tutup berkali-kali).
+    let symbolsChanged = false;
+    symbols.forEach(({ symbol }) => {
+      if (!activeSymbolRefs[symbol]) {
+        activeSymbolRefs[symbol] = 0;
+        symbolsChanged = true;
+      }
+      activeSymbolRefs[symbol]++;
+    });
+    if (symbolsChanged) {
+      clearTimeout(restartTimeout);
+      restartTimeout = setTimeout(updateGlobalStream, 100);
+    }
+
     async function loadInitial() {
       const results = await Promise.allSettled(
         symbols.map(async ({ symbol }) => {
           if (!currentPrices[symbol]) {
-            const candlesM1 = await fetchCandles(symbol, "M1", HISTORY_LENGTH + 1, abortController.signal);
-            if (candlesM1.length < 2) throw new Error("not enough M1 candles");
-            
-            const candlesD1 = await fetchCandles(symbol, "D1", 2, abortController.signal).catch(() => []);
-            const latest = candlesM1[candlesM1.length - 1];
-            const history = candlesM1.map((c) => c.close);
-            
-            let prevClose = candlesM1[candlesM1.length - 2].close;
-            if (candlesD1.length > 0) {
-              prevClose = candlesD1[candlesD1.length - 1].open;
-            }
-            
-            const changePct = ((latest.close - prevClose) / prevClose) * 100;
-            return { symbol, price: latest.close, changePct, history, prevClose };
+            // Cuma D1 (2 candle: kemarin + hari ini) — cukup buat harga
+            // terkini (close candle hari ini) + baseline %change (open
+            // candle hari ini). M1 dulu dipakai buat sparkline WatchlistPanel,
+            // komponen itu sudah dihapus jadi fetch-nya ikut dibuang.
+            const candlesD1 = await fetchCandles(symbol, "D1", 2, abortController.signal);
+            if (candlesD1.length === 0) throw new Error("no D1 candle data");
+
+            const today = candlesD1[candlesD1.length - 1];
+            const prevClose = today.open;
+            const changePct = prevClose > 0 ? ((today.close - prevClose) / prevClose) * 100 : 0;
+
+            return { symbol, price: today.close, changePct, prevClose };
           }
           return { symbol, cached: true };
         })
@@ -137,29 +146,12 @@ export function useTickerPrices(symbols: TickerSymbol[]): Record<string, TickerP
               price: r.value.price!,
               changePct: r.value.changePct!,
               direction: null,
-              history: r.value.history!,
             }
           };
         }
       });
-      
-      setData({ ...currentPrices });
 
-      if (!cancelled) {
-        let changed = false;
-        symbols.forEach(({ symbol }) => {
-          if (!activeSymbolRefs[symbol]) {
-            activeSymbolRefs[symbol] = 0;
-            changed = true;
-          }
-          activeSymbolRefs[symbol]++;
-        });
-        
-        if (changed) {
-          clearTimeout(restartTimeout);
-          restartTimeout = setTimeout(updateGlobalStream, 100); // debounce stream restarts
-        }
-      }
+      setData({ ...currentPrices });
     }
 
     loadInitial();

@@ -4,6 +4,7 @@ import {
   latestPrices,
   fetchMt5History,
   subscribeToSymbol,
+  subscribeToSymbols,
   addPriceListener,
   removePriceListener,
   addCalendarListener,
@@ -116,7 +117,7 @@ router.get("/stream", async (req, res) => {
   const wantsCalendar = req.query.calendar === "1" || req.query.calendar === "true";
 
   if (symbolsToTrack) {
-    symbolsToTrack.forEach(s => subscribeToSymbol(s));
+    subscribeToSymbols(symbolsToTrack);
   }
   if (wantsCalendar) {
     syncCalendarIfNeeded(); // no-op kalau bulan ini+depan udah ada di DB

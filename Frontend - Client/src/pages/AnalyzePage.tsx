@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { TerminalShell } from "../components/layout/TerminalShell";
 import { useAuth } from "../context/AuthContext";
@@ -17,207 +17,26 @@ import {
   Star,
   ArrowLeft,
   Download,
-  Plus,
-  Copy,
-  FileText,
-  ChevronRight,
-  Check
+  Plus
 } from "lucide-react";
 import { NewsFeed } from "../components/analysis/NewsFeed";
 import { EconomicCalendar } from "../components/analysis/EconomicCalendar";
+import { ChatMessageItem } from "../components/analysis/ChatMessageItem";
 import { streamChat, getChatHistory, deleteChatSession } from "../api/chatClient";
-import { fetchCandles, type Candle, fetchBrokerSymbols, type BrokerSymbol } from "../api/marketClient";
+import { fetchCandles, type BrokerSymbol, fetchBrokerSymbols } from "../api/marketClient";
 import { getNews, type NewsItem } from "../api/newsClient";
-import ReactMarkdown from "react-markdown";
-
-// Styling elemen Markdown supaya senada dengan tema terminal gelap Betrix
-// (aksen orange #ff9900, border #222/#333) alih-alih default browser polos.
-const markdownComponents = {
-  h1: (props: any) => <h3 className="text-[13px] font-bold text-[#ff9900] mt-3 mb-1.5 first:mt-0" {...props} />,
-  h2: (props: any) => <h3 className="text-[13px] font-bold text-[#ff9900] mt-3 mb-1.5 first:mt-0" {...props} />,
-  h3: (props: any) => <h4 className="text-[12px] font-bold text-[#ff9900] mt-2.5 mb-1 first:mt-0" {...props} />,
-  p: (props: any) => <p className="text-[12px] leading-relaxed text-[#eee] mb-2 last:mb-0" {...props} />,
-  strong: (props: any) => <strong className="font-bold text-white" {...props} />,
-  em: (props: any) => <em className="italic text-[#ccc]" {...props} />,
-  ul: (props: any) => <ul className="list-disc list-outside pl-4 mb-2 space-y-0.5 text-[12px] text-[#eee]" {...props} />,
-  ol: (props: any) => <ol className="list-decimal list-outside pl-4 mb-2 space-y-0.5 text-[12px] text-[#eee]" {...props} />,
-  li: (props: any) => <li className="leading-relaxed" {...props} />,
-  hr: () => <hr className="border-t border-[#333] my-3" />,
-  code: (props: any) => <code className="bg-[#1a1a1a] border border-[#333] rounded-sm px-1 py-0.5 text-[11px] text-[#ff9900]" {...props} />,
-  blockquote: (props: any) => <blockquote className="border-l-2 border-[#ff9900] pl-3 text-[#aaa] italic my-2" {...props} />,
-};
-
-// Command instrumen yang men-trigger fetch data realtime MT5 (lihat mt5Client.js
-// dan GET /api/market/candles di backend). Simbol diambil dari kata setelah command,
-// mis. "/forex xauusd analisa ..." -> symbol=XAUUSD.
-const INSTRUMENT_COMMANDS = ["forex", "crypto", "stock", "etf", "bond", "index", "futures"];
-const TIMEFRAME_PATTERN = /\b(M1|M5|M15|M30|H1|H4|D1|W1|MN1)\b/i;
-
-interface ParsedInstrumentCommand {
-  symbol: string;
-  timeframe: string;
-}
-
-function parseInstrumentCommand(text: string): ParsedInstrumentCommand | null {
-  const match = text.trim().match(/^\/(\w+)\s+(\S+)/);
-  if (!match) return null;
-  const [, cmd, symbolRaw] = match;
-  if (!INSTRUMENT_COMMANDS.includes(cmd.toLowerCase())) return null;
-  const tfMatch = text.match(TIMEFRAME_PATTERN);
-  return {
-    symbol: symbolRaw.toUpperCase(),
-    timeframe: tfMatch ? tfMatch[1].toUpperCase() : "M15", // default M15 kalau timeframe tidak disebut
-  };
-}
-
-// Susun prompt berisi data candle asli dari MT5 + instruksi format jawaban (Entry/SL/TP1-3
-// + alasan + alternate entry), supaya LLM menjawab berbasis data nyata, bukan mengarang harga.
-function buildTradeAnalysisPrompt(instrument: ParsedInstrumentCommand, candles: Candle[], originalText: string): string {
-  if (!candles || candles.length === 0) {
-    return `[DATA PASAR TIDAK TERSEDIA]\nData candle ${instrument.symbol} (${instrument.timeframe}) kosong/gagal diambil dari MT5 bridge. Beritahu user datanya sedang tidak tersedia, JANGAN mengarang harga.\n\n[PERMINTAAN USER]\n${originalText}`;
-  }
-
-  const recent = candles.slice(-100);
-  const detail = recent.slice(-20); // detail candle dibatasi supaya prompt tidak kepanjangan
-  const currentPrice = recent[recent.length - 1].close;
-  const rangeHigh = Math.max(...recent.map(c => c.high));
-  const rangeLow = Math.min(...recent.map(c => c.low));
-
-  const candleLines = detail.map(c => {
-    const t = new Date(c.time * 1000).toISOString().slice(5, 16).replace("T", " ");
-    return `${t} O:${c.open} H:${c.high} L:${c.low} C:${c.close}`;
-  }).join("\n");
-
-  return [
-    `[DATA PASAR REALTIME - MT5]`,
-    `Symbol: ${instrument.symbol} | Timeframe: ${instrument.timeframe}`,
-    `Harga terkini: ${currentPrice}`,
-    `Range ${recent.length} candle terakhir: High ${rangeHigh} / Low ${rangeLow}`,
-    `${detail.length} candle terbaru (waktu UTC, terlama -> terbaru):`,
-    candleLines,
-    ``,
-    `[INSTRUKSI FORMAT JAWABAN]`,
-    `Wajib sertakan: Entry, Stop Loss (SL), Take Profit 1/2/3 (TP1, TP2, TP3), alasan teknikal berbasis data di atas, dan alternate entry kalau entry utama gagal atau kena SL. Gunakan HANYA data di atas, jangan mengarang harga yang tidak ada di data.`,
-    ``,
-    `[PERMINTAAN USER]`,
-    originalText,
-  ].join("\n");
-}
-
-// Cermin dari TASK_TIER_MAP + TIER_CREDIT_COST di backend (config/models.js,
-// routes/chat.js) -- cuma dipakai buat nampilin estimasi biaya kredit di UI,
-// bukan sumber kebenaran (backend yang benar-benar motong kreditnya).
-const FRONTEND_TASK_TIER_MAP: Record<string, "cheap" | "balanced" | "deep"> = {
-  faq: "cheap",
-  classify_signal: "cheap",
-  quick_summary: "balanced",
-  market_insight: "balanced",
-  trade_reasoning: "deep",
-  risk_narrative: "deep",
-};
-const TIER_CREDIT_COST: Record<string, number> = { cheap: 1, balanced: 3, deep: 5 };
-const AGENT_TIER_LABEL: Record<"cheap" | "balanced" | "deep", string> = { cheap: "Lite", balanced: "Balanced", deep: "Deep" };
-// EQUITY memakai "global" sebagai proxy terdekat karena backend belum punya tag khusus
-// saham/equity. NEWS gabung usd+metal+oil sebagai proxy "USD, METAL, OIL, ENERGY" --
-// backend belum punya tag "energy" terpisah (kategori yang ada cuma: usd, metal, oil,
-// btc, eco, global, crypto -- lihat VALID_ASSETS di routes/news.js), jadi OIL dipakai
-// rangkap sebagai proxy energy juga. AUTO sengaja tidak dipetakan = tidak ada injeksi berita.
-const TAB_TO_NEWS_ASSETS: Record<string, string[] | undefined> = {
-  EQUITY: ["global"],
-  MACRO: ["eco"],
-  NEWS: ["usd", "metal", "oil"],
-};
-
-function buildNewsContextPrefix(tab: string, items: NewsItem[]): string {
-  if (items.length === 0) return "";
-  const lines = items.slice(0, 5).map(n => `- [${n.source}] ${n.title}`).join("\n");
-  return `[BERITA TERBARU - mode ${tab}]\n${lines}\n\n`;
-}
-
-const ChatMessageItem = React.memo(({ msg }: { msg: any }) => {
-  const [isCopied, setIsCopied] = useState(false);
-
-  const handleCopy = () => {
-    navigator.clipboard.writeText(msg.content);
-    setIsCopied(true);
-    setTimeout(() => setIsCopied(false), 2000);
-  };
-
-  const handleSave = () => {
-    const blob = new Blob([msg.content], { type: 'text/markdown' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `betrix-analysis-${Date.now()}.md`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  if (msg.role === 'user') {
-    return (
-      <div className="flex justify-end group" style={{ contain: 'layout' }}>
-        <button 
-          onClick={handleCopy}
-          className="opacity-0 group-hover:opacity-100 p-1.5 text-[#555] hover:text-[#fff] transition-all mr-1 self-center"
-          title="Copy"
-        >
-          {isCopied ? <Check size={14} className="text-[#00ff99]" /> : <Copy size={14} />}
-        </button>
-        <div className="bg-[#ff9900] text-black font-bold px-4 py-2 rounded-sm max-w-[80%] text-[12px] whitespace-pre-wrap shadow-lg">
-          {msg.content}
-        </div>
-      </div>
-    );
-  }
-
-  if (msg.isTyping) {
-    return (
-      <div className="flex flex-col w-full max-w-4xl gap-3" style={{ contain: 'layout' }}>
-        <div className="flex flex-col border border-[#333] bg-[#0a0a0a] rounded-sm p-5 shadow-lg">
-          <div className="flex items-center gap-3 text-[#ff9900] font-bold text-[11px] animate-pulse">
-            <Globe size={14} className="animate-spin" /> 
-            <span>Agent is analyzing market data and executing tools...</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col w-full max-w-4xl gap-3" style={{ contain: 'layout' }}>
-      <div className={`flex flex-col border border-[#333] bg-[#0a0a0a] rounded-sm shadow-lg ${msg.isFinishedGlow ? 'animate-ai-glow' : ''}`}>
-        <div className="flex items-center justify-between px-4 py-2 border-b border-[#222]">
-          <div className="flex items-center gap-2 text-[#eee] font-bold text-[11px]">
-            <ChevronRight size={12} className="text-[#ff9900]" /> Agent Thinking
-          </div>
-          <span className="text-[#555] text-[10px] font-bold">
-            {msg.thinkingTime} 
-            {msg.cost && <span className="ml-2 text-[#ff4444]">{msg.cost}</span>}
-          </span>
-        </div>
-        <div className="px-5 py-4 text-[#eee] leading-relaxed text-[12px]">
-          <ReactMarkdown components={markdownComponents}>{msg.content}</ReactMarkdown>
-        </div>
-        <div className="flex justify-end gap-2 px-4 py-2 border-t border-[#111]">
-          <button 
-            onClick={handleCopy}
-            className="flex items-center gap-1.5 border border-[#333] px-2 py-1 text-[9px] font-bold text-[#888] hover:text-[#00ff99] hover:border-[#00ff99] rounded-sm transition-colors"
-          >
-            {isCopied ? <Check size={10} /> : <Copy size={10} />} 
-            {isCopied ? 'COPIED' : 'COPY'}
-          </button>
-          <button 
-            onClick={handleSave}
-            className="flex items-center gap-1.5 border border-[#333] px-2 py-1 text-[9px] font-bold text-[#888] hover:text-white rounded-sm transition-colors"
-            title="Save as Markdown (.md)"
-          >
-            <FileText size={10} /> SAVE
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-});
+import {
+  INSTRUMENT_COMMANDS,
+  parseInstrumentCommand,
+  buildTradeAnalysisPrompt,
+  FRONTEND_TASK_TIER_MAP,
+  TIER_CREDIT_COST,
+  AGENT_TIER_LABEL,
+  TAB_TO_NEWS_ASSETS,
+  buildNewsContextPrefix,
+  CHAT_SHORTCUTS,
+  CHAT_TEMPLATES,
+} from "../lib/analyzePageHelpers";
 
 export function AnalyzePage() {
   const { user } = useAuth();
@@ -247,37 +66,6 @@ export function AnalyzePage() {
   // tapi sengaja BELUM dikirim ke backend sampai provider-nya diputuskan.
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [allBrokerSymbols, setAllBrokerSymbols] = useState<BrokerSymbol[]>([]);
-
-  const shortcuts = [
-    { cmd: "/stock", desc: "stocks" },
-    { cmd: "/etf", desc: "ETFs & funds" },
-    { cmd: "/bond", desc: "bonds" },
-    { cmd: "/crypto", desc: "crypto" },
-    { cmd: "/index", desc: "indices" },
-    { cmd: "/portfolio", desc: "portfolio" },
-    { cmd: "/forex", desc: "forex pairs" },
-    { cmd: "/futures", desc: "futures" },
-    { cmd: "/watchlist", desc: "watchlist" },
-  ];
-
-  const templates = [
-    {
-      title: "Crypto & Digital Assets",
-      desc: "Analyze Bitcoin post-halving cycle, ETF flows, and institutional adoption trends"
-    },
-    {
-      title: "Dollar Decline & FX Strategy",
-      desc: "Assess the weakening US dollar thesis and currency hedging opportunities"
-    },
-    {
-      title: "S&P 500 Sector Rotation",
-      desc: "Identify overweight and underweight sectors based on the macro cycle and earnings momentum"
-    },
-    {
-      title: "Fed Rate Path & Fixed Income",
-      desc: "Evaluate the Fed's rate cut trajectory, bond supply dynamics, and fixed income positioning"
-    }
-  ];
 
   const handleSubmit = async () => {
     if (!inputText.trim() || isStreaming) return;
@@ -589,8 +377,8 @@ export function AnalyzePage() {
 
   const showCommands = inputText.startsWith('/') && !inputText.includes(' ');
   const filteredShortcuts = inputText.length > 1 && showCommands
-    ? shortcuts.filter(s => s.cmd.toLowerCase().includes(inputText.toLowerCase().trim()))
-    : shortcuts;
+    ? CHAT_SHORTCUTS.filter(s => s.cmd.toLowerCase().includes(inputText.toLowerCase().trim()))
+    : CHAT_SHORTCUTS;
 
   // Autocomplete simbol MT5
   let suggestedSymbols: BrokerSymbol[] = [];
@@ -843,7 +631,7 @@ export function AnalyzePage() {
             <div className="flex flex-col gap-2">
               <h2 className="text-[#00ffff] font-bold tracking-widest text-[11px]">SHORTCUTS {'>'}</h2>
               <div className="grid grid-cols-3 gap-y-1 gap-x-2">
-                {shortcuts.map(s => (
+                {CHAT_SHORTCUTS.map(s => (
                   <div key={s.cmd} className="flex items-center gap-1.5 text-[12px]">
                     <span className="text-[#ff9900] font-bold">{s.cmd}</span>
                     <span className="text-[#777]">{s.desc}</span>
@@ -877,7 +665,7 @@ export function AnalyzePage() {
                 Suggested Templates <ChevronDown size={12} />
               </button>
               <div className="grid grid-cols-4 gap-2 mt-1">
-                {templates.map((t, idx) => (
+                {CHAT_TEMPLATES.map((t, idx) => (
                   <div key={idx} className="border border-[#222] bg-[#0a0a0a] p-3 flex flex-col gap-1.5 hover:border-[#444] transition-colors cursor-pointer shadow-sm">
                     <div className="flex items-start gap-1.5 text-[#ff9900] font-bold text-[11px]">
                       <Star size={12} className="mt-[1px] shrink-0 fill-[#ff9900]" />

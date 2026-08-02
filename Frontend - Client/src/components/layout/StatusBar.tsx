@@ -1,40 +1,38 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Activity, Server, Clock, Database, User } from "lucide-react";
+import { useVisibilityPoll } from "../../hooks/useVisibilityPoll";
 
-const POLL_MS = 10_000; // Tiap 10 detik hitung ping
+const POLL_MS = 10_000; // Tiap 10 detik hitung ping (skip saat tab background)
 
 export const StatusBar = React.memo(function StatusBar() {
   const { user, isConnected } = useAuth();
   const [ping, setPing] = useState<number | null>(null);
+  const cancelledRef = useRef(false);
 
   useEffect(() => {
-    let cancelled = false;
-    
-    async function measurePing() {
-      const token = localStorage.getItem("eaconsole.sessionToken");
-      if (!token) return;
-      
-      const start = performance.now();
-      try {
-        const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-        await fetch(`${BACKEND_URL}/api/news?limit=1`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const end = performance.now();
-        if (!cancelled) setPing(Math.round(end - start));
-      } catch (err) {
-        if (!cancelled) setPing(null);
-      }
-    }
-
-    measurePing();
-    const interval = setInterval(measurePing, POLL_MS);
+    cancelledRef.current = false;
     return () => {
-      cancelled = true;
-      clearInterval(interval);
+      cancelledRef.current = true;
     };
   }, []);
+
+  useVisibilityPoll(async () => {
+    const token = localStorage.getItem("eaconsole.sessionToken");
+    if (!token) return;
+
+    const start = performance.now();
+    try {
+      const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+      await fetch(`${BACKEND_URL}/api/news?limit=1`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const end = performance.now();
+      if (!cancelledRef.current) setPing(Math.round(end - start));
+    } catch (err) {
+      if (!cancelledRef.current) setPing(null);
+    }
+  }, POLL_MS);
 
   const pingColor = 
     ping === null ? "text-[var(--text-muted)]" :

@@ -6,7 +6,7 @@ import { fetchUsageMe, type UsageSummary } from "../api/usageClient";
 import { 
   Settings, User, Key, Shield, Bell, Activity, Clock, 
   Users, Edit2, CheckCircle2, ShieldAlert, BadgeInfo,
-  Calendar, Lock, Save, X, AlertCircle, Trash2, Smartphone
+  Calendar, Lock, Save, X, AlertCircle, Trash2
 } from "lucide-react";
 
 type SettingsTab = "PROFILE" | "API KEY" | "SECURITY" | "NOTIFICATIONS" | "USAGE" | "LOGIN HISTORY" | "ACCOUNT";

@@ -72,13 +72,27 @@ async function sendTrackCalendarRequest() {
   }
 }
 
+// Subscribe 1 simbol — dipakai untuk call site yang memang cuma butuh 1
+// simbol (mis. GET /api/market/ticker?symbol=X).
 export async function subscribeToSymbol(symbol) {
-  if (!trackedSymbols.has(symbol)) {
-    trackedSymbols.add(symbol);
-    // Send track request immediately if the WS is expected to be up
-    if (wsConnection && wsConnection.readyState === WebSocket.OPEN) {
-      await sendTrackRequest();
+  return subscribeToSymbols([symbol]);
+}
+
+// Subscribe banyak simbol sekaligus dalam SATU HTTP POST ke MT5 bridge,
+// bukan 1 POST per simbol (sebelumnya /stream manggil subscribeToSymbol
+// per simbol lewat forEach, jadi kalau ada 12 simbol baru = 12 POST
+// terpisah nyaris bersamaan, masing-masing isinya trackedSymbols yang
+// makin panjang — buang-buang request + bikin race kecil di MT5 bridge).
+export async function subscribeToSymbols(symbols) {
+  let hasNew = false;
+  for (const symbol of symbols) {
+    if (!trackedSymbols.has(symbol)) {
+      trackedSymbols.add(symbol);
+      hasNew = true;
     }
+  }
+  if (hasNew && wsConnection && wsConnection.readyState === WebSocket.OPEN) {
+    await sendTrackRequest();
   }
 }
 

@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Newspaper, RefreshCw } from "lucide-react";
+import { useVisibilityPoll } from "../../hooks/useVisibilityPoll";
 
 interface NewsItem {
   id: string;
@@ -71,7 +72,6 @@ export const NewsFeed = React.memo(function NewsFeed() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
-  const intervalRef = useRef<ReturnType<typeof setInterval>>();
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
   // null on the very first load — that's how we avoid flashing every item
   // the first time the feed renders (only items that show up on later
@@ -119,14 +119,12 @@ export const NewsFeed = React.memo(function NewsFeed() {
     }
   }
 
+  // Polling tiap 30 detik, otomatis skip saat tab background (lihat
+  // useVisibilityPoll) — refresh instan lagi begitu tab jadi aktif.
+  useVisibilityPoll(load, 30_000);
+
   useEffect(() => {
-    load();
-    // Polling tiap 30 detik — interval bersih otomatis pas unmount
-    intervalRef.current = setInterval(load, 30_000);
-    return () => {
-      clearInterval(intervalRef.current);
-      clearTimeout(highlightTimeoutRef.current);
-    };
+    return () => clearTimeout(highlightTimeoutRef.current);
   }, []);
 
   return (
