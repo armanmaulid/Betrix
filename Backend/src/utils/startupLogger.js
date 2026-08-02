@@ -76,7 +76,7 @@ ${cyan.bold("Startup Cleanup")}
 
 ${cyan.bold("Scheduled Jobs")}
   Cleanup:      every 1h (sessions, attempts, tokens, usage, old news)
-  News Feed:    every 1min (RSS polling)
+  News Feed:    every 5s (Finnhub REST)
   Heartbeat:    every 30s
 `;
 

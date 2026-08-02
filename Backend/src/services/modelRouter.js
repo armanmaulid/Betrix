@@ -81,16 +81,32 @@ export async function routeAndCall({ taskType, messages, tier }) {
   };
 }
 
-export async function routeAndStream({ taskType, messages, onToken, signal, tier }) {
+export async function routeAndStream({ taskType, messages, onToken, signal, tier, image }) {
   const model = resolveModel(taskType, tier);
   const system = SYSTEM_PROMPTS[taskType] || SYSTEM_PROMPTS.faq;
+
+  let finalMessages = messages;
+  if (image && finalMessages.length > 0) {
+    const lastIdx = finalMessages.length - 1;
+    const lastMsg = finalMessages[lastIdx];
+    if (lastMsg.role === "user") {
+      finalMessages = [...finalMessages];
+      finalMessages[lastIdx] = {
+        ...lastMsg,
+        content: [
+          { type: "text", text: lastMsg.content },
+          { type: "image_url", image_url: { url: image } }
+        ]
+      };
+    }
+  }
 
   const start = Date.now();
   const result = await streamModel({
     model: model.id,
     maxTokens: model.maxTokens,
     system,
-    messages,
+    messages: finalMessages,
     onToken,
     signal,
   });

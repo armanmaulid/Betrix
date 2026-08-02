@@ -17,7 +17,8 @@ import {
   Star,
   ArrowLeft,
   Download,
-  Plus
+  Plus,
+  X
 } from "lucide-react";
 import { NewsFeed } from "../components/analysis/NewsFeed";
 import { EconomicCalendar } from "../components/analysis/EconomicCalendar";
@@ -66,6 +67,25 @@ export function AnalyzePage() {
   // tapi sengaja BELUM dikirim ke backend sampai provider-nya diputuskan.
   const [webSearchEnabled, setWebSearchEnabled] = useState(false);
   const [allBrokerSymbols, setAllBrokerSymbols] = useState<BrokerSymbol[]>([]);
+  const [attachedImage, setAttachedImage] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 1024 * 1024) {
+        alert("Ukuran gambar terlalu besar! Maksimal 1MB.");
+        e.target.value = '';
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAttachedImage(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+    e.target.value = '';
+  };
 
   const handleSubmit = async () => {
     if (!inputText.trim() || isStreaming) return;
@@ -78,14 +98,18 @@ export function AnalyzePage() {
     // 1. Add user message (apa yang diketik user apa adanya) dan loading agent message
     setMessages(prev => [
       ...prev, 
-      { role: 'user', content: text },
+      { role: 'user', content: text, image: attachedImage },
       { role: 'agent', content: "", isTyping: true } as any
     ]);
+    
+    const imageToSend = attachedImage;
+    setAttachedImage(null);
 
     // 2. Extract clean history to send to backend
     const chatHistory = messages.filter((m: any) => !m.isTyping).map((m: any) => ({
       role: m.role,
-      content: m.content || ""
+      content: m.content || "",
+      image: m.image
     }));
 
     // 3. Deteksi command instrumen (mis. "/forex xauusd analisa... M15") -> ambil data
@@ -225,6 +249,7 @@ export function AnalyzePage() {
       taskType,
       activeSessionId,
       tierOverride,
+      imageToSend,
       (token) => {
         pendingTokens += token;
         const now = Date.now();
@@ -490,6 +515,18 @@ export function AnalyzePage() {
           </div>
         )}
 
+        {attachedImage && (
+          <div className="relative p-1 bg-[#111] border border-[#333] rounded-sm group flex-shrink-0">
+            <img src={attachedImage} alt="Attachment" className="h-12 w-12 object-cover rounded-sm" />
+            <button 
+              onClick={() => setAttachedImage(null)}
+              className="absolute -top-1.5 -right-1.5 bg-red-600 text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity shadow-md"
+            >
+              <X size={10} />
+            </button>
+          </div>
+        )}
+
         <span className="text-[#ff9900] font-bold text-lg leading-none mt-1">{'>'}</span>
         <textarea 
           ref={inputRef}
@@ -566,7 +603,17 @@ export function AnalyzePage() {
               </div>
             )}
           </div>
-          <button className="p-1 text-[#666] hover:text-[#ccc] transition-colors ml-1">
+          <input 
+            type="file" 
+            accept="image/*" 
+            ref={fileInputRef} 
+            onChange={handleImageUpload} 
+            className="hidden" 
+          />
+          <button 
+            onClick={() => fileInputRef.current?.click()}
+            className="p-1 text-[#666] hover:text-[#ccc] transition-colors ml-1"
+          >
             <Paperclip size={14} />
           </button>
           <button 

@@ -24,9 +24,7 @@ export const StatusBar = React.memo(function StatusBar() {
     const start = performance.now();
     try {
       const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-      await fetch(`${BACKEND_URL}/api/news?limit=1`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await fetch(`${BACKEND_URL}/health`);
       const end = performance.now();
       if (!cancelledRef.current) setPing(Math.round(end - start));
     } catch (err) {

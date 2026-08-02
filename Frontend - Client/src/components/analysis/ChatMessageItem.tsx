@@ -32,8 +32,15 @@ export const ChatMessageItem = React.memo(({ msg }: { msg: any }) => {
         >
           {isCopied ? <Check size={14} className="text-[#00ff99]" /> : <Copy size={14} />}
         </button>
-        <div className="bg-[#ff9900] text-black font-bold px-4 py-2 rounded-sm max-w-[80%] text-[12px] whitespace-pre-wrap shadow-lg">
-          {msg.content}
+        <div className="flex flex-col items-end gap-1 max-w-[80%]">
+          {msg.image && (
+            <img src={msg.image} alt="User attachment" className="rounded-sm max-h-48 object-contain bg-[#111] p-1 border border-[#333] shadow-lg" />
+          )}
+          {msg.content && (
+            <div className="bg-[#ff9900] text-black font-bold px-4 py-2 rounded-sm text-[12px] whitespace-pre-wrap shadow-lg">
+              {msg.content}
+            </div>
+          )}
         </div>
       </div>
     );

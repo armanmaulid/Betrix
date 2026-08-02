@@ -83,7 +83,7 @@ export function DashboardPage() {
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
         <p className="text-[12px] text-[var(--text-muted)]">Siap lihat sinyal trading berbasis AI untuk {symbol}?</p>
         <button
-          onClick={() => navigate(`/analyze?symbol=${symbol}`)}
+          onClick={() => navigate("/analyze")}
           className="flex items-center gap-1.5 bg-[var(--accent)] px-4 py-2 text-[12px] font-bold text-[var(--bg)] hover:opacity-90"
         >
           <LineChart size={14} />

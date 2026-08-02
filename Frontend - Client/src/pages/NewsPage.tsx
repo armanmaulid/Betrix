@@ -270,7 +270,7 @@ export function NewsPage() {
                         {item.title}
                       </h2>
                       {item.summary && (
-                        <p className="text-[12px] leading-relaxed text-[#999] opacity-80">
+                        <p className="line-clamp-2 text-[12px] leading-relaxed text-[#999] opacity-80">
                           {item.summary}
                         </p>
                       )}

@@ -14,7 +14,7 @@ import adminRoutes from "./routes/admin.js";
 import messagesRoutes from "./routes/messages.js";
 import activityRoutes from "./routes/activity.js";
 import newsRoutes from "./routes/news.js";
-import marketRoutes from "./routes/market.js";
+import marketRoutes, { warmupMarketCache } from "./routes/market.js";
 import { fetchAndStoreNews, cleanupOldNews } from "./services/newsFetcher.js";
 import { sendHeartbeat } from "./services/newsRealtimeStore.js";
 import { healthCheck } from "./routes/health.js";
@@ -70,7 +70,7 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json({ limit: "100kb" }));
+app.use(express.json({ limit: "50mb" }));
 
 app.use(passport.initialize());
 
@@ -143,7 +143,7 @@ const server = app.listen(PORT, async () => {
     cleanupOldFailedAttempts(),
     cleanupExpiredTokens(),
     cleanupOldUsageRecords(),
-    cleanupOldNews(),
+    cleanupOldNews(7),
   ]);
   const labels = ["sessions", "login attempts", "verify tokens", "usage records", "old news"];
   const cleanupSummary = cleanups.map((r, i) =>
@@ -166,7 +166,7 @@ const server = app.listen(PORT, async () => {
       cleanupOldFailedAttempts(),
       cleanupExpiredTokens(),
       cleanupOldUsageRecords(),
-      cleanupOldNews(),
+      cleanupOldNews(7),
     ]).then((results) => {
       const total = results.reduce((sum, r) =>
         sum + (r.status === "fulfilled" ? r.value : 0), 0);
@@ -182,35 +182,38 @@ const server = app.listen(PORT, async () => {
     fetchAndStoreNews().catch((err) =>
       logger.error("Auto-fetch news gagal", { error: err.message })
     );
-  }, 60 * 1000);
+  }, 5 * 1000);
 
   setInterval(() => sendHeartbeat(), 30 * 1000);
 
   printRoutes(app);
 
-  initializeMt5Client();
-  logger.info("MT5 Bridge Client initialized", { context: "MT5" });
-  // Sync symbols dari MT5 bridge di background pas start up (dengan auto-retry)
-  // Biarkan berjalan tanpa await agar tidak mem-blokir server startup.
-  syncBrokerSymbols().catch(err => {
-    logger.error("Unexpected error in syncBrokerSymbols startup", { error: err.message, context: "System" });
+  // ── 6. Market Data Startup Sequence ──
+  // Tahap 1: Pre-fetch 1D history untuk kalkulasi persentase dsb
+  warmupMarketCache().then(() => {
+    // Tahap 2: Buka koneksi realtime WebSocket ke MT5 setelah history siap
+    initializeMt5Client();
+    logger.info("MT5 Bridge Client initialized", { context: "MT5" });
+
+    // Tahap 3: Sync simbol & kalender di background (Standard Industry)
+    syncBrokerSymbols().catch(err => {
+      logger.error("Unexpected error in syncBrokerSymbols startup", { error: err.message, context: "System" });
+    });
+    
+    syncCalendarIfNeeded().catch(err => {
+      logger.error("Unexpected error in syncCalendarIfNeeded", { error: err.message, context: "System" });
+    });
+  }).catch(err => {
+    logger.error("Gagal melakukan warmupMarketCache di awal", { error: err.message });
   });
 
-  // Jadwalkan sync ulang setiap 24 jam di background (Pola Background Job)
-  // Sehingga jika broker menambah koin/saham baru, sistem ter-update tanpa restart
+  // Background Job 24 Jam untuk kalender dan simbol
   setInterval(() => {
     syncBrokerSymbols().catch(err => {
       logger.error("Unexpected error in syncBrokerSymbols background job", { error: err.message, context: "System" });
     });
   }, 24 * 60 * 60 * 1000);
 
-  // Sync economic calendar ke Postgres pas startup - idempotent, cuma
-  // benar-benar nge-hit MT5 kalau bulan ini+depan belum ada di DB (lihat
-  // calendarStore.syncCalendarIfNeeded). Juga jadwalkan cleanup harian
-  // buat hapus event yang lebih dari 1 tahun.
-  syncCalendarIfNeeded().catch(err => {
-    logger.error("Unexpected error in syncCalendarIfNeeded", { error: err.message, context: "System" });
-  });
   cleanupOldCalendarEvents().catch(() => {});
   setInterval(() => {
     cleanupOldCalendarEvents().catch(err => {

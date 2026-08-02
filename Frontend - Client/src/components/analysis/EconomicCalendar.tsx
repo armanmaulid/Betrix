@@ -60,12 +60,12 @@ function getPeriodRange(period: PeriodKey): { from: Date; to: Date } {
 
   if (period === "last_week" || period === "this_week" || period === "next_week") {
     const day = now.getDay(); // 0=Minggu..6=Sabtu
-    const diffToMonday = (day === 0 ? -6 : 1) - day; // minggu mulai Senin
+    const diffToSunday = -day; // minggu mulai Minggu
     const weekOffset = period === "last_week" ? -1 : period === "next_week" ? 1 : 0;
-    const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToMonday + weekOffset * 7, 0, 0, 0, 0);
+    const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToSunday + weekOffset * 7, 0, 0, 0, 0);
     const to = new Date(from);
     to.setDate(to.getDate() + 7);
-    to.setMilliseconds(to.getMilliseconds() - 1); // Minggu 23:59:59.999
+    to.setMilliseconds(to.getMilliseconds() - 1); // Sabtu 23:59:59.999
     return { from, to };
   }
 

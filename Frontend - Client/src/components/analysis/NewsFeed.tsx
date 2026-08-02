@@ -172,7 +172,7 @@ export const NewsFeed = React.memo(function NewsFeed() {
                 <span
                   className={
                     "rounded px-1 py-0.5 text-[9px] font-bold uppercase " +
-                    (SOURCE_COLOR[item.source] || "bg-[var(--surface-alt)] text-[var(--text-muted)]")
+                    (SOURCE_COLOR[item.source] || "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30")
                   }
                 >
                   {item.source}

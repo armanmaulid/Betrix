@@ -7,6 +7,7 @@ export async function streamChat(
   taskType: string,
   sessionId: string,
   tier: string | undefined,
+  image: string | null,
   onToken: (token: string) => void,
   onDone: (result: any) => void,
   onError: (error: string) => void
@@ -19,7 +20,7 @@ export async function streamChat(
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ message, displayMessage, history, taskType, sessionId, tier })
+      body: JSON.stringify({ message, displayMessage, history, taskType, sessionId, tier, image })
     });
 
     if (!res.ok) {

@@ -21,6 +21,31 @@ const router = Router();
 const marketCache = new Map();
 const CACHE_TTL_MS = 2000; // 2 seconds default
 
+export async function warmupMarketCache() {
+  const PRIMARY_SYMBOLS = [
+    "EURUSD", "GBPUSD", "USDJPY", "USDCHF", "USDCAD", "AUDUSD", 
+    "NZDUSD", "XAUUSD", "XAGUSD", "XTIUSD", "BTCUSD", "ETHUSD"
+  ];
+  
+  logger.info("Mulai pre-fetch 1D History untuk simbol utama...", { context: "Market" });
+  
+  for (const symbol of PRIMARY_SYMBOLS) {
+    try {
+      // Call mt5Client fetch directly (count = 1) just to get the previous close
+      const now = new Date();
+      const startDate = new Date();
+      startDate.setDate(startDate.getDate() - 3); // Ambil 3 hari ke belakang untuk amannya (weekend)
+      
+      const pad = n => n.toString().padStart(2, '0');
+      const formatMt5Date = d => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T00:00:00`;
+      
+      await fetchMt5History(symbol, "D1", formatMt5Date(startDate), formatMt5Date(new Date(now.getTime() + 86400000)));
+      logger.debug(`History 1D untuk ${symbol} berhasil di-fetch di awal`, { context: "Market" });
+    } catch (e) {
+      logger.warn(`Gagal pre-fetch history 1D untuk ${symbol}: ${e.message}`, { context: "Market" });
+    }
+  }
+}
 
 
 // Helper: Deteksi apakah simbol sedang libur akhir pekan

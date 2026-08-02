@@ -142,7 +142,7 @@ router.post("/chat", requireAuth, perUserLimiter, checkChatCredits, async (req, 
 
 // POST /api/chat/stream
 router.post("/chat/stream", requireAuth, perUserLimiter, checkChatCredits, async (req, res) => {
-  const { taskType, message, displayMessage, history = [], sessionId } = req.body;
+  const { taskType, message, displayMessage, history = [], sessionId, image } = req.body;
 
   if (!message || typeof message !== "string") {
     return res.status(400).json({ error: "'message' wajib diisi (string)" });
@@ -167,6 +167,7 @@ router.post("/chat/stream", requireAuth, perUserLimiter, checkChatCredits, async
       taskType: taskType || "faq",
       messages,
       tier: req.resolvedTier,
+      image,
       signal: controller.signal,
       onToken: (token) => {
         res.write(`data: ${JSON.stringify({ token })}\n\n`);
