@@ -15,6 +15,7 @@ import messagesRoutes from "./routes/messages.js";
 import activityRoutes from "./routes/activity.js";
 import newsRoutes from "./routes/news.js";
 import marketRoutes, { warmupMarketCache } from "./routes/market.js";
+import { secondsUntilBrokerMidnight } from "./services/d1CacheStore.js";
 import { fetchAndStoreNews, cleanupOldNews } from "./services/newsFetcher.js";
 import { sendHeartbeat } from "./services/newsRealtimeStore.js";
 import { healthCheck } from "./routes/health.js";
@@ -70,7 +71,7 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json({ limit: "50mb" }));
+app.use(express.json({ limit: "15mb" }));
 
 app.use(passport.initialize());
 
@@ -190,19 +191,49 @@ const server = app.listen(PORT, async () => {
 
   // ── 6. Market Data Startup Sequence ──
   // Tahap 1: Pre-fetch 1D history untuk kalkulasi persentase dsb
-  warmupMarketCache().then(() => {
-    // Tahap 2: Buka koneksi realtime WebSocket ke MT5 setelah history siap
+  warmupMarketCache().then(async () => {
+    // Tahap 2: Sync simbol & kalender dulu, SELESAI, sebelum WS realtime dibuka --
+    // supaya tidak rebutan slot proses dengan handshake WS di EA yang single-threaded
+    await syncBrokerSymbols().catch(err => {
+      logger.error("Unexpected error in syncBrokerSymbols startup", { error: err.message, context: "System" });
+    });
+
+    await syncCalendarIfNeeded().catch(err => {
+      logger.error("Unexpected error in syncCalendarIfNeeded", { error: err.message, context: "System" });
+    });
+
+    // Tahap 3: BARU buka koneksi realtime WebSocket ke MT5
     initializeMt5Client();
     logger.info("MT5 Bridge Client initialized", { context: "MT5" });
 
-    // Tahap 3: Sync simbol & kalender di background (Standard Industry)
-    syncBrokerSymbols().catch(err => {
-      logger.error("Unexpected error in syncBrokerSymbols startup", { error: err.message, context: "System" });
-    });
-    
-    syncCalendarIfNeeded().catch(err => {
-      logger.error("Unexpected error in syncCalendarIfNeeded", { error: err.message, context: "System" });
-    });
+    // ── Auto Re-warmup D1 Cache ──────────────────────────────────
+    // Jadwalkan refresh otomatis D1 cache setiap pergantian hari broker
+    // (00:00 UTC+3). Begitu TTL Redis expired, backend langsung fetch
+    // ulang 12 simbol utama dari MT5 dan isi Redis lagi — jadi user
+    // yang login pagi-pagi selalu dapat data dari Redis, bukan MT5.
+    function scheduleD1CacheRefresh() {
+      const ttl = secondsUntilBrokerMidnight();
+      // +90 detik buffer supaya D1 candle hari baru sudah terbentuk di MT5
+      const delayMs = (ttl + 90) * 1000;
+      const nextRefresh = new Date(Date.now() + delayMs);
+      logger.info(
+        `D1 cache refresh dijadwalkan pada ${nextRefresh.toISOString()} (dalam ${(ttl / 3600).toFixed(1)} jam)`,
+        { context: "D1Cache" }
+      );
+
+      const timer = setTimeout(async () => {
+        logger.info("Memulai auto re-warmup D1 cache (pergantian hari broker)...", { context: "D1Cache" });
+        try {
+          await warmupMarketCache();
+        } catch (err) {
+          logger.error(`Auto re-warmup D1 cache gagal: ${err.message}`, { context: "D1Cache" });
+        }
+        // Jadwalkan lagi untuk besok
+        scheduleD1CacheRefresh();
+      }, delayMs);
+      timer.unref?.(); // Jangan halangi graceful shutdown
+    }
+    scheduleD1CacheRefresh();
   }).catch(err => {
     logger.error("Gagal melakukan warmupMarketCache di awal", { error: err.message });
   });

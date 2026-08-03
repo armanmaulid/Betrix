@@ -4,12 +4,26 @@ import { logger } from "../utils/logger.js";
 
 const LAST_ACTIVE_THROTTLE_MINUTES = 5;
 
+const LAST_ACTIVE_MEMORY_THROTTLE_MS = 60000; // Throttle 1 menit di memory Node
 const lastActiveMemoryCache = new Map();
+
+// FIX (memory leak): lastActiveMemoryCache sebelumnya tidak pernah
+// di-evict — entry lama (user yang sudah lama tidak request) tetap
+// tersimpan di memory selamanya sampai proses restart. Bersihkan entry
+// yang sudah lewat throttle window-nya secara berkala.
+setInterval(() => {
+  const now = Date.now();
+  for (const [userId, lastTouch] of lastActiveMemoryCache) {
+    if (now - lastTouch >= LAST_ACTIVE_MEMORY_THROTTLE_MS) {
+      lastActiveMemoryCache.delete(userId);
+    }
+  }
+}, 5 * 60 * 1000).unref();
 
 function touchLastActive(userId) {
   const now = Date.now();
   const lastTouch = lastActiveMemoryCache.get(userId);
-  if (lastTouch && now - lastTouch < 60000) { // Throttle 1 menit di memory Node
+  if (lastTouch && now - lastTouch < LAST_ACTIVE_MEMORY_THROTTLE_MS) {
     return;
   }
   lastActiveMemoryCache.set(userId, now);

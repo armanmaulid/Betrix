@@ -56,13 +56,18 @@ struct Order {
 class CCommandCore {
 private:
     CData *dataSender;
+    string cachedSymbolListJson;
+    int cachedSymbolCount;
     
     JsonResponse SendError(int status, string details = "");
     JsonResponse SendJson(string jsonContent, int status = 200);
+    void BuildSymbolListCache();
 public:
     // Constructor
     CCommandCore(CData *ps = NULL) {
         dataSender = ps;
+        cachedSymbolListJson = "";
+        cachedSymbolCount = -1;
     }
 
 
@@ -81,6 +86,8 @@ public:
     JsonResponse GetAccountInformation();
     JsonResponse GetSymbolInfo(string symbol);
     JsonResponse GetSymbolList();
+    JsonResponse GetSymbolCount();
+    void WarmSymbolCache();
     JsonResponse OrderInformation(ulong ticket);
     JsonResponse ModifyOrder(Order &order);
     
@@ -1005,11 +1012,10 @@ JsonResponse CCommandCore::GetCalendar(string countryCode, string currency, int 
 //+------------------------------------------------------------------+
 //| Get symbol info and List                                         |
 //+------------------------------------------------------------------+
-JsonResponse CCommandCore::GetSymbolList() {
+void CCommandCore::BuildSymbolListCache() {
    int total = SymbolsTotal(false);
    string json = "\"symbols\": [";
    bool first = true;
-   Print("total symobls : " + IntegerToString(total));
 
    for(int i = 0; i < total; i++) {
       string symbol = SymbolName(i, false);
@@ -1031,6 +1037,29 @@ JsonResponse CCommandCore::GetSymbolList() {
 
    StringAdd(json, "]");
 
+   cachedSymbolListJson = json;
+   cachedSymbolCount = total;
+
+   Print("Symbol cache built: ", cachedSymbolCount, " symbols");
+}
+
+JsonResponse CCommandCore::GetSymbolList() {
+   int total = SymbolsTotal(false);
+
+   if (total != cachedSymbolCount || cachedSymbolListJson == "") {
+      BuildSymbolListCache();
+   }
+
+   return SendJson(cachedSymbolListJson);
+}
+
+void CCommandCore::WarmSymbolCache() {
+   BuildSymbolListCache();
+}
+
+JsonResponse CCommandCore::GetSymbolCount() {
+   int total = SymbolsTotal(false);
+   string json = "\"count\": " + IntegerToString(total);
    return SendJson(json);
 }
 

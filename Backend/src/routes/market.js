@@ -10,6 +10,7 @@ import {
   addCalendarListener,
   removeCalendarListener,
 } from "../services/mt5Client.js";
+import { getD1Cache, setD1Cache, warmupD1Cache } from "../services/d1CacheStore.js";
 import { getCalendarEventsFromDb, syncCalendarIfNeeded } from "../services/calendarStore.js";
 import { requireAuth } from "../middleware/auth.js";
 import { validateSession } from "../services/sessionStore.js";
@@ -27,24 +28,8 @@ export async function warmupMarketCache() {
     "NZDUSD", "XAUUSD", "XAGUSD", "XTIUSD", "BTCUSD", "ETHUSD"
   ];
   
-  logger.info("Mulai pre-fetch 1D History untuk simbol utama...", { context: "Market" });
-  
-  for (const symbol of PRIMARY_SYMBOLS) {
-    try {
-      // Call mt5Client fetch directly (count = 1) just to get the previous close
-      const now = new Date();
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - 3); // Ambil 3 hari ke belakang untuk amannya (weekend)
-      
-      const pad = n => n.toString().padStart(2, '0');
-      const formatMt5Date = d => `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T00:00:00`;
-      
-      await fetchMt5History(symbol, "D1", formatMt5Date(startDate), formatMt5Date(new Date(now.getTime() + 86400000)));
-      logger.debug(`History 1D untuk ${symbol} berhasil di-fetch di awal`, { context: "Market" });
-    } catch (e) {
-      logger.warn(`Gagal pre-fetch history 1D untuk ${symbol}: ${e.message}`, { context: "Market" });
-    }
-  }
+  logger.info("Mulai pre-fetch 1D History + Redis cache untuk simbol utama...", { context: "Market" });
+  await warmupD1Cache(PRIMARY_SYMBOLS, fetchMt5History);
 }
 
 
@@ -268,6 +253,39 @@ router.get("/candles", async (req, res) => {
     }
 
     const fetchPromise = (async () => {
+      // ── Redis D1 cache shortcut ──────────────────────────────────
+      // Untuk request D1 dengan count kecil (≤2, khas tickerbar),
+      // cek Redis dulu. Data D1 sudah di-cache saat startup
+      // (warmupD1Cache) dan valid sampai 00:00 waktu broker.
+      if (interval === "D1" && limit <= 2) {
+        const cached = await getD1Cache(mt5Symbol);
+        if (cached && Array.isArray(cached) && cached.length > 0) {
+          let candles = cached.map(q => ({
+            time: Math.floor(new Date(q.time).getTime() / 1000),
+            open: q.open,
+            high: q.high,
+            low: q.low,
+            close: q.close,
+            volume: q.real_volume || q.tick_volume || 0
+          }));
+          if (candles.length > limit) candles = candles.slice(-limit);
+
+          // Overlay harga realtime ke candle terakhir (sama seperti
+          // logic yang sudah ada di bawah untuk non-cached path)
+          const livePrice = latestPrices[mt5Symbol];
+          if (livePrice && candles.length > 0) {
+            const lastCandle = candles[candles.length - 1];
+            lastCandle.close = livePrice.price;
+            if (livePrice.price > lastCandle.high) lastCandle.high = livePrice.price;
+            if (livePrice.price < lastCandle.low) lastCandle.low = livePrice.price;
+          }
+
+          marketCache.set(cacheKey, { timestamp: Date.now(), data: candles });
+          return candles;
+        }
+      }
+      // ── End Redis D1 cache shortcut ──────────────────────────────
+
       const now = new Date();
       const startDate = new Date();
 
@@ -363,6 +381,13 @@ router.get("/candles", async (req, res) => {
       }
 
       marketCache.set(cacheKey, { timestamp: Date.now(), data: candles });
+
+      // Write-through: kalau ini D1 fetch, simpan juga ke Redis
+      // supaya request berikutnya tidak perlu hit MT5 lagi.
+      if (interval === "D1" && historyData?.data) {
+        setD1Cache(mt5Symbol, historyData.data).catch(() => {}); // fire-and-forget
+      }
+
       return candles;
     })();
 

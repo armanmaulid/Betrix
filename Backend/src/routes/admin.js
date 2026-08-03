@@ -602,7 +602,7 @@ router.post("/users/:id/reset-password", async (req, res) => {
 
     const user = userRows[0];
 
-    const tempPassword = crypto.randomBytes(4).toString('hex');
+    const tempPassword = crypto.randomBytes(8).toString('hex');
     const hashedPassword = await bcrypt.hash(tempPassword, 10);
 
     await pool.query(

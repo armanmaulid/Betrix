@@ -37,6 +37,7 @@ private:
     void HandleGetCalendar(HttpRequest &request);
     void HandleGetSymbolInfo(HttpRequest &request);
     void HandleGetSymbolList(HttpRequest &request);
+    void HandleGetSymbolCount(HttpRequest &request);
     void HandleGetHistoryOrders(HttpRequest &request);
     void HandleGetHistoryPrices(HttpRequest &request);
     void HandleGetOrderInformation(HttpRequest &request);
@@ -85,6 +86,8 @@ public:
     void GetAccountInformation();
     void GetSymbolInfo(string symbol);
     void GetSymbolList();
+    void GetSymbolCount();
+    void WarmSymbolCache();
     void GetQuote(string symbol);
     void GetCalendar(string countryCode, string currency, int days);
     void GetOrderList();
@@ -165,6 +168,9 @@ void CCommandHandler::HandleGetRequest(HttpRequest &request) {
             }
             else if (request.pathSegments[2] == "list") {
                 HandleGetSymbolList(request);
+            }
+            else if (request.pathSegments[2] == "count") {
+                HandleGetSymbolCount(request);
             }
             else {
                 SendError(404, "Unknown symbol endpoint: " + request.pathSegments[2]);
@@ -354,6 +360,10 @@ void CCommandHandler::HandleGetSymbolInfo(HttpRequest &request) {
 //+------------------------------------------------------------------+
 void CCommandHandler::HandleGetSymbolList(HttpRequest &request) {
     GetSymbolList();
+}
+
+void CCommandHandler::HandleGetSymbolCount(HttpRequest &request) {
+    GetSymbolCount();
 }
 
 //+------------------------------------------------------------------+
@@ -963,6 +973,16 @@ void CCommandHandler::GetSymbolList() {
 
     JsonResponse res = Core.GetSymbolList();
     SendJson(res);
+}
+
+void CCommandHandler::GetSymbolCount() {
+
+    JsonResponse res = Core.GetSymbolCount();
+    SendJson(res);
+}
+
+void CCommandHandler::WarmSymbolCache() {
+    if (Core != NULL) Core.WarmSymbolCache();
 }
 
 //+------------------------------------------------------------------+

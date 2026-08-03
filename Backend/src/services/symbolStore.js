@@ -1,5 +1,5 @@
 import { pool } from "../db/pool.js";
-import { fetchMt5Symbols } from "./mt5Client.js";
+import { fetchMt5Symbols, fetchMt5SymbolCount } from "./mt5Client.js";
 import { logger } from "../utils/logger.js";
 
 // Helper untuk mengekstrak kategori dari path.
@@ -14,12 +14,6 @@ function extractCategory(path) {
 export async function syncBrokerSymbols(retries = 5, delayMs = 3000) {
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
-      const mt5Symbols = await fetchMt5Symbols();
-      
-      if (!Array.isArray(mt5Symbols)) {
-        throw new Error("Invalid response from MT5 symbols list");
-      }
-
     // Ambil jumlah simbol AKTIF saat ini di DB untuk optimasi (skip jika sama).
     // PENTING: harus filter is_active=true - broker_symbols nyimpen histori
     // simbol yang pernah delisted (is_active=false, tapi row-nya nggak
@@ -30,10 +24,23 @@ export async function syncBrokerSymbols(retries = 5, delayMs = 3000) {
     const { rows: countRows } = await pool.query("SELECT COUNT(*) FROM broker_symbols WHERE is_active = true");
     const dbCount = parseInt(countRows[0].count);
 
-    if (dbCount === mt5Symbols.length) {
+    // FIX (CPU spike di MT5 saat startup): endpoint /v1/symbol/list itu berat
+    // di sisi EA (loop semua simbol broker + build JSON string), dan dulu
+    // selalu dipanggil tiap startup cuma buat cek apakah ada perubahan.
+    // Sekarang cek dulu via /v1/symbol/count (murah, O(1) di sisi EA) --
+    // endpoint berat cuma disentuh kalau jumlahnya memang beda.
+    const remoteCount = await fetchMt5SymbolCount();
+
+    if (dbCount === remoteCount) {
       logger.info(`Broker symbols up-to-date (count: ${dbCount}). Skipping sync.`, { context: "System" });
       return;
     }
+
+      const mt5Symbols = await fetchMt5Symbols();
+      
+      if (!Array.isArray(mt5Symbols)) {
+        throw new Error("Invalid response from MT5 symbols list");
+      }
 
     logger.info(`Syncing ${mt5Symbols.length} broker symbols to DB...`, { context: "System" });
 

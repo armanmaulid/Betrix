@@ -37,12 +37,26 @@ export async function createSession(userId) {
   return sessionToken;
 }
 
+const SESSION_MEMORY_CACHE_TTL_MS = 5000;
 const sessionMemoryCache = new Map();
+
+// FIX (memory leak): sessionMemoryCache sebelumnya tidak pernah di-evict —
+// entry lama (token dari user yang sudah lama tidak aktif) tetap tersimpan
+// di memory Node selamanya sampai proses restart. Bersihkan entry yang
+// sudah lewat TTL-nya secara berkala.
+setInterval(() => {
+  const now = Date.now();
+  for (const [token, entry] of sessionMemoryCache) {
+    if (now - entry.timestamp >= SESSION_MEMORY_CACHE_TTL_MS) {
+      sessionMemoryCache.delete(token);
+    }
+  }
+}, 60 * 1000).unref();
 
 export async function validateSession(sessionToken) {
   const now = Date.now();
   const cached = sessionMemoryCache.get(sessionToken);
-  if (cached && now - cached.timestamp < 5000) {
+  if (cached && now - cached.timestamp < SESSION_MEMORY_CACHE_TTL_MS) {
     return cached.user;
   }
 
@@ -84,6 +98,7 @@ export async function revokeSession(sessionToken) {
     await redis.srem(`user_sessions:${userId}`, sessionToken);
   }
   await redis.del(`session:${sessionToken}`);
+  sessionMemoryCache.delete(sessionToken);
   return userId;
 }
 
@@ -95,6 +110,9 @@ export async function revokeAllUserSessions(userId, { exceptToken } = {}) {
     const keysToDelete = tokensToRevoke.map(token => `session:${token}`);
     await redis.del(...keysToDelete);
     await redis.srem(`user_sessions:${userId}`, ...tokensToRevoke);
+    for (const token of tokensToRevoke) {
+      sessionMemoryCache.delete(token);
+    }
   }
 
   return tokensToRevoke.length;

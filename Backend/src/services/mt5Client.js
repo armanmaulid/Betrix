@@ -197,3 +197,14 @@ export async function fetchMt5Symbols() {
   const json = JSON.parse(sanitizedText);
   return json.symbols || json;
 }
+
+// REST API Helper to get just the symbol count from MT5 (cheap, no full list build)
+export async function fetchMt5SymbolCount() {
+  const url = `http://${MT5_URL}/v1/symbol/count`;
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`MT5 Bridge responded with ${response.status}`);
+  }
+  const json = await response.json();
+  return json.count;
+}

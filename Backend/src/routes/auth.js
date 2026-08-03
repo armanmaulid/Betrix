@@ -240,8 +240,8 @@ router.post("/login", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("[POST /api/auth/login] error:", err.message);
-    res.status(500).json({ error: "Gagal login", detail: err.message });
+    logger.error("[POST /api/auth/login] error", { error: err.message });
+    res.status(500).json({ error: "Gagal login" });
   }
 });
 

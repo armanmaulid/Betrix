@@ -113,10 +113,12 @@ void InitializeWebSocketServer() {
     dataManager = new CData();
     dataManager.setSymbols(symbols);
     dataManager.setMbookSymbols(mbookSymbols);
-    if (commandHandler != NULL)
+    if (commandHandler != NULL) {
         commandHandler.SetPriceSender(dataManager);
+        commandHandler.WarmSymbolCache();
+    }
 
-    Print("WebSocket server initialized on port ", HTTP_PORT);
+    Print("SocketBridgeEA ready — listening on port ", HTTP_PORT, ", accepting connections");
 }
 
 

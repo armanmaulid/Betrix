@@ -68,9 +68,44 @@ const checkChatCredits = (req, res, next) => {
   return requireCredits(TIER_CREDIT_COST[tier], `chat_${tier}`)(req, res, next);
 };
 
-// POST /api/chat
-router.post("/chat", requireAuth, perUserLimiter, checkChatCredits, async (req, res) => {
-  const { taskType, message, displayMessage, history = [], sessionId } = req.body;
+// FIX (image upload): field `image` sebelumnya diteruskan mentah-mentah ke
+// modelRouter -> AI gateway tanpa validasi format/ukuran sama sekali di
+// server (cuma dicek 1MB di frontend, yang gampang di-bypass dengan curl
+// langsung). Selain buang kredit untuk payload yang bukan gambar valid,
+// ini juga celah abuse: field ini diteruskan sebagai `image_url.url` ke
+// gateway, jadi kalau bukan data: URI, gateway bisa dipancing fetch URL
+// sembarang atas nama API key kita.
+const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB (ukuran file asli, sebelum base64)
+const IMAGE_DATA_URL_RE = /^data:image\/(png|jpe?g|webp|gif);base64,([A-Za-z0-9+/]+={0,2})$/i;
+
+function validateImageField(image) {
+  if (image === undefined || image === null || image === "") {
+    return { ok: true };
+  }
+  if (typeof image !== "string") {
+    return { ok: false, error: "Format gambar tidak valid" };
+  }
+  const match = image.match(IMAGE_DATA_URL_RE);
+  if (!match) {
+    return { ok: false, error: "Gambar harus berupa data URL base64 (image/png, jpeg, webp, atau gif)" };
+  }
+  const approxBytes = Math.floor((match[2].length * 3) / 4);
+  if (approxBytes > MAX_IMAGE_BYTES) {
+    return {
+      ok: false,
+      error: `Ukuran gambar melebihi batas maksimal ${MAX_IMAGE_BYTES / 1024 / 1024}MB`,
+    };
+  }
+  return { ok: true };
+}
+
+// FIX (business logic): validasi body sekarang jalan SEBELUM checkChatCredits
+// (bukan di dalam handler setelahnya) supaya request yang tidak valid gagal
+// duluan tanpa sempat motong kredit user. Sebelumnya urutannya kebalik --
+// checkChatCredits jalan duluan sebagai middleware, baru handler validasi
+// message/taskType, jadi request cacat tetap dikenakan biaya tanpa refund.
+function validateChatBody(req, res, next) {
+  const { message, taskType, image } = req.body;
 
   if (!message || typeof message !== "string") {
     return res.status(400).json({ error: "'message' wajib diisi (string)" });
@@ -78,6 +113,18 @@ router.post("/chat", requireAuth, perUserLimiter, checkChatCredits, async (req, 
   if (taskType && !VALID_TASK_TYPES.includes(taskType)) {
     return res.status(400).json({ error: `taskType tidak dikenal: ${taskType}` });
   }
+
+  const imageCheck = validateImageField(image);
+  if (!imageCheck.ok) {
+    return res.status(400).json({ error: imageCheck.error });
+  }
+
+  next();
+}
+
+// POST /api/chat
+router.post("/chat", requireAuth, perUserLimiter, validateChatBody, checkChatCredits, async (req, res) => {
+  const { taskType, message, displayMessage, history = [], sessionId } = req.body;
 
   const cleanHistory = sanitizeHistory(history);
   const messages = [...cleanHistory, { role: "user", content: message.substring(0, 4000) }];
@@ -141,15 +188,8 @@ router.post("/chat", requireAuth, perUserLimiter, checkChatCredits, async (req, 
 });
 
 // POST /api/chat/stream
-router.post("/chat/stream", requireAuth, perUserLimiter, checkChatCredits, async (req, res) => {
+router.post("/chat/stream", requireAuth, perUserLimiter, validateChatBody, checkChatCredits, async (req, res) => {
   const { taskType, message, displayMessage, history = [], sessionId, image } = req.body;
-
-  if (!message || typeof message !== "string") {
-    return res.status(400).json({ error: "'message' wajib diisi (string)" });
-  }
-  if (taskType && !VALID_TASK_TYPES.includes(taskType)) {
-    return res.status(400).json({ error: `taskType tidak dikenal: ${taskType}` });
-  }
 
   const cleanHistory = sanitizeHistory(history);
   const messages = [...cleanHistory, { role: "user", content: message.substring(0, 4000) }];

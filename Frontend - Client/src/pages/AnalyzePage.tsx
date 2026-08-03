@@ -70,11 +70,13 @@ export function AnalyzePage() {
   const [attachedImage, setAttachedImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // Harus sinkron dengan MAX_IMAGE_BYTES di Backend/src/routes/chat.js
+
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 1024 * 1024) {
-        alert("Ukuran gambar terlalu besar! Maksimal 1MB.");
+      if (file.size > MAX_IMAGE_BYTES) {
+        alert(`Ukuran gambar terlalu besar! Maksimal ${MAX_IMAGE_BYTES / 1024 / 1024}MB.`);
         e.target.value = '';
         return;
       }
