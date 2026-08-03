@@ -183,7 +183,7 @@ const server = app.listen(PORT, async () => {
     fetchAndStoreNews().catch((err) =>
       logger.error("Auto-fetch news gagal", { error: err.message })
     );
-  }, 5 * 1000);
+  }, 10 * 1000);
 
   setInterval(() => sendHeartbeat(), 30 * 1000);
 
