@@ -1,7 +1,8 @@
 import { pool } from "../db/pool.js";
 import { logger } from "../utils/logger.js";
 
-const MT5_URL = process.env.MT5_BRIDGE_URL || "127.0.0.1:8890";
+const rawBridgeUrl = process.env.MT5_BRIDGE_URL || "127.0.0.1:8890";
+const MT5_HTTP_BASE = process.env.MT5_HTTP_URL || (rawBridgeUrl.startsWith("http") ? rawBridgeUrl : `http://${rawBridgeUrl}`);
 
 // ─────────────────────────────────────────────────────────────────────────
 // Economic calendar - sekarang disimpan permanen di Postgres (bukan cuma
@@ -53,7 +54,7 @@ export async function syncCalendarIfNeeded() {
 
     logger.info("Calendar bulan ini+depan belum ada di DB. Syncing dari MT5...", { context: "Calendar" });
 
-    const res = await fetch(`http://${MT5_URL}/v1/calendar`); // default EA = ±1 bulan kalender
+    const res = await fetch(`${MT5_HTTP_BASE}/v1/calendar`); // default EA = ±1 bulan kalender
     if (!res.ok) {
       throw new Error(`MT5 bridge responded with ${res.status}`);
     }

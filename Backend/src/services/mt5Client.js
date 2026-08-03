@@ -2,7 +2,13 @@ import WebSocket from "ws";
 import { logger } from "../utils/logger.js";
 import { upsertEvents } from "./calendarStore.js";
 
-const MT5_URL = process.env.MT5_BRIDGE_URL || "127.0.0.1:8890";
+// WebSocket & HTTP URL ke MT5 Bridge EA.
+// MT5_WS_URL contoh: "ws://127.0.0.1:8890" atau "wss://mt5.domain.com"
+// MT5_HTTP_URL contoh: "http://127.0.0.1:8890" atau "https://mt5.domain.com"
+const rawBridgeUrl = process.env.MT5_BRIDGE_URL || "127.0.0.1:8890";
+const MT5_HTTP_BASE = process.env.MT5_HTTP_URL || (rawBridgeUrl.startsWith("http") ? rawBridgeUrl : `http://${rawBridgeUrl}`);
+const MT5_WS_BASE = process.env.MT5_WS_URL || (rawBridgeUrl.startsWith("ws") ? rawBridgeUrl : `ws://${rawBridgeUrl}`);
+
 export const latestPrices = {};
 
 const trackedSymbols = new Set();
@@ -39,7 +45,7 @@ export function removeCalendarListener(fn) {
 async function sendTrackRequest() {
   if (trackedSymbols.size === 0) return;
   try {
-    const res = await fetch(`http://${MT5_URL}/v1/track/prices`, {
+    const res = await fetch(`${MT5_HTTP_BASE}/v1/track/prices`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ symbols: Array.from(trackedSymbols) })
@@ -56,7 +62,7 @@ async function sendTrackRequest() {
 
 async function sendTrackCalendarRequest() {
   try {
-    const res = await fetch(`http://${MT5_URL}/v1/track/calendar`, {
+    const res = await fetch(`${MT5_HTTP_BASE}/v1/track/calendar`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       // Sengaja tanpa filter - biar backend yang filter, EA cukup broadcast semua.
@@ -73,25 +79,26 @@ async function sendTrackCalendarRequest() {
 }
 
 // Subscribe 1 simbol — dipakai untuk call site yang memang cuma butuh 1
-// simbol (mis. GET /api/market/ticker?symbol=X).
+// simbol (misal SSE market.js saat client connect).
 export async function subscribeToSymbol(symbol) {
-  return subscribeToSymbols([symbol]);
+  if (!symbol) return;
+  trackedSymbols.add(symbol);
+  await sendTrackRequest();
 }
 
-// Subscribe banyak simbol sekaligus dalam SATU HTTP POST ke MT5 bridge,
-// bukan 1 POST per simbol (sebelumnya /stream manggil subscribeToSymbol
-// per simbol lewat forEach, jadi kalau ada 12 simbol baru = 12 POST
-// terpisah nyaris bersamaan, masing-masing isinya trackedSymbols yang
-// makin panjang — buang-buang request + bikin race kecil di MT5 bridge).
+// Subscribe beberapa simbol sekaligus (batch) — misal TickerStrip yang
+// butuh 12 simbol sekaligus pas mount. Kirim 1 HTTP request daripada 12
+// request berurutan.
 export async function subscribeToSymbols(symbols) {
-  let hasNew = false;
-  for (const symbol of symbols) {
-    if (!trackedSymbols.has(symbol)) {
-      trackedSymbols.add(symbol);
-      hasNew = true;
+  if (!Array.isArray(symbols) || symbols.length === 0) return;
+  let addedAny = false;
+  for (const s of symbols) {
+    if (s && !trackedSymbols.has(s)) {
+      trackedSymbols.add(s);
+      addedAny = true;
     }
   }
-  if (hasNew && wsConnection && wsConnection.readyState === WebSocket.OPEN) {
+  if (addedAny) {
     await sendTrackRequest();
   }
 }
@@ -107,7 +114,8 @@ export function initializeMt5Client() {
 
   function connect() {
     // The MT5 EA upgrades the root endpoint to a WebSocket connection
-    wsConnection = new WebSocket(`ws://${MT5_URL}/`);
+    const wsUrl = MT5_WS_BASE.endsWith('/') ? MT5_WS_BASE : `${MT5_WS_BASE}/`;
+    wsConnection = new WebSocket(wsUrl);
 
     wsConnection.on("open", async () => {
       logger.info("Connected to WebSocket for Live Ticks", { context: "MT5" });
@@ -173,7 +181,7 @@ export function initializeMt5Client() {
 
 // REST API Helper for OHLC History
 export async function fetchMt5History(symbol, timeframe, fromDate, toDate) {
-  const url = `http://${MT5_URL}/v1/history/prices?symbol=${encodeURIComponent(symbol)}&time_frame=${encodeURIComponent(timeframe)}&from_date=${fromDate}&to_date=${toDate}`;
+  const url = `${MT5_HTTP_BASE}/v1/history/prices?symbol=${encodeURIComponent(symbol)}&time_frame=${encodeURIComponent(timeframe)}&from_date=${fromDate}&to_date=${toDate}`;
   const response = await fetch(url);
   if (!response.ok) {
     const errorText = await response.text().catch(() => "");
@@ -184,7 +192,7 @@ export async function fetchMt5History(symbol, timeframe, fromDate, toDate) {
 
 // REST API Helper to get all available symbols from MT5
 export async function fetchMt5Symbols() {
-  const url = `http://${MT5_URL}/v1/symbol/list`;
+  const url = `${MT5_HTTP_BASE}/v1/symbol/list`;
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`MT5 Bridge responded with ${response.status}`);
@@ -200,7 +208,7 @@ export async function fetchMt5Symbols() {
 
 // REST API Helper to get just the symbol count from MT5 (cheap, no full list build)
 export async function fetchMt5SymbolCount() {
-  const url = `http://${MT5_URL}/v1/symbol/count`;
+  const url = `${MT5_HTTP_BASE}/v1/symbol/count`;
   const response = await fetch(url);
   if (!response.ok) {
     throw new Error(`MT5 Bridge responded with ${response.status}`);
