@@ -40,7 +40,7 @@ export function LoginPage() {
         <div className="mb-8 flex flex-col items-center gap-2">
           <TrendingUp className="text-[var(--accent)]" size={32} />
           <h1 className="font-display text-xl font-semibold text-[var(--text-primary)]">
-            EA Admin Console
+            Betrix Admin
           </h1>
           <p className="text-sm text-[var(--text-muted)]">Masuk untuk kelola dashboard</p>
         </div>

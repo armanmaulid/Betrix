@@ -1,4 +1,4 @@
-# EA Console — Client Frontend
+# Betrix — Client Frontend
 
 Frontend client-facing untuk trading assistant: chart candlestick real-time (data dari MT5), panel strategi AI, hasil sinyal (entry/SL/TP + alternatif), news feed, dan economic calendar.
 

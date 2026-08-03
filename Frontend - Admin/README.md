@@ -1,4 +1,4 @@
-# EA Admin Console — Frontend
+# Betrix Admin — Frontend
 
 Frontend admin dashboard untuk backend Web Financial Advisor (forex EA). React + Vite + TypeScript + Tailwind, konsumsi semua endpoint `/api/admin/*` dan `/api/usage/stats`.
 

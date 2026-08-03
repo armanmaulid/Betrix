@@ -30,7 +30,7 @@ export function Sidebar() {
       <div className="flex items-center gap-2 border-b border-[var(--border)] px-5 py-5">
         <TrendingUp className="text-[var(--accent)]" size={22} />
         <span className="font-display text-base font-semibold tracking-tight">
-          EA Console
+          Betrix
         </span>
       </div>
       <nav className="flex-1 space-y-1 px-3 py-4">

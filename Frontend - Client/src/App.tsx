@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useEffect, lazy, Suspense } from "react";
-import { AuthProvider } from "./context/AuthContext";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 
 // Setiap halaman di-lazy-load per route, bukan diimpor eager semua di
@@ -25,6 +25,20 @@ function RouteFallback() {
   );
 }
 
+function TitleUpdater() {
+  const { user } = useAuth();
+  
+  useEffect(() => {
+    if (user?.email) {
+      document.title = `Betrix - ${user.email}`;
+    } else {
+      document.title = "Betrix — Client";
+    }
+  }, [user]);
+
+  return null;
+}
+
 export function App() {
   useEffect(() => {
     const disableEvent = (e: Event) => e.preventDefault();
@@ -41,6 +55,7 @@ export function App() {
 
   return (
     <AuthProvider>
+      <TitleUpdater />
       <BrowserRouter>
         <Suspense fallback={<RouteFallback />}>
           <Routes>

@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /*
-  Same charcoal-amber token set as EA Console (admin), for brand consistency
+  Same charcoal-amber token set as Betrix (admin), for brand consistency
   across admin + client. Client defaults to dark since AnalysisPage renders
   with theme="dark" on the chart — adjust here if you add a light/dark
   toggle later.

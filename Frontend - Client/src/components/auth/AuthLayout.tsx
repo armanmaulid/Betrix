@@ -41,7 +41,7 @@ export function AuthLayout({
       <div className="absolute left-6 top-6 z-30 flex items-center gap-2">
         <LiveDot />
         <span className="text-[10px] font-bold uppercase tracking-[0.25em] text-[var(--text-muted)]">
-          EA Console
+          Betrix
         </span>
         <div className="ml-4 text-[9px] text-[var(--text-muted)]">
           {new Date().toLocaleTimeString("en-US", { hour12: false })}
