@@ -116,17 +116,8 @@ export function initializeMt5Client() {
     // The MT5 EA upgrades the root endpoint to a WebSocket connection
     const wsUrl = MT5_WS_BASE.endsWith('/') ? MT5_WS_BASE : `${MT5_WS_BASE}/`;
     
-    // Cloudflare tunnel / reverse proxy WebSocket fix: pass Host header expected by local server
-    const parsedUrl = new URL(wsUrl);
-    const hostHeader = process.env.MT5_WS_HOST_HEADER || "127.0.0.1:8890";
-    
     logger.info(`Connecting to MT5 WebSocket at ${wsUrl}...`, { context: "MT5" });
-    wsConnection = new WebSocket(wsUrl, {
-      headers: {
-        Host: hostHeader,
-        UserAgent: "Betrix-Backend"
-      }
-    });
+    wsConnection = new WebSocket(wsUrl);
 
     wsConnection.on("open", async () => {
       logger.info("Connected to WebSocket for Live Ticks", { context: "MT5" });
