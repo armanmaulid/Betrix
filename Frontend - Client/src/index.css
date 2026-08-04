@@ -612,7 +612,7 @@ button:hover::after {
     var(--accent) 60%,
     transparent 100%
   );
-  animation: accent-sweep 3s infinite;
+  animation: accent-sweep 6s infinite;
 }
 
 .bx-nav-tab {
@@ -645,11 +645,11 @@ button:hover::after {
     transform: translateX(-100%);
     animation-timing-function: cubic-bezier(0.2, 0.8, 0.4, 1); /* ease-out back to slow down smoothly */
   }
-  50% {
+  25% {
     transform: translateX(0%);
     animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.2); /* ease-in to accelerate out smoothly */
   }
-  100% {
+  50%, 100% {
     transform: translateX(100%);
   }
 }
