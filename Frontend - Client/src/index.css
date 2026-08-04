@@ -616,7 +616,7 @@ button:hover::after {
 }
 
 .bx-nav-tab {
-  @apply flex flex-shrink-0 items-center justify-center gap-1.5 whitespace-nowrap border-r border-[var(--border)] px-4 py-1 text-[11px] font-bold text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-alt)] hover:text-[var(--accent)];
+  @apply flex flex-shrink-0 items-center justify-center gap-1.5 whitespace-nowrap border-r border-[var(--border)] px-4 py-0.5 text-[11px] font-bold text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-alt)] hover:text-[var(--accent)];
 }
 
 .bx-nav-tab-active {
