@@ -84,7 +84,7 @@ export function AuthLayout({
         </div>
 
         {/* Card bottom accent line */}
-        <div className="h-[2px] w-full bg-gradient-to-r from-transparent via-[var(--accent)] to-transparent opacity-60" />
+        <div className="bx-accent-line" />
       </div>
     </div>
   );

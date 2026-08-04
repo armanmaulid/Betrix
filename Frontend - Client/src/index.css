@@ -388,11 +388,20 @@ button:hover::after {
   animation: input-glow 2s ease-in-out infinite;
 }
 
+/* Card bottom accent line sweep */
+@keyframes accent-sweep {
+  0% { transform: translateX(-100%); }
+  40% { transform: translateX(-10%); }
+  60% { transform: translateX(10%); }
+  100% { transform: translateX(100%); }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .btn-press,
   .input-typing,
   .animate-ticker,
-  .news-highlight::after {
+  .news-highlight::after,
+  .animate-accent-sweep {
     animation: none !important;
   }
 }
@@ -589,6 +598,25 @@ button:hover::after {
   .animate-ticker,
   .news-highlight::after {
     animation: none !important;
+  }
+}
+
+/* ============================================================
+   REUSABLE UI COMPONENTS
+   ============================================================ */
+.bx-accent-line {
+  @apply relative h-[2px] w-full overflow-hidden bg-[var(--border)]/30;
+}
+.bx-accent-line::after {
+  content: "";
+  @apply absolute inset-0 h-full w-full bg-gradient-to-r from-transparent via-[var(--accent)] to-transparent opacity-80;
+  animation: accent-sweep 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bx-accent-line::after {
+    animation: none;
+    background: var(--accent); /* Fallback to solid line or static gradient */
   }
 }
 
