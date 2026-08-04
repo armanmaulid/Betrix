@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState, useMemo, type ReactNode } from "react";
 import { Outlet, useOutletContext } from "react-router-dom";
 import { TerminalShell } from "./TerminalShell";
 
@@ -11,10 +11,10 @@ export function TerminalShellLayout() {
   const [rightPanel, setRightPanel] = useState<ReactNode | null>(null);
   const [onSearch, setOnSearch] = useState<((s: string) => void)>(() => () => {});
 
-  const context: ShellContextType = {
+  const context = useMemo<ShellContextType>(() => ({
     setRightPanel,
     setOnSearch: (fn: (s: string) => void) => setOnSearch(() => fn)
-  };
+  }), []);
 
   return (
     <TerminalShell onSearchSymbol={onSearch} rightPanel={rightPanel}>
