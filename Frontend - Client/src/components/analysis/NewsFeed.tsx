@@ -64,6 +64,12 @@ function formatRelativeTime(iso: string): string {
   return `${diffDays} hari lalu`;
 }
 
+function stripHtml(html: string): string {
+  if (!html) return "";
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  return doc.body.textContent || "";
+}
+
 // Data dari backend /api/news via Vite proxy (localhost:3000).
 // Auto-polling tiap 30 detik untuk update realtime.
 // Nanti bisa diganti pakai EventSource(/api/news/stream) setelah ada login.
@@ -192,10 +198,10 @@ export const NewsFeed = React.memo(function NewsFeed() {
                   · {formatRelativeTime(item.publishedAt)}
                 </span>
               </div>
-              <p className="text-[11.5px] leading-snug text-[var(--text-primary)]">{item.title}</p>
+              <p className="text-[11.5px] leading-snug text-[var(--text-primary)]" title={stripHtml(item.title)}>{stripHtml(item.title)}</p>
               {item.summary && (
-                <p className="mt-1 line-clamp-2 text-[10.5px] leading-snug text-[var(--text-muted)]">
-                  {item.summary}
+                <p className="mt-1 line-clamp-2 text-[10.5px] leading-snug text-[var(--text-muted)]" title={stripHtml(item.summary)}>
+                  {stripHtml(item.summary)}
                 </p>
               )}
             </a>
