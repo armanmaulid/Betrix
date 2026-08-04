@@ -607,9 +607,9 @@ button:hover::after {
   background-image: linear-gradient(
     90deg,
     transparent 0%,
-    var(--accent) 35%,
-    rgba(255, 255, 255, 0.5) 50%,
-    var(--accent) 65%,
+    var(--accent) 40%,
+    #ffdfba 50%,
+    var(--accent) 60%,
     transparent 100%
   );
   animation: accent-sweep 3s infinite; /* Timing functions handled in keyframes */
