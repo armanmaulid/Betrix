@@ -18,6 +18,7 @@ export function TerminalShell({ onSearchSymbol, rightPanel, children }: Terminal
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-[var(--bg)] font-mono text-[13px] text-[var(--text-primary)]">
       <TopBar onSearchSymbol={onSearchSymbol} />
+      <div className="bx-accent-line" />
       <TickerStrip />
 
       <div className="flex flex-1 overflow-hidden">

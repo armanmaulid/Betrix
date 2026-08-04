@@ -62,7 +62,7 @@ export const TickerStrip = React.memo(function TickerStrip({ symbols = MARKET_SY
         <div
           key={`${keyPrefix}-${s.symbol}`}
           className={
-            "flex flex-shrink-0 items-center gap-2 whitespace-nowrap border-r border-[var(--border)] px-4 py-1.5 " +
+            "flex flex-shrink-0 items-center gap-2 whitespace-nowrap border-r border-[var(--border)] px-4 py-1 " +
             (flash === "up" ? "flash-up" : flash === "down" ? "flash-down" : "")
           }
         >

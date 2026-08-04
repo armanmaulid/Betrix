@@ -6,6 +6,7 @@ import { Maximize2, Search, Zap } from "lucide-react";
 const FUNCTION_TABS = [
   { key: "F1", label: "DASHBOARD", to: "/" },
   { key: "F2", label: "ANALISA AI", to: "/analyze" },
+  { key: "F3", label: "NEWS", to: "/news" },
 ];
 
 interface TopBarProps {
@@ -56,7 +57,7 @@ export const TopBar = React.memo(function TopBar({ onSearchSymbol }: TopBarProps
               key={t.key}
               onClick={() => navigate(t.to)}
               className={
-                "btn-sweep flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap border-r border-[var(--border)] px-3 py-2 font-bold " +
+                "btn-sweep flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap border-r border-[var(--border)] px-3 py-1.5 font-bold " +
                 (isActive
                   ? "bg-[var(--accent)] text-[var(--bg)]"
                   : "text-[var(--text-muted)] hover:bg-[var(--surface-alt)] hover:text-[var(--accent)]")
