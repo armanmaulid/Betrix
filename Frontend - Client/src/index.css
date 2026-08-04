@@ -388,13 +388,7 @@ button:hover::after {
   animation: input-glow 2s ease-in-out infinite;
 }
 
-/* Card bottom accent line sweep */
-@keyframes accent-sweep {
-  0% { transform: translateX(-100%); }
-  40% { transform: translateX(-10%); }
-  60% { transform: translateX(10%); }
-  100% { transform: translateX(100%); }
-}
+
 
 @media (prefers-reduced-motion: reduce) {
   .btn-press,
@@ -610,13 +604,28 @@ button:hover::after {
 .bx-accent-line::after {
   content: "";
   @apply absolute inset-0 h-full w-full bg-gradient-to-r from-transparent via-[var(--accent)] to-transparent opacity-80;
-  animation: accent-sweep 3s ease-in-out infinite;
+  animation: accent-sweep 3s infinite; /* Timing functions handled in keyframes */
 }
 
 @media (prefers-reduced-motion: reduce) {
   .bx-accent-line::after {
     animation: none;
     background: var(--accent); /* Fallback to solid line or static gradient */
+  }
+}
+
+/* Card bottom accent line sweep */
+@keyframes accent-sweep {
+  0% {
+    transform: translateX(-100%);
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.4, 1); /* ease-out back to slow down smoothly */
+  }
+  50% {
+    transform: translateX(0%);
+    animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.2); /* ease-in to accelerate out smoothly */
+  }
+  100% {
+    transform: translateX(100%);
   }
 }
 
