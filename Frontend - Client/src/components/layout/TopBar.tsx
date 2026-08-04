@@ -67,7 +67,7 @@ export const TopBar = React.memo(function TopBar({ onSearchSymbol }: TopBarProps
 
       <form
         onSubmit={handleSearchSubmit}
-        className="mx-2 my-0.5 flex flex-1 items-center gap-2 border border-[var(--border)] bg-[var(--surface-alt)] px-2"
+        className="mx-3 my-1.5 flex flex-1 items-center gap-2 border border-[var(--border)] bg-[var(--surface-alt)] px-2"
       >
         <Search size={12} className="flex-shrink-0 text-[var(--text-muted)]" />
         <input
