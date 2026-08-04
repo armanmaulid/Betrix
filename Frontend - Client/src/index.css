@@ -599,11 +599,19 @@ button:hover::after {
    REUSABLE UI COMPONENTS
    ============================================================ */
 .bx-accent-line {
-  @apply relative h-[2px] w-full overflow-hidden;
+  @apply relative h-px w-full overflow-hidden;
 }
 .bx-accent-line::after {
   content: "";
-  @apply absolute inset-0 h-full w-full bg-gradient-to-r from-transparent via-[var(--accent)] to-transparent opacity-80;
+  @apply absolute inset-0 h-full w-full;
+  background-image: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--accent) 35%,
+    rgba(255, 255, 255, 0.5) 50%,
+    var(--accent) 65%,
+    transparent 100%
+  );
   animation: accent-sweep 3s infinite; /* Timing functions handled in keyframes */
 }
 
