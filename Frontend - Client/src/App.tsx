@@ -14,6 +14,7 @@ const AnalyzePage = lazy(() => import("./pages/AnalyzePage").then(m => ({ defaul
 const AuthCallbackPage = lazy(() => import("./pages/AuthCallbackPage").then(m => ({ default: m.AuthCallbackPage })));
 const SettingsPage = lazy(() => import("./pages/SettingsPage").then(m => ({ default: m.SettingsPage })));
 const NewsPage = lazy(() => import("./pages/NewsPage").then(m => ({ default: m.NewsPage })));
+const EconomicCalendarPage = lazy(() => import("./pages/EconomicCalendarPage").then(m => ({ default: m.EconomicCalendarPage })));
 
 import { TerminalShellLayout } from "./components/layout/TerminalShellLayout";
 
@@ -67,6 +68,7 @@ export function App() {
             <Route element={<ProtectedRoute><TerminalShellLayout /></ProtectedRoute>}>
               <Route path="/" element={<DashboardPage />} />
               <Route path="/analyze" element={<AnalyzePage />} />
+              <Route path="/calendar" element={<EconomicCalendarPage />} />
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/news" element={<NewsPage />} />
             </Route>

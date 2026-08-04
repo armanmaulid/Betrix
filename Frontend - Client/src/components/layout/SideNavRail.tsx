@@ -12,7 +12,7 @@ const NAV_ITEMS = [
   { icon: CandlestickChart, label: "Chart", path: "/", anchorId: "panel-chart" },
   { icon: Sparkles, label: "Analisa AI", path: "/analyze" },
   { icon: Newspaper, label: "News", path: "/news" },
-  { icon: CalendarClock, label: "Kalender Ekonomi", path: "/", anchorId: "panel-calendar" },
+  { icon: CalendarClock, label: "Kalender Ekonomi", path: "/calendar" },
 ];
 
 export const SideNavRail = React.memo(function SideNavRail() {

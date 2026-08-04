@@ -186,15 +186,22 @@ const server = app.listen(PORT, async () => {
     });
   }, 60 * 60 * 1000);
 
-  fetchAndStoreNews().catch((err) =>
-    logger.error("Fetch news gagal", { error: err.message })
-  );
-
-  setInterval(() => {
+  // Polling news Finnhub hanya dijadwalkan bila API key terpasang — tanpa
+  // key, fetch hanya me-return 0 + log warn tiap 10s (bukan error, tapi
+  // spam log yang nggak berguna).
+  if (process.env.FINNHUB_API_KEY) {
     fetchAndStoreNews().catch((err) =>
-      logger.error("Auto-fetch news gagal", { error: err.message })
+      logger.error("Fetch news gagal", { error: err.message })
     );
-  }, 10 * 1000);
+
+    setInterval(() => {
+      fetchAndStoreNews().catch((err) =>
+        logger.error("Auto-fetch news gagal", { error: err.message })
+      );
+    }, 10 * 1000);
+  } else {
+    logger.warn("FINNHUB_API_KEY not set — news polling dinonaktifkan.", { context: "NEWS" });
+  }
 
   setInterval(() => sendHeartbeat(), 30 * 1000);
 

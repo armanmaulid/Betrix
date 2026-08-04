@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarClock, RefreshCw, Info, Filter, X } from "lucide-react";
-import { fetchEconomicCalendar, type CalendarEvent } from "../../api/marketClient";
+import { useShellContext } from "../components/layout/TerminalShellLayout";
+import { fetchEconomicCalendar, type CalendarEvent } from "../api/marketClient";
 
 const IMPACT_DOT: Record<CalendarEvent["importance"], string> = {
   high: "bg-[var(--danger)]",
@@ -8,24 +9,16 @@ const IMPACT_DOT: Record<CalendarEvent["importance"], string> = {
   low: "bg-[var(--text-muted)]",
   none: "bg-[var(--border)]",
 };
-
+const IMPACT_LEVEL: Record<CalendarEvent["importance"], number> = { high: 3, medium: 2, low: 1, none: 0 };
 const IMPACTS: Array<CalendarEvent["importance"]> = ["high", "medium", "low"];
 
 type PeriodKey = "last_week" | "this_week" | "next_week" | "last_month" | "this_month" | "next_month";
-
 const PERIOD_LABELS: Record<PeriodKey, string> = {
-  last_week: "Minggu Lalu",
-  this_week: "Minggu Ini",
-  next_week: "Minggu Depan",
-  last_month: "Bulan Lalu",
-  this_month: "Bulan Ini",
-  next_month: "Bulan Depan",
+  last_week: "Minggu Lalu", this_week: "Minggu Ini", next_week: "Minggu Depan",
+  last_month: "Bulan Lalu", this_month: "Bulan Ini", next_month: "Bulan Depan",
 };
 const PERIOD_ORDER: PeriodKey[] = ["last_week", "this_week", "next_week", "last_month", "this_month", "next_month"];
 
-// Label negara yang umum dipakai - fallback ke kode ISO-nya sendiri kalau
-// nggak ada di daftar (daftar ini sengaja nggak lengkap, cuma buat mempercantik
-// tampilan filter, bukan sumber data).
 const COUNTRY_NAMES: Record<string, string> = {
   US: "United States", EU: "Euro Zone", GB: "United Kingdom", JP: "Japan",
   AU: "Australia", NZ: "New Zealand", CA: "Canada", CH: "Switzerland",
@@ -38,9 +31,6 @@ function countryLabel(code: string): string {
   return COUNTRY_NAMES[code] || code;
 }
 
-// ISO alpha-2 -> flag emoji, murni dari Unicode regional indicator symbols,
-// nggak butuh asset gambar apapun. "EU" juga didukung Unicode sebagai
-// pengecualian resmi (flag Uni Eropa).
 function flagEmoji(code: string): string {
   if (!code || code.length !== 2) return "🏳️";
   const points = [...code.toUpperCase()].map((c) => 127397 + c.charCodeAt(0));
@@ -57,18 +47,15 @@ interface FilterState {
 
 function getPeriodRange(period: PeriodKey): { from: Date; to: Date } {
   const now = new Date();
-
   if (period === "last_week" || period === "this_week" || period === "next_week") {
-    const day = now.getDay(); // 0=Minggu..6=Sabtu
-    const diffToSunday = -day; // minggu mulai Minggu
+    const day = now.getDay();
     const weekOffset = period === "last_week" ? -1 : period === "next_week" ? 1 : 0;
-    const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diffToSunday + weekOffset * 7, 0, 0, 0, 0);
+    const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day + weekOffset * 7, 0, 0, 0, 0);
     const to = new Date(from);
     to.setDate(to.getDate() + 7);
-    to.setMilliseconds(to.getMilliseconds() - 1); // Sabtu 23:59:59.999
+    to.setMilliseconds(to.getMilliseconds() - 1);
     return { from, to };
   }
-
   const monthOffset = period === "last_month" ? -1 : period === "next_month" ? 1 : 0;
   const from = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1, 0, 0, 0, 0);
   const to = new Date(now.getFullYear(), now.getMonth() + monthOffset + 1, 0, 23, 59, 59, 999);
@@ -76,11 +63,7 @@ function getPeriodRange(period: PeriodKey): { from: Date; to: Date } {
 }
 
 function formatTime(iso: string): string {
-  const d = new Date(iso);
-  // Backend ngirim ISO-8601 UTC ("...Z") - timeZone sengaja nggak di-set
-  // eksplisit di sini, jadi Intl otomatis pakai timezone lokal device/
-  // browser user buat nampilin jamnya.
-  return d.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" });
 }
 
 function formatDate(iso: string): string {
@@ -88,21 +71,43 @@ function formatDate(iso: string): string {
   const now = new Date();
   const tomorrow = new Date(now);
   tomorrow.setDate(tomorrow.getDate() + 1);
-
   const withYear = d.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "numeric" }).toUpperCase();
-
   if (d.toDateString() === now.toDateString()) return `HARI INI · ${withYear}`;
   if (d.toDateString() === tomorrow.toDateString()) return `BESOK · ${withYear}`;
   return withYear;
 }
 
 function formatValue(val: string | null): string {
-  if (!val) return "-";
-  return val;
+  return val ?? "-";
 }
 
-// Bloomberg Terminal style: filter toolbar + expandable detail panel + data columns
-export const EconomicCalendar = React.memo(function EconomicCalendar() {
+// Template grid bersama header kolom & baris event, selaras seperti tabel
+// Investing.com: Time | Cur(flag+code) | Imp | Event | Actual | Forecast | Previous
+const CAL_COLS = "grid grid-cols-[44px_54px_48px_1fr_64px_64px_64px] items-center gap-2 px-3";
+
+function ImpactDots({ importance }: { importance: CalendarEvent["importance"] }) {
+  const level = IMPACT_LEVEL[importance];
+  const color = IMPACT_DOT[importance];
+  return (
+    <span className="flex items-center gap-0.5" title={`Impact: ${importance}`}>
+      {[0, 1, 2].map((i) => (
+        <span key={i} className={"h-1.5 w-1.5 rounded-full " + (i < level ? color : "bg-[var(--border)]")} />
+      ))}
+    </span>
+  );
+}
+
+function actualTone(ev: CalendarEvent): string {
+  if (ev.actual === null || ev.forecast === null) return "text-[var(--text-primary)]";
+  const a = Number.parseFloat(ev.actual);
+  const f = Number.parseFloat(ev.forecast);
+  if (Number.isNaN(a) || Number.isNaN(f)) return "text-[var(--text-primary)]";
+  return a > f ? "text-[var(--success)]" : a < f ? "text-[var(--danger)]" : "text-[var(--text-primary)]";
+}
+
+export function EconomicCalendarPage() {
+  const { setRightPanel, setOnSearch } = useShellContext();
+
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [generatedAt, setGeneratedAt] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -112,9 +117,6 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
   const [availableCountries, setAvailableCountries] = useState<string[]>([]);
   const [availableCurrencies, setAvailableCurrencies] = useState<string[]>([]);
 
-  // Auto-select-all cuma dilakukan sekali di load pertama - biar pilihan
-  // user nggak ke-reset tiap kali data di-refresh (manual reload / SSE
-  // calendar_update).
   const didInitFilters = useRef(false);
   const scrolledForKeyRef = useRef<string | null>(null);
   const listContainerRef = useRef<HTMLDivElement>(null);
@@ -146,8 +148,6 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
       setAvailableCountries(countries);
       setAvailableCurrencies(currencies);
 
-      // Default: semua negara dicentang, tapi currency hanya USD.
-      // Cuma dijalankan sekali saat mount pertama kali.
       if (!didInitFilters.current) {
         didInitFilters.current = true;
         setFilter((prev) => ({
@@ -156,9 +156,6 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
           currencies: new Set(currencies.filter((c) => c === "USD")),
         }));
       } else {
-        // Kalau ada negara BARU muncul dari refresh berikutnya
-        // otomatis ikut dicentang agar tidak diam-diam ketutup filter lama.
-        // (Currency baru tidak otomatis dicentang karena default hanya USD).
         setFilter((prev) => {
           const nextCountries = new Set(prev.countries);
           countries.forEach((c) => nextCountries.add(c));
@@ -174,12 +171,12 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
 
   useEffect(() => {
     load();
+    setOnSearch(() => {});
+    setRightPanel(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Live update: dengerin event calendar_update dari backend (yang relay
-  // dari mt5-bridge tiap ada actual value baru rilis / revisi forecast).
-  // Debounce ringan karena beberapa event bisa datang beruntun sekaligus.
+  // Live update via SSE calendar_update (relay dari mt5-bridge).
   useEffect(() => {
     const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
     const token = localStorage.getItem("eaconsole.sessionToken") || "";
@@ -187,16 +184,11 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
 
     const es = new EventSource(`${BACKEND_URL}/api/market/stream?calendar=1&token=${token}`);
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-
     es.addEventListener("calendar_update", () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => load(true), 500);
     });
-
-    es.onerror = () => {
-      // EventSource sudah auto-reconnect bawaan browser, cukup diamkan.
-    };
-
+    es.onerror = () => {};
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       es.close();
@@ -206,40 +198,29 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
 
   const periodRange = getPeriodRange(filter.period);
 
-  // Apply filters
-  const filtered = events.filter((ev) => {
+  const filtered = useMemo(() => events.filter((ev) => {
     if (!filter.countries.has(ev.country)) return false;
     if (!filter.currencies.has(ev.currency)) return false;
     if (!filter.impacts.has(ev.importance)) return false;
-    if (filter.showOnlyWithData && ev.actual === null && ev.forecast === null && ev.previous === null) {
-      return false;
-    }
+    if (filter.showOnlyWithData && ev.actual === null && ev.forecast === null && ev.previous === null) return false;
     const evMs = new Date(ev.time).getTime();
     if (evMs < periodRange.from.getTime() || evMs > periodRange.to.getTime()) return false;
     return true;
-  });
+  }), [events, filter, periodRange]);
 
-  // Auto-scroll ke grup "hari ini" begitu data (ter-filter) siap - sekali
-  // per kombinasi data+filter, bukan tiap render, biar nggak ganggu kalau
-  // user lagi scroll manual.
+  // Auto-scroll ke grup "hari ini" sekali per data+filter.
   useEffect(() => {
     if (isLoading || filtered.length === 0) return;
     const todayKey = new Date().toDateString();
     const scrollKey = `${todayKey}|${filtered.length}`;
     if (scrolledForKeyRef.current === scrollKey) return;
-
     const hasToday = filtered.some((ev) => new Date(ev.time).toDateString() === todayKey);
     if (!hasToday || !listContainerRef.current) return;
-
     const el = listContainerRef.current.querySelector(`[data-date-key="${CSS.escape(todayKey)}"]`);
     if (el) {
-      // FIX: Gunakan scrollBy pada container alih-alih scrollIntoView agar tidak nge-scroll halaman utama
       const containerRect = listContainerRef.current.getBoundingClientRect();
       const elRect = el.getBoundingClientRect();
-      listContainerRef.current.scrollBy({
-        top: elRect.top - containerRect.top,
-        behavior: "auto"
-      });
+      listContainerRef.current.scrollBy({ top: elRect.top - containerRect.top, behavior: "auto" });
       scrolledForKeyRef.current = scrollKey;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -247,41 +228,41 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
 
   function toggleCountry(code: string) {
     const next = new Set(filter.countries);
-    if (next.has(code)) next.delete(code);
-    else next.add(code);
+    next.has(code) ? next.delete(code) : next.add(code);
     setFilter({ ...filter, countries: next });
   }
-
   function toggleCurrency(code: string) {
     const next = new Set(filter.currencies);
-    if (next.has(code)) next.delete(code);
-    else next.add(code);
+    next.has(code) ? next.delete(code) : next.add(code);
     setFilter({ ...filter, currencies: next });
   }
-
   function toggleImpact(impact: CalendarEvent["importance"]) {
     const next = new Set(filter.impacts);
-    if (next.has(impact)) next.delete(impact);
-    else next.add(impact);
+    next.has(impact) ? next.delete(impact) : next.add(impact);
     setFilter({ ...filter, impacts: next });
   }
-
   function resetFilters() {
     setFilter({
       countries: new Set(availableCountries),
-      currencies: new Set(availableCurrencies.filter(c => c === "USD")),
+      currencies: new Set(availableCurrencies.filter((c) => c === "USD")),
       impacts: new Set(["high", "medium"]),
       showOnlyWithData: false,
       period: "this_week",
     });
   }
 
+  const groups = useMemo(() => {
+    const g: Record<string, CalendarEvent[]> = {};
+    for (const ev of filtered) (g[new Date(ev.time).toDateString()] ??= []).push(ev);
+    return g;
+  }, [filtered]);
+
   return (
-    <div className="relative flex h-[420px] flex-col border-b border-[var(--border)] bg-[var(--surface)] last:border-b-0">
+    <div className="relative flex h-full flex-col overflow-hidden bg-[#050505]">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-l-2 border-b-[var(--border)] border-l-[var(--accent)] bg-[var(--surface)] px-3 py-2">
-        <span className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wide text-cyan-400">
-          <CalendarClock size={12} className="text-[var(--accent)]" />
+      <div className="flex items-center justify-between border-b border-l-2 border-b-[var(--border)] border-l-[var(--accent)] bg-[var(--surface)] px-4 py-2.5">
+        <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-cyan-400">
+          <CalendarClock size={14} className="text-[var(--accent)]" />
           Economic Calendar
         </span>
         <div className="flex items-center gap-2">
@@ -289,12 +270,10 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
             value={filter.period}
             onChange={(e) => setFilter({ ...filter, period: e.target.value as PeriodKey })}
             aria-label="Pilih periode tanggal"
-            className="border border-[var(--border)] bg-[var(--surface)] px-1.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-primary)] hover:border-[var(--accent)] focus:border-[var(--accent)] focus:outline-none"
+            className="border border-[var(--border)] bg-[var(--surface)] px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-primary)] hover:border-[var(--accent)] focus:border-[var(--accent)] focus:outline-none"
           >
             {PERIOD_ORDER.map((p) => (
-              <option key={p} value={p}>
-                {PERIOD_LABELS[p]}
-              </option>
+              <option key={p} value={p}>{PERIOD_LABELS[p]}</option>
             ))}
           </select>
           <button
@@ -316,22 +295,33 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
             aria-label="Muat ulang calendar"
             className="text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-50"
           >
-            <RefreshCw size={12} className={isLoading ? "animate-spin" : ""} />
+            <RefreshCw size={13} className={isLoading ? "animate-spin" : ""} />
           </button>
         </div>
       </div>
 
-      {/* Calendar List */}
-      <div ref={listContainerRef} className="flex-1 overflow-y-auto px-3 py-2">
+      {/* Column header sticky */}
+      <div className={CAL_COLS + " border-b border-[var(--border)] bg-[var(--surface)] py-2 text-[9px] font-bold uppercase tracking-wider text-[var(--text-muted)]"}>
+        <span>Time</span>
+        <span className="text-center">Cur</span>
+        <span className="text-center">Imp.</span>
+        <span>Event</span>
+        <span className="text-right">Actual</span>
+        <span className="text-right">Forecast</span>
+        <span className="text-right">Previous</span>
+      </div>
+
+      {/* List */}
+      <div ref={listContainerRef} className="flex-1 overflow-y-auto">
         {isLoading ? (
-          <p className="text-xs text-[var(--text-muted)]">Memuat...</p>
+          <p className="px-4 py-3 text-xs text-[var(--text-muted)]">Memuat...</p>
         ) : error ? (
-          <div className="flex items-start gap-1.5 text-xs text-[var(--danger)]">
+          <div className="flex items-start gap-1.5 px-4 py-3 text-xs text-[var(--danger)]">
             <Info size={12} className="mt-0.5 flex-shrink-0" />
             <span>{error}</span>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center">
+          <div className="px-4 py-6 text-center">
             <p className="text-xs text-[var(--text-muted)]">
               Tidak ada event di {PERIOD_LABELS[filter.period]} dengan filter ini
             </p>
@@ -340,81 +330,27 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
             </button>
           </div>
         ) : (
-          (() => {
-            const groups: Record<string, CalendarEvent[]> = {};
-            for (const ev of filtered) {
-              const key = new Date(ev.time).toDateString();
-              (groups[key] ??= []).push(ev);
-            }
-            return Object.entries(groups).map(([dateKey, groupEvents]) => (
-              <div key={dateKey} data-date-key={dateKey} className="mb-3">
-                <div className="sticky top-0 mb-1 border-b border-[var(--border)] bg-[var(--surface)] pb-1 text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">
-                  {formatDate(dateKey)}
-                </div>
-                {groupEvents.map((ev, i) => (
-                  <div key={i} className="group border-b border-[var(--border)] py-2 hover:bg-[var(--surface-alt)]">
-                    {/* Top row: Impact, Time, Currency, Event */}
-                    <div className="flex items-start gap-2 px-1">
-                      {/* Impact dot */}
-                      <span className={"mt-1 h-1.5 w-1.5 flex-shrink-0 " + IMPACT_DOT[ev.importance]} />
-
-                      {/* Time */}
-                      <span className="tabular w-7 flex-shrink-0 text-[10px] text-[var(--text-primary)]">
-                        {formatTime(ev.time)}
-                      </span>
-
-                      {/* Flag + Currency badge */}
-                      <span
-                        className="flex flex-shrink-0 items-center gap-1 border border-[var(--border)] bg-[var(--surface-alt)] px-1.5 py-0.5 text-[10px] font-bold text-[var(--text-primary)]"
-                        title={countryLabel(ev.country)}
-                      >
-                        <span className="text-[11px]">{flagEmoji(ev.country)}</span>
-                        <span>{ev.currency}</span>
-                      </span>
-
-                      {/* Event name */}
-                      <div className="flex-1">
-                        <div className="text-[11px] leading-tight text-[var(--text-primary)]">{ev.event}</div>
-
-                        {/* Data row (Prev | Forecast | Actual) - right below event name */}
-                        {(ev.previous !== null || ev.forecast !== null || ev.actual !== null) && (
-                          <div className="mt-1.5 flex items-center gap-3 text-[10px] tabular">
-                            <div className="flex flex-col">
-                              <span className="text-[9px] uppercase text-[var(--text-muted)]">Prev</span>
-                              <span className="font-semibold text-[var(--text-primary)]">{formatValue(ev.previous)}</span>
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="text-[9px] uppercase text-[var(--text-muted)]">Forecast</span>
-                              <span className="font-semibold text-[var(--text-primary)]">{formatValue(ev.forecast)}</span>
-                            </div>
-                            {ev.actual !== null && (
-                              <div className="flex flex-col">
-                                <span className="text-[9px] uppercase text-[var(--text-muted)]">Actual</span>
-                                <span
-                                  className={
-                                    "font-bold " +
-                                    (ev.forecast !== null
-                                      ? Number.parseFloat(ev.actual) > Number.parseFloat(ev.forecast)
-                                        ? "text-[var(--success)]"
-                                        : Number.parseFloat(ev.actual) < Number.parseFloat(ev.forecast)
-                                          ? "text-[var(--danger)]"
-                                          : "text-[var(--text-primary)]"
-                                      : "text-[var(--text-primary)]")
-                                  }
-                                >
-                                  {formatValue(ev.actual)}
-                                </span>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+          Object.entries(groups).map(([dateKey, groupEvents]) => (
+            <div key={dateKey} data-date-key={dateKey}>
+              <div className="sticky top-0 z-[5] border-b border-[var(--border)] bg-[var(--surface)] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">
+                {formatDate(dateKey)}
               </div>
-            ));
-          })()
+              {groupEvents.map((ev, i) => (
+                <div key={i} className={CAL_COLS + " border-b border-[var(--border)] py-1.5 text-[11px] hover:bg-[var(--surface-alt)]"}>
+                  <span className="tabular text-[var(--text-primary)]">{formatTime(ev.time)}</span>
+                  <span className="flex items-center justify-center gap-1 font-bold text-[var(--text-primary)]" title={countryLabel(ev.country)}>
+                    <span className="text-[12px]">{flagEmoji(ev.country)}</span>
+                    <span>{ev.currency}</span>
+                  </span>
+                  <span className="flex justify-center"><ImpactDots importance={ev.importance} /></span>
+                  <span className="truncate text-[var(--text-primary)]" title={ev.event}>{ev.event}</span>
+                  <span className={"text-right tabular font-bold " + actualTone(ev)}>{formatValue(ev.actual)}</span>
+                  <span className="text-right tabular text-[var(--text-muted)]">{formatValue(ev.forecast)}</span>
+                  <span className="text-right tabular text-[var(--text-muted)]">{formatValue(ev.previous)}</span>
+                </div>
+              ))}
+            </div>
+          ))
         )}
       </div>
 
@@ -429,7 +365,6 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
       {filterPanelOpen && (
         <div className="absolute inset-y-0 right-0 z-50 w-64 animate-[slide-in-right_0.2s_ease-out] border-l border-[var(--border)] bg-[var(--surface)] shadow-[0_0_24px_rgba(0,0,0,0.6)]">
           <div className="flex h-full flex-col">
-            {/* Panel Header */}
             <div className="flex items-center justify-between border-b border-[var(--border)] px-3 py-2">
               <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--accent)]">Filter Options</span>
               <button
@@ -441,22 +376,13 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
               </button>
             </div>
 
-            {/* Panel Content */}
             <div className="flex-1 overflow-y-auto px-3 py-3">
-              {/* Priority */}
               <div className="mb-4">
-                <div className="mb-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
-                  <span>Priority</span>
-                </div>
+                <div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Priority</div>
                 <div className="space-y-1">
                   {IMPACTS.map((imp) => (
                     <label key={imp} className="flex cursor-pointer items-center gap-2 text-[11px] hover:text-[var(--accent)]">
-                      <input
-                        type="checkbox"
-                        checked={filter.impacts.has(imp)}
-                        onChange={() => toggleImpact(imp)}
-                        className="h-3 w-3 accent-[var(--accent)]"
-                      />
+                      <input type="checkbox" checked={filter.impacts.has(imp)} onChange={() => toggleImpact(imp)} className="h-3 w-3 accent-[var(--accent)]" />
                       <span className={"h-1.5 w-1.5 " + IMPACT_DOT[imp]} />
                       <span className="font-semibold capitalize">{imp}</span>
                     </label>
@@ -464,102 +390,57 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
                 </div>
               </div>
 
-              {/* Currency */}
               <div className="mb-4">
                 <div className="mb-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
                   <span>Currency</span>
                   <span className="flex gap-2 normal-case">
-                    <button
-                      onClick={() => setFilter({ ...filter, currencies: new Set(availableCurrencies) })}
-                      className="text-[var(--accent)] hover:underline"
-                    >
-                      Semua
-                    </button>
-                    <button
-                      onClick={() => setFilter({ ...filter, currencies: new Set() })}
-                      className="text-[var(--text-muted)] hover:underline"
-                    >
-                      Kosongkan
-                    </button>
+                    <button onClick={() => setFilter({ ...filter, currencies: new Set(availableCurrencies) })} className="text-[var(--accent)] hover:underline">Semua</button>
+                    <button onClick={() => setFilter({ ...filter, currencies: new Set() })} className="text-[var(--text-muted)] hover:underline">Kosongkan</button>
                   </span>
                 </div>
                 <div className="max-h-32 space-y-1 overflow-y-auto">
                   {availableCurrencies.map((code) => (
                     <label key={code} className="flex cursor-pointer items-center gap-2 text-[11px] hover:text-[var(--accent)]">
-                      <input
-                        type="checkbox"
-                        checked={filter.currencies.has(code)}
-                        onChange={() => toggleCurrency(code)}
-                        className="h-3 w-3 accent-[var(--accent)]"
-                      />
+                      <input type="checkbox" checked={filter.currencies.has(code)} onChange={() => toggleCurrency(code)} className="h-3 w-3 accent-[var(--accent)]" />
                       <span className="font-semibold">{code}</span>
                     </label>
                   ))}
-                  {availableCurrencies.length === 0 && (
-                    <p className="text-[10px] text-[var(--text-muted)]">Belum ada data</p>
-                  )}
+                  {availableCurrencies.length === 0 && <p className="text-[10px] text-[var(--text-muted)]">Belum ada data</p>}
                 </div>
               </div>
 
-              {/* Country */}
               <div className="mb-4">
                 <div className="mb-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">
                   <span>Country</span>
                   <span className="flex gap-2 normal-case">
-                    <button
-                      onClick={() => setFilter({ ...filter, countries: new Set(availableCountries) })}
-                      className="text-[var(--accent)] hover:underline"
-                    >
-                      Semua
-                    </button>
-                    <button
-                      onClick={() => setFilter({ ...filter, countries: new Set() })}
-                      className="text-[var(--text-muted)] hover:underline"
-                    >
-                      Kosongkan
-                    </button>
+                    <button onClick={() => setFilter({ ...filter, countries: new Set(availableCountries) })} className="text-[var(--accent)] hover:underline">Semua</button>
+                    <button onClick={() => setFilter({ ...filter, countries: new Set() })} className="text-[var(--text-muted)] hover:underline">Kosongkan</button>
                   </span>
                 </div>
                 <div className="max-h-40 space-y-1 overflow-y-auto">
                   {availableCountries.map((code) => (
                     <label key={code} className="flex cursor-pointer items-center gap-2 text-[11px] hover:text-[var(--accent)]">
-                      <input
-                        type="checkbox"
-                        checked={filter.countries.has(code)}
-                        onChange={() => toggleCountry(code)}
-                        className="h-3 w-3 accent-[var(--accent)]"
-                      />
+                      <input type="checkbox" checked={filter.countries.has(code)} onChange={() => toggleCountry(code)} className="h-3 w-3 accent-[var(--accent)]" />
                       <span>{flagEmoji(code)}</span>
                       <span className="font-semibold">{code}</span>
                       <span className="truncate text-[var(--text-muted)]">{countryLabel(code)}</span>
                     </label>
                   ))}
-                  {availableCountries.length === 0 && (
-                    <p className="text-[10px] text-[var(--text-muted)]">Belum ada data</p>
-                  )}
+                  {availableCountries.length === 0 && <p className="text-[10px] text-[var(--text-muted)]">Belum ada data</p>}
                 </div>
               </div>
 
-              {/* Show Only With Data */}
               <div className="mb-4">
                 <label className="flex cursor-pointer items-start gap-2 text-[11px] hover:text-[var(--accent)]">
-                  <input
-                    type="checkbox"
-                    checked={filter.showOnlyWithData}
-                    onChange={(e) => setFilter({ ...filter, showOnlyWithData: e.target.checked })}
-                    className="mt-0.5 h-3 w-3 accent-[var(--accent)]"
-                  />
+                  <input type="checkbox" checked={filter.showOnlyWithData} onChange={(e) => setFilter({ ...filter, showOnlyWithData: e.target.checked })} className="mt-0.5 h-3 w-3 accent-[var(--accent)]" />
                   <span>
                     Show only events with data
-                    <span className="mt-1 block text-[9px] text-[var(--text-muted)]">
-                      Hide events tanpa Prev/Forecast/Actual
-                    </span>
+                    <span className="mt-1 block text-[9px] text-[var(--text-muted)]">Hide events tanpa Prev/Forecast/Actual</span>
                   </span>
                 </label>
               </div>
             </div>
 
-            {/* Panel Footer */}
             <div className="border-t border-[var(--border)] px-3 py-2">
               <button
                 onClick={resetFilters}
@@ -573,4 +454,4 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
       )}
     </div>
   );
-});
+}
