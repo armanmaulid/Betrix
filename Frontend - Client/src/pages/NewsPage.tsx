@@ -290,15 +290,15 @@ export function NewsPage() {
           {/* RIGHT SIDEBAR */}
           <div className="bx-right-sidebar bg-[#050505]">
             {/* FEED STATUS */}
-            <div className="flex h-[280px] flex-col border-b border-[#222]">
-              <div className="flex items-center justify-between border-b border-[#222] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#ff9900]">
+            <div className="flex max-h-[280px] shrink-0 flex-col border-b border-[#222]">
+              <div className="flex shrink-0 items-center justify-between border-b border-[#222] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#ff9900]">
                 <span className="flex items-center gap-1.5">
                   <div className="h-1.5 w-1.5 bg-[#ff9900]"></div>
                   FEED STATUS
                 </span>
                 <span className="text-[#666]">{feedStats.sorted.length} SOURCES</span>
               </div>
-              <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto p-4" style={{ scrollbarWidth: "none" }}>
+              <div className="flex flex-col gap-2.5 overflow-y-auto p-4" style={{ scrollbarWidth: "none" }}>
                 {feedStats.sorted.map(([source, count], idx) => (
                   <div key={source} className="flex items-center justify-between font-mono text-[10px]">
                     <span className="w-28 truncate text-[#ccc]" title={source}>
