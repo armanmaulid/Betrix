@@ -33,7 +33,8 @@ export function LoginPage() {
         account_suspended: "Akun ditangguhkan. Hubungi admin untuk info lebih lanjut.",
         device_bound: "Device ini sudah terdaftar ke akun lain. Satu device hanya bisa untuk satu akun.",
         already_logged_in: "Anda sudah login dari device ini. Logout terlebih dahulu untuk login ulang.",
-        server_error: "Terjadi kesalahan pada server saat login Google."
+        server_error: "Terjadi kesalahan pada server saat login Google.",
+        rate_limit: "Terlalu banyak percobaan login/register, coba lagi dalam 5 menit."
       };
       setError(errorMap[errorParam] || "Gagal login dengan Google.");
       // clear query string without refreshing
@@ -158,7 +159,7 @@ export function LoginPage() {
         </Field>
 
         {error && (
-          <div className="flex items-start gap-2 border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-[12px] text-[var(--danger)] animate-[shake_0.4s_ease-in-out]">
+          <div className="bx-alert bx-alert-error">
             <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
             <span>{error}</span>
           </div>

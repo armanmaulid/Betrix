@@ -94,6 +94,17 @@ const limiter = rateLimit({
 const authLimiter = rateLimit({
   windowMs: 5 * 60 * 1000, // 5 menit
   max: 10, // 10 requests total (berhasil + gagal)
+  handler: (req, res, next, options) => {
+    if (req.method === 'GET' && req.originalUrl.includes('/google')) {
+      const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+      const referer = req.get('Referer') || '';
+      if (referer.includes('/register')) {
+        return res.redirect(`${frontendUrl}/register?error=rate_limit`);
+      }
+      return res.redirect(`${frontendUrl}/login?error=rate_limit`);
+    }
+    return res.status(options.statusCode).json(options.message);
+  },
   message: { error: "Terlalu banyak percobaan login/register, coba lagi dalam 5 menit" },
   standardHeaders: true,
   legacyHeaders: false,

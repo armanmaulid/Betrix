@@ -839,3 +839,28 @@ button:hover::after {
     background: var(--accent);
   }
 }
+
+/* ============================================================
+   ALERT BOXES
+   Reusable alert boxes for Error, Warning, Info, and Success
+   ============================================================ */
+.bx-alert {
+  @apply flex items-start gap-2 border px-3 py-2 text-[12px];
+  animation: shake 0.4s ease-in-out;
+}
+
+.bx-alert-error {
+  @apply border-[var(--danger)] bg-[var(--danger-soft)] text-[var(--danger)];
+}
+
+.bx-alert-warning {
+  @apply border-[var(--warning)] bg-[var(--warning-soft)] text-[var(--warning)];
+}
+
+.bx-alert-info {
+  @apply border-[var(--info)] bg-[var(--info-soft)] text-[var(--info)];
+}
+
+.bx-alert-success {
+  @apply border-[var(--success)] bg-[var(--success-soft)] text-[var(--success)];
+}

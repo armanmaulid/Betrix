@@ -1,10 +1,13 @@
-import { useState, type FormEvent, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect, type FormEvent, type ReactNode } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Loader2, UserPlus, AlertTriangle, MailCheck } from "lucide-react";
 import { AuthLayout } from "../components/auth/AuthLayout";
 import { register as registerApi, resendVerification, AuthApiError, getGoogleOAuthUrl } from "../api/authClient";
 
 export function RegisterPage() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -13,6 +16,20 @@ export function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [submittedEmail, setSubmittedEmail] = useState<string | null>(null);
   const [resendNote, setResendNote] = useState<string | null>(null);
+
+  useEffect(() => {
+    const errorParam = new URLSearchParams(location.search).get("error");
+    if (errorParam) {
+      const errorMap: Record<string, string> = {
+        rate_limit: "Terlalu banyak percobaan login/register, coba lagi dalam 5 menit.",
+        google_denied: "Pendaftaran dibatalkan oleh pengguna.",
+        auth_failed: "Autentikasi Google gagal.",
+        server_error: "Terjadi kesalahan pada server saat pendaftaran Google."
+      };
+      setError(errorMap[errorParam] || "Gagal mendaftar dengan Google.");
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location, navigate]);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -189,7 +206,7 @@ export function RegisterPage() {
         </Field>
 
         {error && (
-          <div className="flex items-start gap-2 border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-[12px] text-[var(--danger)] animate-[shake_0.4s_ease-in-out]">
+          <div className="bx-alert bx-alert-error">
             <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
             <span>{error}</span>
           </div>
