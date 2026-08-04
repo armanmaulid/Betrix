@@ -56,15 +56,10 @@ export const TopBar = React.memo(function TopBar({ onSearchSymbol }: TopBarProps
             <button
               key={t.key}
               onClick={() => navigate(t.to)}
-              className={
-                "btn-sweep flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap border-r border-[var(--border)] px-3 py-1.5 font-bold " +
-                (isActive
-                  ? "bg-[var(--accent)] text-[var(--bg)]"
-                  : "text-[var(--text-muted)] hover:bg-[var(--surface-alt)] hover:text-[var(--accent)]")
-              }
+              className={`btn-sweep bx-nav-tab ${isActive ? "bx-nav-tab-active" : ""}`}
             >
-              <span className={isActive ? "text-[var(--bg)]" : "text-[var(--accent)]"}>{t.key}</span>
-              <span className="font-normal">{t.label}</span>
+              <span className="bx-nav-tab-key">{t.key}</span>
+              <span className="bx-nav-tab-label">{t.label}</span>
             </button>
           );
         })}

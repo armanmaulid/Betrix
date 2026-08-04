@@ -612,8 +612,29 @@ button:hover::after {
     var(--accent) 60%,
     transparent 100%
   );
-  animation: accent-sweep 3s infinite; /* Timing functions handled in keyframes */
+  animation: accent-sweep 3s infinite;
 }
+
+.bx-nav-tab {
+  @apply flex flex-shrink-0 items-center justify-center gap-1.5 whitespace-nowrap border-r border-[var(--border)] px-4 py-1.5 text-[11px] font-bold text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-alt)] hover:text-[var(--accent)];
+}
+
+.bx-nav-tab-active {
+  @apply bg-[var(--accent)] text-[var(--bg)] hover:bg-[var(--accent)] hover:text-[var(--bg)];
+}
+
+.bx-nav-tab .bx-nav-tab-key {
+  @apply text-[var(--accent)];
+}
+
+.bx-nav-tab-active .bx-nav-tab-key {
+  @apply text-[var(--bg)];
+}
+
+.bx-nav-tab .bx-nav-tab-label {
+  @apply font-normal;
+}
+
 
 @media (prefers-reduced-motion: reduce) {
   .bx-accent-line::after {
