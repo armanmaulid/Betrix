@@ -94,8 +94,8 @@ export interface CalendarResponse {
 // in the external Python API).
 const calendarCache = { data: null as CalendarResponse | null, timestamp: 0 };
 
-export async function fetchEconomicCalendar(): Promise<CalendarResponse> {
-  if (calendarCache.data && Date.now() - calendarCache.timestamp < 60000) {
+export async function fetchEconomicCalendar(forceRefresh = false): Promise<CalendarResponse> {
+  if (!forceRefresh && calendarCache.data && Date.now() - calendarCache.timestamp < 60000) {
     return calendarCache.data;
   }
 

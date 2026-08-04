@@ -23,36 +23,19 @@ const MT5_HTTP_BASE = process.env.MT5_HTTP_URL || (rawBridgeUrl.startsWith("http
  * ±1 bulan lalu s/d ±1 bulan depan, lihat mt5-bridge/CommandCore.mqh) dan
  * simpan semuanya ke DB sekaligus (termasuk bulan lalu, sekalian aja).
  */
-let lastSeededMonthKey = null;
+let lastSeededDayKey = null;
 
 export async function syncCalendarIfNeeded() {
   try {
     const now = new Date();
-    const currentMonthKey = `${now.getFullYear()}-${now.getMonth()}`;
+    const currentDayKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}`;
 
-    // Cek di memori Backend: Apakah bulan ini sudah sukses diverifikasi/sync?
-    if (lastSeededMonthKey === currentMonthKey) {
-      return; // Langsung return, bypass query DB dan MT5 sepenuhnya!
+    // Cek di memori Backend: Apakah hari ini sudah sukses di-sync?
+    if (lastSeededDayKey === currentDayKey) {
+      return; // Langsung return, bypass MT5 sepenuhnya untuk hari ini!
     }
 
-    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1, 0, 0, 0, 0);
-    const endOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 2, 0, 23, 59, 59, 999);
-
-    const { rows } = await pool.query(
-      "SELECT COUNT(*) FROM calendar_events WHERE event_time >= $1 AND event_time <= $2",
-      [startOfThisMonth.toISOString(), endOfNextMonth.toISOString()]
-    );
-    const existingCount = parseInt(rows[0].count, 10);
-
-    if (existingCount > 0) {
-      logger.info(`Calendar bulan ini+depan sudah ada di DB (${existingCount} events). Skip sync ke MT5.`, {
-        context: "Calendar",
-      });
-      lastSeededMonthKey = currentMonthKey; // Simpan status sukses ke memori
-      return;
-    }
-
-    logger.info("Calendar bulan ini+depan belum ada di DB. Syncing dari MT5...", { context: "Calendar" });
+    logger.info("Calendar belum di-sync hari ini. Syncing dari MT5...", { context: "Calendar" });
 
     const res = await fetch(`${MT5_HTTP_BASE}/v1/calendar`); // default EA = ±1 bulan kalender
     if (!res.ok) {
@@ -62,14 +45,13 @@ export async function syncCalendarIfNeeded() {
     const events = Array.isArray(data.events) ? data.events : [];
 
     const saved = await upsertEvents(events);
-    logger.info(`Calendar synced dari MT5: ${saved} events disimpan/diupdate ke DB.`, { context: "Calendar" });
+    logger.info(`Calendar synced dari MT5 (Daily): ${saved} events disimpan/diupdate ke DB.`, { context: "Calendar" });
     
-    lastSeededMonthKey = currentMonthKey; // Simpan status sukses ke memori
+    lastSeededDayKey = currentDayKey; // Simpan status sukses ke memori
   } catch (err) {
     logger.error(`Gagal sync calendar dari MT5: ${err.message}`, { context: "Calendar" });
     // Sengaja tidak throw - biar server tetap start meski MT5 lagi mati.
-    // syncCalendarIfNeeded akan dicoba lagi di kesempatan berikutnya
-    // (mis. saat WebSocket ke MT5 berhasil konek).
+    // syncCalendarIfNeeded akan dicoba lagi di kesempatan berikutnya.
   }
 }
 

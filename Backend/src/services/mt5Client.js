@@ -11,7 +11,22 @@ const MT5_WS_BASE = process.env.MT5_WS_URL || (rawBridgeUrl.startsWith("ws") ? r
 
 export const latestPrices = {};
 
-const trackedSymbols = new Set();
+// FIX (CPU spike di MT5 setelah reconnect): dulu trackedSymbols itu Set
+// yang cuma nambah terus seumur hidup proses, nggak pernah ada yang
+// ngurangin - meskipun SSE stream-nya sudah lama disconnect atau symbol-nya
+// cuma sekali diminta lewat endpoint quote/candle. Efeknya, begitu WS ke
+// MT5 reconnect (restart EA dsb), sendTrackRequest() ngirim ULANG seluruh
+// daftar yang sudah menggembung itu sekaligus - dan EA jadi nge-loop
+// SEMUA symbol itu tiap 20ms selamanya (SendCurrentPrices), bukan cuma
+// symbol yang benar-benar sedang dipakai user.
+//
+// Sekarang tracking pakai Map<symbol, {refCount, lastTouched}>:
+// - refCount > 0  -> ada SSE stream aktif yang butuh symbol ini, jangan disweep.
+// - refCount == 0 -> cuma "disentuh" sekali (quote/candle one-off), boleh
+//                    di-sweep otomatis kalau nggak disentuh lagi dalam SYMBOL_TTL_MS.
+const trackedSymbols = new Map();
+const SYMBOL_TTL_MS = 60 * 60 * 1000;      // symbol yang cuma di-quote sekali, dianggap basi setelah 1 jam nggak disentuh lagi
+const SWEEP_INTERVAL_MS = 10 * 60 * 1000;  // cek stale entries tiap 10 menit
 let wsConnection = null;
 
 const priceListeners = new Set();
@@ -48,7 +63,7 @@ async function sendTrackRequest() {
     const res = await fetch(`${MT5_HTTP_BASE}/v1/track/prices`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ symbols: Array.from(trackedSymbols) })
+      body: JSON.stringify({ symbols: Array.from(trackedSymbols.keys()) })
     });
     if (!res.ok) {
       logger.error(`Failed to update tracking symbols: ${res.status}`, { context: "MT5" });
@@ -59,6 +74,25 @@ async function sendTrackRequest() {
     logger.error(`Error sending track request: ${e.message}`, { context: "MT5" });
   }
 }
+
+// Buang symbol yang refCount-nya 0 (nggak ada SSE stream aktif) DAN sudah
+// nggak disentuh selama SYMBOL_TTL_MS. Kalau ada yang ke-drop, kirim ulang
+// daftar yang sudah dipangkas ke EA supaya sinkron.
+function sweepStaleSymbols() {
+  const now = Date.now();
+  let removedAny = false;
+  for (const [symbol, entry] of trackedSymbols.entries()) {
+    if (entry.refCount <= 0 && now - entry.lastTouched > SYMBOL_TTL_MS) {
+      trackedSymbols.delete(symbol);
+      removedAny = true;
+    }
+  }
+  if (removedAny) {
+    logger.debug(`Pruned stale symbols, ${trackedSymbols.size} remaining`, { context: "MT5" });
+    sendTrackRequest();
+  }
+}
+setInterval(sweepStaleSymbols, SWEEP_INTERVAL_MS).unref?.();
 
 async function sendTrackCalendarRequest() {
   try {
@@ -78,28 +112,52 @@ async function sendTrackCalendarRequest() {
   }
 }
 
-// Subscribe 1 simbol — dipakai untuk call site yang memang cuma butuh 1
-// simbol (misal SSE market.js saat client connect).
+// Dipakai untuk one-off request (GET quote/candle) yang cuma mau "pastikan
+// symbol ini di-stream", TANPA klaim kepemilikan jangka panjang - refCount
+// TETAP 0, jadi kalau nggak ada yang nyentuh lagi dalam SYMBOL_TTL_MS bakal
+// otomatis di-sweep.
 export async function subscribeToSymbol(symbol) {
   if (!symbol) return;
-  trackedSymbols.add(symbol);
-  await sendTrackRequest();
+  const isNew = !trackedSymbols.has(symbol);
+  if (isNew) {
+    trackedSymbols.set(symbol, { refCount: 0, lastTouched: Date.now() });
+  } else {
+    trackedSymbols.get(symbol).lastTouched = Date.now();
+  }
+  if (isNew) await sendTrackRequest();
 }
 
-// Subscribe beberapa simbol sekaligus (batch) — misal TickerStrip yang
-// butuh 12 simbol sekaligus pas mount. Kirim 1 HTTP request daripada 12
-// request berurutan.
+// Subscribe beberapa simbol sekaligus DENGAN klaim kepemilikan (refCount++)
+// — dipakai SSE stream (market.js) yang punya lifecycle jelas (connect →
+// close), supaya pasangannya (unsubscribeFromSymbols) tau kapan symbol
+// sudah nggak dibutuhkan siapa-siapa lagi.
 export async function subscribeToSymbols(symbols) {
   if (!Array.isArray(symbols) || symbols.length === 0) return;
   let addedAny = false;
   for (const s of symbols) {
-    if (s && !trackedSymbols.has(s)) {
-      trackedSymbols.add(s);
+    if (!s) continue;
+    const entry = trackedSymbols.get(s);
+    if (entry) {
+      entry.refCount += 1;
+      entry.lastTouched = Date.now();
+    } else {
+      trackedSymbols.set(s, { refCount: 1, lastTouched: Date.now() });
       addedAny = true;
     }
   }
-  if (addedAny) {
-    await sendTrackRequest();
+  if (addedAny) await sendTrackRequest();
+}
+
+// Pasangan subscribeToSymbols — panggil ini pas SSE stream close. Cuma
+// nurunin refCount, TIDAK langsung hapus dari trackedSymbols (biar kalau
+// user reconnect cepat/refresh halaman, nggak bolak-balik subscribe ke EA).
+// Penghapusan beneran terjadi lewat sweepStaleSymbols() kalau memang idle
+// lama (refCount 0 selama SYMBOL_TTL_MS).
+export function unsubscribeFromSymbols(symbols) {
+  if (!Array.isArray(symbols) || symbols.length === 0) return;
+  for (const s of symbols) {
+    const entry = trackedSymbols.get(s);
+    if (entry) entry.refCount = Math.max(0, entry.refCount - 1);
   }
 }
 

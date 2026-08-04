@@ -127,11 +127,11 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
     period: "this_week",
   });
 
-  async function load() {
+  async function load(forceRefresh = false) {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await fetchEconomicCalendar();
+      const data = await fetchEconomicCalendar(forceRefresh);
       setEvents(data.events);
       setGeneratedAt(data.generatedAt);
 
@@ -190,7 +190,7 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
 
     es.addEventListener("calendar_update", () => {
       if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => load(), 500);
+      debounceTimer = setTimeout(() => load(true), 500);
     });
 
     es.onerror = () => {
@@ -311,7 +311,7 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
             Filter
           </button>
           <button
-            onClick={load}
+            onClick={() => load(true)}
             disabled={isLoading}
             aria-label="Muat ulang calendar"
             className="text-[var(--text-muted)] hover:text-[var(--text-primary)] disabled:opacity-50"

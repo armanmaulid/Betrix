@@ -5,6 +5,7 @@ import {
   fetchMt5History,
   subscribeToSymbol,
   subscribeToSymbols,
+  unsubscribeFromSymbols,
   addPriceListener,
   removePriceListener,
   addCalendarListener,
@@ -173,6 +174,7 @@ router.get("/stream", async (req, res) => {
   req.on("close", () => {
     removePriceListener(listener);
     if (calendarListener) removeCalendarListener(calendarListener);
+    if (symbolsToTrack) unsubscribeFromSymbols(symbolsToTrack);
 
     const remaining = (activeStreamsByUser.get(user.id) || 1) - 1;
     if (remaining <= 0) {

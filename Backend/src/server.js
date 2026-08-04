@@ -243,6 +243,9 @@ const server = app.listen(PORT, async () => {
     syncBrokerSymbols().catch(err => {
       logger.error("Unexpected error in syncBrokerSymbols background job", { error: err.message, context: "System" });
     });
+    syncCalendarIfNeeded().catch(err => {
+      logger.error("Unexpected error in syncCalendarIfNeeded background job", { error: err.message, context: "System" });
+    });
   }, 24 * 60 * 60 * 1000);
 
   cleanupOldCalendarEvents().catch(() => {});
