@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { TerminalShellLayout, useShellContext } from "../components/layout/TerminalShellLayout";
+import { useShellContext } from "../components/layout/TerminalShellLayout";
 import { getNews, type NewsItem } from "../api/newsClient";
 import { RefreshCw, Loader2 } from "lucide-react";
 
@@ -60,7 +60,6 @@ function formatTime(iso: string): string {
 
 export function NewsPage() {
   const { setRightPanel, setOnSearch } = useShellContext();
-  const { user } = useAuth();
   
   useEffect(() => {
     setOnSearch(() => {});

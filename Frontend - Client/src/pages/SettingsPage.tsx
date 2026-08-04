@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { TerminalShellLayout, useShellContext } from "../components/layout/TerminalShellLayout";
+import { useShellContext } from "../components/layout/TerminalShellLayout";
 import { useAuth } from "../context/AuthContext";
 import { updateProfile, changePassword, changeEmail, getSessions, revokeSession, type DeviceSession } from "../api/authClient";
 import { fetchUsageMe, type UsageSummary } from "../api/usageClient";

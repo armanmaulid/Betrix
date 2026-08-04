@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { LineChart } from "lucide-react";
-import { TerminalShellLayout, useShellContext } from "../components/layout/TerminalShellLayout";
+import { useShellContext } from "../components/layout/TerminalShellLayout";
 import { TradingViewWidget } from "../components/analysis/TradingViewWidget";
 import { toTradingViewSymbol } from "../lib/tradingViewSymbols";
 import { NewsFeed } from "../components/analysis/NewsFeed";

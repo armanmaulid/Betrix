@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { TerminalShellLayout, useShellContext } from "../components/layout/TerminalShellLayout";
+import { useShellContext } from "../components/layout/TerminalShellLayout";
 import { useAuth } from "../context/AuthContext";
 import { 
   Bot, 
