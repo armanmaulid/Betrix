@@ -45,6 +45,12 @@ function formatTime(iso: string): string {
   return `${d.getHours().toString().padStart(2, "0")}:${d.getMinutes().toString().padStart(2, "0")}`;
 }
 
+function stripHtml(html: string): string {
+  if (!html) return "";
+  const doc = new DOMParser().parseFromString(html, "text/html");
+  return doc.body.textContent || "";
+}
+
 export function NewsPage() {
   const { setRightPanel, setOnSearch } = useShellContext();
   
@@ -257,12 +263,12 @@ export function NewsPage() {
                           {formatRelativeTime(item.publishedAt)}
                         </span>
                       </div>
-                      <h2 className="mb-1.5 text-[14px] font-bold leading-snug text-[#f5f5f5]">
-                        {item.title}
+                      <h2 className="mb-1.5 text-[14px] font-bold leading-snug text-[#f5f5f5]" title={item.title}>
+                        {stripHtml(item.title)}
                       </h2>
                       {item.summary && (
-                        <p className="line-clamp-2 text-[12px] leading-relaxed text-[#999] opacity-80">
-                          {item.summary}
+                        <p className="line-clamp-2 text-[12px] leading-relaxed text-[#999] opacity-80" title={stripHtml(item.summary)}>
+                          {stripHtml(item.summary)}
                         </p>
                       )}
                     </a>
@@ -338,8 +344,8 @@ export function NewsPage() {
                       {formatTime(item.publishedAt)}
                     </span>
                     <div className="mt-[7px] h-1 w-1 flex-shrink-0 bg-[#00ff00]"></div>
-                    <span className="line-clamp-2 flex-1 text-[11px] leading-snug text-[#ccc] hover:text-white">
-                      {item.title}
+                    <span className="line-clamp-2 flex-1 text-[11px] leading-snug text-[#ccc] hover:text-white" title={stripHtml(item.title)}>
+                      {stripHtml(item.title)}
                     </span>
                   </a>
                 ))}
