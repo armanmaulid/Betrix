@@ -25,19 +25,6 @@ const TABS = [
   { id: "global", label: "WORLD" },
 ];
 
-const SOURCE_LIST = [
-  "FXStreet",
-  "ActionForex",
-  "Investing Eco",
-  "Investing Comms",
-  "ForexCrunch",
-  "WSJ Markets",
-  "FXStreet Crypto",
-  "CoinTelegraph",
-  "Decrypt",
-  "DailyHodl",
-  "Crypto Briefing",
-];
 
 function formatRelativeTime(iso: string): string {
   const diffMs = Date.now() - new Date(iso).getTime();
@@ -180,9 +167,6 @@ export function NewsPage() {
 
   const feedStats = useMemo(() => {
     const stats: Record<string, number> = {};
-    SOURCE_LIST.forEach(source => {
-      stats[source] = 0;
-    });
     items.forEach((item) => {
       stats[item.source] = (stats[item.source] || 0) + 1;
     });
