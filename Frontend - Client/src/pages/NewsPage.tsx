@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
-import { TerminalShell } from "../components/layout/TerminalShell";
+import { TerminalShellLayout, useShellContext } from "../components/layout/TerminalShellLayout";
 import { getNews, type NewsItem } from "../api/newsClient";
 import { RefreshCw, Loader2 } from "lucide-react";
 
@@ -59,6 +59,14 @@ function formatTime(iso: string): string {
 }
 
 export function NewsPage() {
+  const { setRightPanel, setOnSearch } = useShellContext();
+  const { user } = useAuth();
+  
+  useEffect(() => {
+    setOnSearch(() => {});
+    setRightPanel(null);
+  }, [setOnSearch, setRightPanel]);
+
   const [items, setItems] = useState<NewsItem[]>([]);
   const [wireItems, setWireItems] = useState<NewsItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -188,7 +196,7 @@ export function NewsPage() {
   }, [items]);
 
   return (
-    <TerminalShell onSearchSymbol={() => {}}>
+    <>
       <div className="flex h-full flex-col bg-[#050505]">
         {/* HEADER */}
         <div className="flex flex-wrap items-center justify-between border-b border-[#222] px-4 py-2">
@@ -357,6 +365,6 @@ export function NewsPage() {
           </div>
         </div>
       </div>
-    </TerminalShell>
+    </>
   );
 }

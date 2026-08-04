@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { LineChart } from "lucide-react";
-import { TerminalShell } from "../components/layout/TerminalShell";
+import { TerminalShellLayout, useShellContext } from "../components/layout/TerminalShellLayout";
 import { TradingViewWidget } from "../components/analysis/TradingViewWidget";
 import { toTradingViewSymbol } from "../lib/tradingViewSymbols";
 import { NewsFeed } from "../components/analysis/NewsFeed";
@@ -26,6 +26,7 @@ export function DashboardPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [symbol, setSymbol] = useState(searchParams.get('symbol') || DEFAULT_SYMBOL);
+  const { setRightPanel, setOnSearch } = useShellContext();
 
   useEffect(() => {
     const urlSymbol = searchParams.get('symbol');
@@ -34,26 +35,33 @@ export function DashboardPage() {
     }
   }, [searchParams]);
 
-  function handleSearchSymbol(rawSymbol: string) {
-    const s = rawSymbol.toUpperCase();
-    setSymbol(s);
-    navigate(`/?symbol=${s}`);
-  }
+  useEffect(() => {
+    const handleSearchSymbol = (rawSymbol: string) => {
+      const s = rawSymbol.toUpperCase();
+      setSymbol(s);
+      navigate(`/?symbol=${s}`);
+    };
+    setOnSearch(handleSearchSymbol);
+    
+    setRightPanel(
+      <>
+        <div id="panel-news">
+          <NewsFeed />
+        </div>
+        <div id="panel-calendar">
+          <EconomicCalendar />
+        </div>
+      </>
+    );
+    
+    return () => {
+      setOnSearch(() => {});
+      setRightPanel(null);
+    };
+  }, [navigate, setSymbol, setOnSearch, setRightPanel]);
 
   return (
-    <TerminalShell
-      onSearchSymbol={handleSearchSymbol}
-      rightPanel={
-        <>
-          <div id="panel-news">
-            <NewsFeed />
-          </div>
-          <div id="panel-calendar">
-            <EconomicCalendar />
-          </div>
-        </>
-      }
-    >
+    <>
       <div id="panel-dashboard" className="border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
         <p className="text-[13px]">
           👋 Hai <span className="font-bold text-[var(--accent)]">{user?.name || user?.email}</span>, yuk cek
@@ -90,6 +98,6 @@ export function DashboardPage() {
           ANALISA SEKARANG
         </button>
       </div>
-    </TerminalShell>
+    </>
   );
 }

@@ -15,6 +15,8 @@ const AuthCallbackPage = lazy(() => import("./pages/AuthCallbackPage").then(m =>
 const SettingsPage = lazy(() => import("./pages/SettingsPage").then(m => ({ default: m.SettingsPage })));
 const NewsPage = lazy(() => import("./pages/NewsPage").then(m => ({ default: m.NewsPage })));
 
+import { TerminalShellLayout } from "./components/layout/TerminalShellLayout";
+
 // Fallback minimalis senada tema terminal gelap — dipakai Suspense saat
 // chunk route lain masih di-download.
 function RouteFallback() {
@@ -62,38 +64,12 @@ export function App() {
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <DashboardPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/analyze"
-              element={
-                <ProtectedRoute>
-                  <AnalyzePage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/settings"
-              element={
-                <ProtectedRoute>
-                  <SettingsPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/news"
-              element={
-                <ProtectedRoute>
-                  <NewsPage />
-                </ProtectedRoute>
-              }
-            />
+            <Route element={<ProtectedRoute><TerminalShellLayout /></ProtectedRoute>}>
+              <Route path="/" element={<DashboardPage />} />
+              <Route path="/analyze" element={<AnalyzePage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/news" element={<NewsPage />} />
+            </Route>
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

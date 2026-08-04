@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { TerminalShell } from "../components/layout/TerminalShell";
+import { TerminalShellLayout, useShellContext } from "../components/layout/TerminalShellLayout";
 import { useAuth } from "../context/AuthContext";
 import { updateProfile, changePassword, changeEmail, getSessions, revokeSession, type DeviceSession } from "../api/authClient";
 import { fetchUsageMe, type UsageSummary } from "../api/usageClient";
@@ -12,7 +12,13 @@ import {
 type SettingsTab = "PROFILE" | "API KEY" | "SECURITY" | "NOTIFICATIONS" | "USAGE" | "LOGIN HISTORY" | "ACCOUNT";
 
 export function SettingsPage() {
+  const { setRightPanel, setOnSearch } = useShellContext();
   const { user, setUser } = useAuth();
+  
+  useEffect(() => {
+    setOnSearch(() => {});
+    setRightPanel(null);
+  }, [setOnSearch, setRightPanel]);
   const sessionToken = localStorage.getItem("eaconsole.sessionToken") || "";
   
   // Navigation State
@@ -577,7 +583,7 @@ export function SettingsPage() {
   };
 
   return (
-    <TerminalShell onSearchSymbol={() => {}}>
+    <>
       <div className="flex flex-col flex-1 h-full overflow-y-auto bg-[var(--bg)] p-4 md:p-4 text-[var(--text-primary)] font-mono">
         
         {/* Page Header */}
@@ -669,6 +675,6 @@ export function SettingsPage() {
           </div>
         </div>
       )}
-    </TerminalShell>
+    </>
   );
 }

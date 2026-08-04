@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
-import { TerminalShell } from "../components/layout/TerminalShell";
+import { TerminalShellLayout, useShellContext } from "../components/layout/TerminalShellLayout";
 import { useAuth } from "../context/AuthContext";
 import { 
   Bot, 
@@ -40,6 +40,7 @@ import {
 } from "../lib/analyzePageHelpers";
 
 export function AnalyzePage() {
+  const { setRightPanel, setOnSearch } = useShellContext();
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -658,20 +659,26 @@ export function AnalyzePage() {
     navigate(`/?symbol=${s.toUpperCase()}`);
   }, [navigate]);
 
+  useEffect(() => {
+    setOnSearch(handleSearchSymbol);
+    setRightPanel(
+      <>
+        <div id="panel-news">
+          <NewsFeed />
+        </div>
+        <div id="panel-calendar">
+          <EconomicCalendar />
+        </div>
+      </>
+    );
+    return () => {
+      setOnSearch(() => {});
+      setRightPanel(null);
+    };
+  }, [setOnSearch, setRightPanel, handleSearchSymbol]);
+
   return (
-    <TerminalShell
-      onSearchSymbol={handleSearchSymbol}
-      rightPanel={
-        <>
-          <div id="panel-news">
-            <NewsFeed />
-          </div>
-          <div id="panel-calendar">
-            <EconomicCalendar />
-          </div>
-        </>
-      }
-    >
+    <>
       <div className="flex flex-col flex-1 bg-[#050505] overflow-hidden font-mono text-[13px] text-[#ccc]">
         
         {view === 'landing' ? (
@@ -811,6 +818,6 @@ export function AnalyzePage() {
           </div>
         )}
       </div>
-    </TerminalShell>
+    </>
   );
 }
