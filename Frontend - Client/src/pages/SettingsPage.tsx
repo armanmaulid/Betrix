@@ -584,7 +584,7 @@ export function SettingsPage() {
 
   return (
     <>
-      <div className="flex flex-col flex-1 h-full overflow-y-auto bg-[var(--bg)] p-4 md:p-4 text-[var(--text-primary)] font-mono">
+      <div className="flex flex-col flex-1 h-full overflow-y-auto bg-[var(--bg)] py-4 text-[var(--text-primary)] font-mono">
         
         {/* Page Header */}
         <div className="mb-4">

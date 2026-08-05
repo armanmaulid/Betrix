@@ -188,9 +188,9 @@ export function NewsPage() {
     <>
       <div className="flex h-full flex-col bg-[#050505]">
         {/* HEADER */}
-        <div className="flex flex-wrap items-center justify-between border-b border-[#222] px-4 py-2">
+        <div className="flex flex-wrap items-center justify-between border-b border-[#222] py-2">
           <div className="flex items-center gap-3">
-            <span className="bg-[#ff6600] px-2 py-0.5 text-[11px] font-bold uppercase text-black">
+            <span className="bx-section-tag">
               News
             </span>
             <span className="flex items-center gap-1.5 text-[11px] font-bold text-[#00ff00]">
@@ -231,7 +231,7 @@ export function NewsPage() {
                 <p className="text-[12px]">Aggregating live feeds...</p>
               </div>
             ) : error ? (
-              <div className="m-4 border border-red-500/30 bg-red-500/10 p-4 text-[12px] text-red-500">
+              <div className="my-4 border border-red-500/30 bg-red-500/10 p-4 text-[12px] text-red-500">
                 {error}
               </div>
             ) : items.length === 0 ? (
@@ -250,7 +250,7 @@ export function NewsPage() {
                       href={item.url}
                       target="_blank"
                       rel="noreferrer"
-                      className={`block border-b border-[#222] p-4 transition-colors hover:bg-[#111] ${
+                      className={`block border-b border-[#222] py-4 transition-colors hover:bg-[#111] ${
                         newIds.has(item.id) ? "news-highlight border-[#ff6600]/50" : ""
                       }`}
                     >

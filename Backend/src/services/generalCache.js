@@ -1,5 +1,5 @@
-// Cache in-memory sederhana untuk FAQ responses. Default 7 hari TTL karena
-// jawaban FAQ jarang berubah kecuali ada content update.
+// Cache in-memory sederhana untuk General responses. Default 7 hari TTL karena
+// jawaban General jarang berubah kecuali ada content update.
 //
 // KETERBATASAN yang perlu diketahui:
 // - Cuma efektif untuk request single-turn (tanpa "history"), karena key-nya
@@ -8,12 +8,12 @@
 //   di-deploy lebih dari satu instance (butuh Redis beneran untuk itu).
 
 // TTL configurable via .env (dalam hari), default 7 hari
-const CACHE_TTL_DAYS = parseInt(process.env.FAQ_CACHE_TTL_DAYS) || 7;
+const CACHE_TTL_DAYS = parseInt(process.env.GENERAL_CACHE_TTL_DAYS) || 7;
 const CACHE_TTL_MS = CACHE_TTL_DAYS * 24 * 60 * 60 * 1000;
 
 const store = new Map();
 
-export const CACHEABLE_TASK_TYPES = ["faq", "classify_signal"];
+export const CACHEABLE_TASK_TYPES = ["general", "classify_signal"];
 
 function makeKey(taskType, message) {
   return `${taskType}::${message.trim().toLowerCase()}`;
@@ -30,7 +30,7 @@ export function getCached(taskType, message) {
 }
 
 // Max cache entries to prevent unbounded memory growth
-const MAX_CACHE_SIZE = parseInt(process.env.FAQ_CACHE_MAX_SIZE) || 1000;
+const MAX_CACHE_SIZE = parseInt(process.env.GENERAL_CACHE_MAX_SIZE) || 1000;
 
 export function setCached(taskType, message, data) {
   // Evict oldest entries if cache is full
@@ -62,7 +62,7 @@ const sweepTimer = setInterval(() => {
     }
   }
   if (removed > 0 && process.env.LOG_LEVEL === "debug") {
-    console.debug(`[faqCache] sweep: ${removed} entry expired dibuang, sisa ${store.size}`);
+    console.debug(`[generalCache] sweep: ${removed} entry expired dibuang, sisa ${store.size}`);
   }
 }, SWEEP_INTERVAL_MS);
 

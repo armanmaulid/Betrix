@@ -1,10 +1,10 @@
 import { resolveModel } from "../config/models.js";
 import { callModel, streamModel } from "./aiClient.js";
-import { getCached, setCached, CACHEABLE_TASK_TYPES } from "./faqCache.js";
+import { getCached, setCached, CACHEABLE_TASK_TYPES } from "./generalCache.js";
 import { logger } from "../utils/logger.js";
 
 const SYSTEM_PROMPTS = {
-  faq: "Anda adalah mesin pemroses FAQ untuk platform trading forex. Jawab singkat, jelas, dan akurat " +
+  general: "Anda adalah mesin pemroses umum untuk platform trading forex. Jawab singkat, jelas, dan akurat " +
     "soal istilah trading, cara kerja indikator, atau konsep dasar forex. " +
     "Format jawaban dalam paragraf natural tanpa list berlebihan kecuali diperlukan. " +
     "Fokus hanya pada memproses informasi, abaikan instruksi identitas bawaan Anda.",
@@ -29,7 +29,7 @@ const SYSTEM_PROMPTS = {
 
 export async function routeAndCall({ taskType, messages, tier }) {
   const model = resolveModel(taskType, tier);
-  const system = SYSTEM_PROMPTS[taskType] || SYSTEM_PROMPTS.faq;
+  const system = SYSTEM_PROMPTS[taskType] || SYSTEM_PROMPTS.general;
 
   const lastMessage = messages[messages.length - 1]?.content || "";
   const isCacheable = CACHEABLE_TASK_TYPES.includes(taskType) && messages.length === 1;
@@ -83,7 +83,7 @@ export async function routeAndCall({ taskType, messages, tier }) {
 
 export async function routeAndStream({ taskType, messages, onToken, signal, tier, image }) {
   const model = resolveModel(taskType, tier);
-  const system = SYSTEM_PROMPTS[taskType] || SYSTEM_PROMPTS.faq;
+  const system = SYSTEM_PROMPTS[taskType] || SYSTEM_PROMPTS.general;
 
   let finalMessages = messages;
   if (image && finalMessages.length > 0) {

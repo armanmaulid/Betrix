@@ -54,9 +54,20 @@
 }
 
 @keyframes ai-glow-finish {
-  0% { box-shadow: 0 0 0px rgba(0, 255, 136, 0); border-color: #222; }
-  30% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.5); border-color: var(--success); }
-  100% { box-shadow: 0 0 0px rgba(0, 255, 136, 0); border-color: #222; }
+  0% {
+    box-shadow: 0 0 0px rgba(0, 255, 136, 0);
+    border-color: #222;
+  }
+
+  30% {
+    box-shadow: 0 0 20px rgba(0, 255, 136, 0.5);
+    border-color: var(--success);
+  }
+
+  100% {
+    box-shadow: 0 0 0px rgba(0, 255, 136, 0);
+    border-color: #222;
+  }
 }
 
 .animate-ai-glow {
@@ -93,9 +104,11 @@ body {
   width: 8px;
   height: 8px;
 }
+
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
 ::-webkit-scrollbar-thumb {
   background: var(--border);
   border-radius: 8px;
@@ -137,6 +150,7 @@ textarea {
   from {
     transform: translateX(0);
   }
+
   to {
     transform: translateX(-50%);
   }
@@ -166,6 +180,7 @@ textarea {
   0% {
     transform: translateX(-150%) skewX(-15deg);
   }
+
   100% {
     transform: translateX(250%) skewX(-15deg);
   }
@@ -175,9 +190,11 @@ textarea {
   0% {
     background-color: var(--info-soft);
   }
+
   60% {
     background-color: var(--info-soft);
   }
+
   100% {
     background-color: transparent;
   }
@@ -214,21 +231,26 @@ textarea {
   0% {
     background-color: var(--success-soft);
   }
+
   100% {
     background-color: transparent;
   }
 }
+
 @keyframes flash-down {
   0% {
     background-color: var(--danger-soft);
   }
+
   100% {
     background-color: transparent;
   }
 }
+
 .flash-up {
   animation: flash-up 350ms ease-out;
 }
+
 .flash-down {
   animation: flash-down 350ms ease-out;
 }
@@ -241,6 +263,7 @@ button {
   position: relative;
   overflow: hidden;
 }
+
 button::after {
   content: "";
   position: absolute;
@@ -252,20 +275,24 @@ button::after {
   pointer-events: none;
   opacity: 0;
 }
+
 button:hover::after {
   opacity: 1;
   animation: btn-sweep-move 400ms linear;
 }
+
 @keyframes btn-sweep-move {
   from {
     left: -60%;
   }
+
   to {
     left: 120%;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   .flash-up,
   .flash-down,
   .news-highlight,
@@ -285,6 +312,7 @@ button:hover::after {
     opacity: 0;
     transform: scale(0.96);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -296,6 +324,7 @@ button:hover::after {
   from {
     transform: translateY(-100%);
   }
+
   to {
     transform: translateY(100%);
   }
@@ -306,6 +335,7 @@ button:hover::after {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -317,12 +347,15 @@ button:hover::after {
     transform: translateY(0) translateX(0);
     opacity: 0;
   }
+
   10% {
     opacity: 1;
   }
+
   90% {
     opacity: 1;
   }
+
   100% {
     transform: translateY(-100vh) translateX(var(--drift, 0));
     opacity: 0;
@@ -331,9 +364,12 @@ button:hover::after {
 
 /* Input focus glow */
 @keyframes input-glow {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 0 0 transparent;
   }
+
   50% {
     box-shadow: 0 0 12px 2px var(--accent-glow);
   }
@@ -345,6 +381,7 @@ button:hover::after {
     opacity: 0;
     transform: scale(0.92);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -356,6 +393,7 @@ button:hover::after {
   from {
     transform: translateY(-100%);
   }
+
   to {
     transform: translateY(100%);
   }
@@ -370,15 +408,26 @@ button:hover::after {
 
 /* Error shake */
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-8px); }
-  75% { transform: translateX(8px); }
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-8px);
+  }
+
+  75% {
+    transform: translateX(8px);
+  }
 }
 
 /* Button press scale */
 .btn-press {
   transition: transform 80ms linear !important;
 }
+
 .btn-press:active {
   transform: scale(0.98);
 }
@@ -391,6 +440,7 @@ button:hover::after {
 
 
 @media (prefers-reduced-motion: reduce) {
+
   .btn-press,
   .input-typing,
   .animate-ticker,
@@ -407,6 +457,7 @@ button:hover::after {
   from {
     transform: translateX(100%);
   }
+
   to {
     transform: translateX(0);
   }
@@ -427,9 +478,11 @@ button:hover::after {
 .bx-modal-error {
   @apply border-red-500/30 shadow-[0_0_20px_rgba(255,0,0,0.1)];
 }
+
 .bx-modal-error .bx-modal-header {
   @apply flex items-center gap-3 text-red-500 mb-4;
 }
+
 .bx-modal-error .bx-modal-btn-confirm {
   @apply flex items-center justify-center gap-2 bg-red-500 text-black px-4 py-2 text-[11px] font-bold hover:bg-red-600 transition-colors disabled:opacity-50;
 }
@@ -438,9 +491,11 @@ button:hover::after {
 .bx-modal-warning {
   @apply border-orange-500/30 shadow-[0_0_20px_rgba(255,165,0,0.1)];
 }
+
 .bx-modal-warning .bx-modal-header {
   @apply flex items-center gap-3 text-orange-500 mb-4;
 }
+
 .bx-modal-warning .bx-modal-btn-confirm {
   @apply flex items-center justify-center gap-2 bg-orange-500 text-black px-4 py-2 text-[11px] font-bold hover:bg-orange-600 transition-colors disabled:opacity-50;
 }
@@ -449,9 +504,11 @@ button:hover::after {
 .bx-modal-info {
   @apply border-blue-500/30 shadow-[0_0_20px_rgba(0,0,255,0.1)];
 }
+
 .bx-modal-info .bx-modal-header {
   @apply flex items-center gap-3 text-blue-500 mb-4;
 }
+
 .bx-modal-info .bx-modal-btn-confirm {
   @apply flex items-center justify-center gap-2 bg-blue-500 text-black px-4 py-2 text-[11px] font-bold hover:bg-blue-600 transition-colors disabled:opacity-50;
 }
@@ -460,12 +517,15 @@ button:hover::after {
 .bx-modal-title {
   @apply text-[16px] font-bold tracking-wider;
 }
+
 .bx-modal-text {
   @apply text-[12px] text-[var(--text-muted)] mb-6;
 }
+
 .bx-modal-footer {
   @apply flex justify-end gap-3;
 }
+
 .bx-modal-btn-cancel {
   @apply px-4 py-2 text-[11px] font-bold text-[var(--text-muted)] hover:text-white transition-colors disabled:opacity-50;
 }
@@ -494,6 +554,7 @@ button:hover::after {
   from {
     transform: translateY(-100%);
   }
+
   to {
     transform: translateY(100%);
   }
@@ -504,6 +565,7 @@ button:hover::after {
   from {
     transform: rotate(0deg);
   }
+
   to {
     transform: rotate(360deg);
   }
@@ -515,12 +577,15 @@ button:hover::after {
     transform: translateY(0) translateX(0);
     opacity: 0;
   }
+
   10% {
     opacity: 1;
   }
+
   90% {
     opacity: 1;
   }
+
   100% {
     transform: translateY(-100vh) translateX(var(--drift, 0));
     opacity: 0;
@@ -529,9 +594,12 @@ button:hover::after {
 
 /* Input focus glow */
 @keyframes input-glow {
-  0%, 100% {
+
+  0%,
+  100% {
     box-shadow: 0 0 0 0 transparent;
   }
+
   50% {
     box-shadow: 0 0 12px 2px var(--accent-glow);
   }
@@ -543,6 +611,7 @@ button:hover::after {
     opacity: 0;
     transform: scale(0.92);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -554,6 +623,7 @@ button:hover::after {
   from {
     transform: translateY(-100%);
   }
+
   to {
     transform: translateY(100%);
   }
@@ -568,15 +638,26 @@ button:hover::after {
 
 /* Error shake */
 @keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-8px); }
-  75% { transform: translateX(8px); }
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-8px);
+  }
+
+  75% {
+    transform: translateX(8px);
+  }
 }
 
 /* Button press scale */
 .btn-press {
   transition: transform 80ms linear !important;
 }
+
 .btn-press:active {
   transform: scale(0.98);
 }
@@ -587,6 +668,7 @@ button:hover::after {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   .btn-press,
   .input-typing,
   .animate-ticker,
@@ -601,17 +683,16 @@ button:hover::after {
 .bx-accent-line {
   @apply relative h-px w-full overflow-hidden;
 }
+
 .bx-accent-line::after {
   content: "";
   @apply absolute inset-0 h-full w-full;
-  background-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    var(--accent) 40%,
-    #ffdfba 50%,
-    var(--accent) 60%,
-    transparent 100%
-  );
+  background-image: linear-gradient(90deg,
+      transparent 0%,
+      var(--accent) 40%,
+      #ffdfba 50%,
+      var(--accent) 60%,
+      transparent 100%);
   animation: accent-sweep 6s infinite;
 }
 
@@ -635,7 +716,8 @@ button:hover::after {
 @media (prefers-reduced-motion: reduce) {
   .bx-accent-line::after {
     animation: none;
-    background: var(--accent); /* Fallback to solid line or static gradient */
+    background: var(--accent);
+    /* Fallback to solid line or static gradient */
   }
 }
 
@@ -643,13 +725,18 @@ button:hover::after {
 @keyframes accent-sweep {
   0% {
     transform: translateX(-100%);
-    animation-timing-function: cubic-bezier(0.2, 0.8, 0.4, 1); /* ease-out back to slow down smoothly */
+    animation-timing-function: cubic-bezier(0.2, 0.8, 0.4, 1);
+    /* ease-out back to slow down smoothly */
   }
+
   25% {
     transform: translateX(0%);
-    animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.2); /* ease-in to accelerate out smoothly */
+    animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.2);
+    /* ease-in to accelerate out smoothly */
   }
-  50%, 100% {
+
+  50%,
+  100% {
     transform: translateX(100%);
   }
 }
@@ -661,6 +748,7 @@ button:hover::after {
   from {
     transform: translateX(100%);
   }
+
   to {
     transform: translateX(0);
   }
@@ -679,33 +767,39 @@ button:hover::after {
 
 /* Error Modal (Red) */
 .bx-modal-error {
-  @apply border-red-500/30 shadow-[0_0_20px_rgba(255,0,0,0.1)];
+  @apply border-red-500/30 shadow-[0_0_20px_rgba(255,_0,_0,_0.1)];
 }
+
 .bx-modal-error .bx-modal-header {
   @apply flex items-center gap-3 text-red-500 mb-4;
 }
+
 .bx-modal-error .bx-modal-btn-confirm {
   @apply flex items-center justify-center gap-2 bg-red-500 text-black px-4 py-2 text-[11px] font-bold hover:bg-red-600 transition-colors disabled:opacity-50;
 }
 
 /* Warning Modal (Orange) */
 .bx-modal-warning {
-  @apply border-orange-500/30 shadow-[0_0_20px_rgba(255,165,0,0.1)];
+  @apply border-orange-500/30 shadow-[0_0_20px_rgba(255,_165,_0,_0.1)];
 }
+
 .bx-modal-warning .bx-modal-header {
   @apply flex items-center gap-3 text-orange-500 mb-4;
 }
+
 .bx-modal-warning .bx-modal-btn-confirm {
   @apply flex items-center justify-center gap-2 bg-orange-500 text-black px-4 py-2 text-[11px] font-bold hover:bg-orange-600 transition-colors disabled:opacity-50;
 }
 
 /* Info Modal (Blue/Cyan) */
 .bx-modal-info {
-  @apply border-blue-500/30 shadow-[0_0_20px_rgba(0,0,255,0.1)];
+  @apply border-blue-500/30 shadow-[0_0_20px_rgba(0,_0,_255,_0.1)];
 }
+
 .bx-modal-info .bx-modal-header {
   @apply flex items-center gap-3 text-blue-500 mb-4;
 }
+
 .bx-modal-info .bx-modal-btn-confirm {
   @apply flex items-center justify-center gap-2 bg-blue-500 text-black px-4 py-2 text-[11px] font-bold hover:bg-blue-600 transition-colors disabled:opacity-50;
 }
@@ -714,12 +808,15 @@ button:hover::after {
 .bx-modal-title {
   @apply text-[16px] font-bold tracking-wider;
 }
+
 .bx-modal-text {
   @apply text-[12px] text-[var(--text-muted)] mb-6;
 }
+
 .bx-modal-footer {
   @apply flex justify-end gap-3;
 }
+
 .bx-modal-btn-cancel {
   @apply px-4 py-2 text-[11px] font-bold text-[var(--text-muted)] hover:text-white transition-colors disabled:opacity-50;
 }
@@ -754,8 +851,15 @@ button:hover::after {
 }
 
 @keyframes slideUpFade {
-  from { opacity: 0; transform: translateY(15px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .animate-slide-up-fade {
@@ -804,18 +908,19 @@ button:hover::after {
    with an organic wind-blown flag (parallax) animation
    ============================================================ */
 @keyframes wave-flag {
-  0% { 
-    background-position: 200% 0%, 300% 0%; 
+  0% {
+    background-position: 200% 0%, 300% 0%;
   }
-  100% { 
-    background-position: -50% 0%, -100% 0%; 
+
+  100% {
+    background-position: -50% 0%, -100% 0%;
   }
 }
 
 .bx-section-tag {
   @apply inline-flex items-center gap-2 text-black px-3 py-1 text-[11px] font-bold tracking-wider;
   background-color: var(--accent);
-  background-image: 
+  background-image:
     linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.45) 50%, transparent 70%),
     linear-gradient(75deg, transparent 20%, rgba(0, 0, 0, 0.15) 50%, transparent 80%);
   background-size: 200% 100%, 350% 100%;
@@ -825,7 +930,7 @@ button:hover::after {
 .bx-section-tag-sm {
   @apply inline-flex items-center gap-1.5 text-black px-2 py-0.5 text-[10px] font-bold tracking-wider;
   background-color: var(--accent);
-  background-image: 
+  background-image:
     linear-gradient(105deg, transparent 30%, rgba(255, 255, 255, 0.45) 50%, transparent 70%),
     linear-gradient(75deg, transparent 20%, rgba(0, 0, 0, 0.15) 50%, transparent 80%);
   background-size: 200% 100%, 350% 100%;
@@ -833,6 +938,7 @@ button:hover::after {
 }
 
 @media (prefers-reduced-motion: reduce) {
+
   .bx-section-tag,
   .bx-section-tag-sm {
     animation: none;
@@ -863,4 +969,13 @@ button:hover::after {
 
 .bx-alert-success {
   @apply border-[var(--success)] bg-[var(--success-soft)] text-[var(--success)];
+}
+
+/* ============================================================
+   PAGE CONTAINER
+   Consistent left and right padding for all client pages
+   ============================================================ */
+.page-container {
+  padding-left: 1rem;
+  padding-right: 1rem;
 }

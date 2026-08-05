@@ -26,7 +26,7 @@ Backend + AI orchestration layer untuk Betrix — platform sinyal/analisis tradi
 - **Database:** PostgreSQL (kompatibel Neon — SSL wajib di luar `development`+`localhost`)
 - **Cache/session store:** Upstash Redis (REST client, `@upstash/redis`)
 - **AI:** Genfity AI Gateway (lewat `services/aiClient.js` + `services/modelRouter.js`, routing ke 3 tier model: cheap/balanced/deep)
-- **Market data:** MT5 Bridge custom (`services/mt5Client.js`) via WebSocket, diteruskan ke client lewat SSE
+- **Market data:** Finnhub WebSocket (via `services/finnhubClient.js`) untuk live ticks 12 simbol utama, dan MT5 Bridge custom (`services/mt5Client.js`) untuk history/candles & kalender ekonomi. Keduanya diteruskan ke client lewat SSE
 - **Auth:** session token custom (bukan JWT) — token random 32-byte, TTL 24 jam tetap, disimpan di Redis; plus Google OAuth (Passport)
 - **Email:** Nodemailer (SMTP)
 - **Logging:** Winston + daily rotate file
@@ -126,6 +126,7 @@ npm start
 | `FRONTEND_URL` | **ya** | `http://localhost:5173` | Dipakai untuk redirect OAuth & link di email |
 | `BASE_URL` | tidak | — | URL publik backend (dipakai di email verifikasi, dll) |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | untuk email | — | |
+| `FINNHUB_API_KEY` | **ya** | — | Token API Finnhub untuk live ticker (WebSocket) & fetcher berita |
 | `AI_API_KEY` / `AI_BASE_URL` | **ya** | — | Kredensial Genfity AI Gateway |
 | `AI_REQUEST_TIMEOUT_MS` / `AI_STREAM_TIMEOUT_MS` | tidak | — | |
 | `MODEL_CHEAP` / `MODEL_BALANCED` / `MODEL_DEEP` (+ `_MAX_TOKENS`) | tidak | lihat `config/models.js` | Nama model per tier |
@@ -393,16 +394,20 @@ const es = new EventSource(`/api/news/stream?token=${sessionToken}`);
 es.addEventListener('news', (e) => { const articles = JSON.parse(e.data); });
 ```
 
-**C. `GET /api/market/stream?symbol=X,Y&token=<sessionToken>`** — `EventSource`, wajib auth.
+**C. `GET /api/market/stream?symbol=X,Y&calendar=1&token=<sessionToken>`** — `EventSource`, wajib auth.
 ```js
-const es = new EventSource(`/api/market/stream?symbol=EURUSD,XAUUSD&token=${sessionToken}`);
+const es = new EventSource(`/api/market/stream?symbol=EURUSD,XAUUSD&calendar=1&token=${sessionToken}`);
 es.addEventListener('connected', (e) => {});
 es.addEventListener('price_update', (e) => {
   const { symbol, price, bid, ask, timestamp } = JSON.parse(e.data);
 });
+es.addEventListener('calendar_update', (e) => {
+  const { events } = JSON.parse(e.data);
+});
 ```
 - Tanpa `symbol` → semua simbol yang sedang di-track backend dikirim.
-- **Cap koneksi bersamaan per user** (default 5) — `429` kalau melebihi. Jangan buka `EventSource` baru tiap ganti timeframe/simbol — reuse 1 koneksi.
+- Tambahkan query param `&calendar=1` untuk menerima push event `calendar_update` saat ada perubahan data kalender ekonomi.
+- **Cap koneksi bersamaan per user** (default 5) — `429` kalau melebihi. Jangan buka `EventSource` baru tiap ganti timeframe/simbol — reuse 1 koneksi. Backend juga menangani *cleanup* otomatis koneksi saat user logout.
 - Token invalid/expired → `401` di response awal.
 
 ### Market Data
@@ -410,10 +415,12 @@ es.addEventListener('price_update', (e) => {
 GET /api/market/stream              ?token= query, cap koneksi/user
 GET /api/market/candles             Histori OHLC — seed chart sekali, bukan polling
 GET /api/market/ticker              Snapshot harga terakhir (fallback kalau stream belum connect)
-GET /api/market/economic-calendar   Cache 6 jam
+GET /api/market/economic-calendar   Data disinkronisasi harian dari MT5 & disimpan di database Postgres
 GET /api/market/symbols             Daftar simbol didukung (diambil dari tabel broker_symbols)
 ```
 > **Catatan MT5 Symbols:** Daftar simbol (`/api/market/symbols`) tidak lagi di-hardcode. Saat backend Node.js pertama kali menyala, ia akan otomatis menarik seluruh daftar simbol dari MT5 Bridge (melalui `GET /v1/symbol/list`) dan menyimpannya di tabel `broker_symbols`. Proses sinkronisasi ini sudah dilengkapi mekanisme anti-bug (sanitasi backslash JSON otomatis) dan optimasi bypass (jika jumlah simbol di database sama persis dengan MT5, *update* di-*skip*).
+>
+> **Catatan Finnhub Live Ticks:** Khusus untuk 12 simbol utama (seperti WTI, EURUSD, BTCUSD), *live ticks* secara khusus diambil menggunakan **Finnhub WebSocket** untuk menghemat resource dan memberikan stabilitas lebih tinggi. Sementara MT5 Bridge difokuskan untuk menarik data historis (candles) dan sinkronisasi kalender ekonomi harian.
 
 ### Strategi integrasi KlineChart (real-time, tanpa polling)
 

@@ -62,7 +62,7 @@ export function DashboardPage() {
 
   return (
     <>
-      <div id="panel-dashboard" className="border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+      <div id="panel-dashboard" className="border-b border-[var(--border)] bg-[var(--surface)] py-3">
         <p className="text-[13px]">
           👋 Hai <span className="font-bold text-[var(--accent)]">{user?.name || user?.email}</span>, yuk cek
           pergerakan market hari ini.
@@ -88,7 +88,7 @@ export function DashboardPage() {
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--border)] bg-[var(--surface)] py-3">
         <p className="text-[12px] text-[var(--text-muted)]">Siap lihat sinyal trading berbasis AI untuk {symbol}?</p>
         <button
           onClick={() => navigate("/analyze")}

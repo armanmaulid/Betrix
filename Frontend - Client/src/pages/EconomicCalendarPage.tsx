@@ -84,7 +84,7 @@ function formatValue(val: string | null): string {
 
 // Template grid bersama header kolom & baris event, selaras seperti tabel
 // Investing.com: Time | Cur(flag+code) | Imp | Event | Actual | Forecast | Previous
-const CAL_COLS = "grid grid-cols-[44px_54px_48px_1fr_64px_64px_64px] items-center gap-2 px-3";
+const CAL_COLS = "grid grid-cols-[44px_54px_48px_1fr_64px_64px_64px] items-center gap-2";
 
 function ImpactDots({ importance }: { importance: CalendarEvent["importance"] }) {
   const level = IMPACT_LEVEL[importance];
@@ -263,10 +263,10 @@ export function EconomicCalendarPage() {
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-[#050505]">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-l-2 border-b-[var(--border)] border-l-[var(--accent)] bg-[var(--surface)] px-4 py-2.5">
-        <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-cyan-400">
-          <CalendarClock size={14} className="text-[var(--accent)]" />
-          Economic Calendar
+      <div className="flex items-center justify-between border-b border-b-[var(--border)] bg-[var(--surface)] py-2.5">
+        <span className="bx-section-tag">
+          <CalendarClock size={14} />
+          ECONOMIC CALENDAR
         </span>
         <div className="flex items-center gap-2">
           <select
@@ -317,14 +317,14 @@ export function EconomicCalendarPage() {
       {/* List */}
       <div ref={listContainerRef} className="flex-1 overflow-y-auto">
         {isLoading ? (
-          <p className="px-4 py-3 text-xs text-[var(--text-muted)]">Memuat...</p>
+          <p className="py-3 text-xs text-[var(--text-muted)]">Memuat...</p>
         ) : error ? (
-          <div className="flex items-start gap-1.5 px-4 py-3 text-xs text-[var(--danger)]">
+          <div className="flex items-start gap-1.5 py-3 text-xs text-[var(--danger)]">
             <Info size={12} className="mt-0.5 flex-shrink-0" />
             <span>{error}</span>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="px-4 py-6 text-center">
+          <div className="py-6 text-center">
             <p className="text-xs text-[var(--text-muted)]">
               Tidak ada event di {PERIOD_LABELS[filter.period]} dengan filter ini
             </p>
@@ -335,7 +335,7 @@ export function EconomicCalendarPage() {
         ) : (
           Object.entries(groups).map(([dateKey, groupEvents]) => (
             <div key={dateKey} data-date-key={dateKey}>
-              <div className="sticky top-0 z-[5] border-b border-[var(--border)] bg-[var(--surface)] px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">
+              <div className="sticky top-0 z-[5] border-b border-[var(--border)] bg-[var(--surface)] py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">
                 {formatDate(dateKey)}
               </div>
               {groupEvents.map((ev, i) => (

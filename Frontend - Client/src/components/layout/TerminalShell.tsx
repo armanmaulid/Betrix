@@ -25,7 +25,7 @@ export function TerminalShell({ onSearchSymbol, rightPanel, children }: Terminal
         <SideNavRail />
 
         <div className="flex flex-1 overflow-hidden">
-          <div className="flex flex-1 flex-col overflow-y-auto">{children}</div>
+          <div className="flex flex-1 flex-col overflow-y-auto page-container">{children}</div>
 
           {rightPanel && (
             <div className="bx-right-sidebar overflow-y-auto">

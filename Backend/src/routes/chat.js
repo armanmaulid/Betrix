@@ -39,7 +39,7 @@ async function refundIfCharged(req, reason) {
 }
 
 const VALID_TASK_TYPES = [
-  "faq",
+  "general",
   "trade_reasoning",
   "risk_narrative",
   "market_insight",
@@ -59,7 +59,7 @@ const VALID_TIERS = ["cheap", "balanced", "deep"];
 // tier yang PERSIS SAMA buat panggil model -- jangan sampai user di-charge
 // utk tier "deep" tapi yang benar2 jalan malah "balanced".
 const checkChatCredits = (req, res, next) => {
-  const taskType = req.body.taskType || req.query.taskType || "faq";
+  const taskType = req.body.taskType || req.query.taskType || "general";
   const requestedTier = req.body.tier;
   const tier = requestedTier && VALID_TIERS.includes(requestedTier)
     ? requestedTier
@@ -130,11 +130,11 @@ router.post("/chat", requireAuth, perUserLimiter, validateChatBody, checkChatCre
   const messages = [...cleanHistory, { role: "user", content: message.substring(0, 4000) }];
 
   try {
-    const result = await routeAndCall({ taskType: taskType || "faq", messages, tier: req.resolvedTier });
+    const result = await routeAndCall({ taskType: taskType || "general", messages, tier: req.resolvedTier });
 
     logMetrics({
       type: "chat_completion",
-      taskType: taskType || "faq",
+      taskType: taskType || "general",
       modelUsed: result.modelUsed,
       latencyMs: result.latencyMs,
       inputTokens: result.usage?.input_tokens,
@@ -145,7 +145,7 @@ router.post("/chat", requireAuth, perUserLimiter, validateChatBody, checkChatCre
     if (result.usage) {
       logTokenUsage({
         userId: req.user.id,
-        taskType: taskType || "faq",
+        taskType: taskType || "general",
         modelUsed: result.modelUsed,
         inputTokens: result.usage.input_tokens || 0,
         outputTokens: result.usage.output_tokens || 0,
@@ -163,7 +163,7 @@ router.post("/chat", requireAuth, perUserLimiter, validateChatBody, checkChatCre
     logChat({
       userId: req.user?.id,
       sessionId: sessionId || null,
-      taskType: taskType || "faq",
+      taskType: taskType || "general",
       modelUsed: result.modelUsed,
       message: displayMessage || message,
       reply: result.text,
@@ -176,7 +176,7 @@ router.post("/chat", requireAuth, perUserLimiter, validateChatBody, checkChatCre
     logUserActivity({
       userId: req.user?.id ?? null,
       action: "chat_message",
-      details: { model: result.modelUsed, taskType: taskType || "faq" },
+      details: { model: result.modelUsed, taskType: taskType || "general" },
       ip: req.normalizedIP || req.ip,
       userAgent: req.headers["user-agent"] ?? null,
     });
@@ -204,7 +204,7 @@ router.post("/chat/stream", requireAuth, perUserLimiter, validateChatBody, check
 
   try {
     const result = await routeAndStream({
-      taskType: taskType || "faq",
+      taskType: taskType || "general",
       messages,
       tier: req.resolvedTier,
       image,
@@ -225,7 +225,7 @@ router.post("/chat/stream", requireAuth, perUserLimiter, validateChatBody, check
 
     logMetrics({
       type: "chat_stream",
-      taskType: taskType || "faq",
+      taskType: taskType || "general",
       modelUsed: result.modelUsed,
       latencyMs: result.latencyMs,
       inputTokens: result.usage?.input_tokens,
@@ -236,7 +236,7 @@ router.post("/chat/stream", requireAuth, perUserLimiter, validateChatBody, check
     if (result.usage) {
       logTokenUsage({
         userId: req.user.id,
-        taskType: taskType || "faq",
+        taskType: taskType || "general",
         modelUsed: result.modelUsed,
         inputTokens: result.usage.input_tokens || 0,
         outputTokens: result.usage.output_tokens || 0,
@@ -247,7 +247,7 @@ router.post("/chat/stream", requireAuth, perUserLimiter, validateChatBody, check
     logChat({
       userId: req.user?.id,
       sessionId: sessionId || null,
-      taskType: taskType || "faq",
+      taskType: taskType || "general",
       modelUsed: result.modelUsed,
       message: displayMessage || message,
       reply: result.text,
@@ -260,7 +260,7 @@ router.post("/chat/stream", requireAuth, perUserLimiter, validateChatBody, check
     logUserActivity({
       userId: req.user?.id ?? null,
       action: "chat_message",
-      details: { model: result.modelUsed, taskType: taskType || "faq" },
+      details: { model: result.modelUsed, taskType: taskType || "general" },
       ip: req.normalizedIP || req.ip,
       userAgent: req.headers["user-agent"] ?? null,
     });
