@@ -9,7 +9,7 @@ import { updatePrice } from "./mt5Client.js";
 //
 // PENTING: daftar simbol di sini SENGAJA TETAP (fixed), sama untuk semua
 // user, BUKAN per-user watchlist. Alasannya:
-//   1. Finnhub free tier WS dibatasi 50 simbol per koneksi - 11 simbol
+//   1. Finnhub free tier WS dibatasi 50 simbol per koneksi - 12 simbol
 //      tetap di bawah ini jauh di bawah limit itu, apapun jumlah user yang
 //      login (1 orang atau 10.000 orang, tetap 1 koneksi WS ke Finnhub,
 //      1x subscribe per simbol).
@@ -19,10 +19,13 @@ import { updatePrice } from "./mt5Client.js";
 //      newsFetcher.js, tapi itu REST terjadwal per 10 detik - jauh dari
 //      limit 60/menit).
 //
-// XTIUSD (WTI oil) SENGAJA belum dipindah ke sini - belum ada kepastian
-// simbol commodity CFD WTI yang reliable di free-tier feed OANDA-nya
-// Finnhub, jadi tetap dari MT5 (lihat routes/market.js, sumbernya nggak
-// campur, tergantung simbol mana yang dicari user).
+// Semua 12 simbol TickerBarPrice sekarang dicover Finnhub, termasuk WTI
+// (OANDA:WTICO_USD → XTIUSD). Prefix broker SENGAJA konsisten OANDA untuk
+// semua forex/metal/oil - jangan campur prefix broker lain (FXCM, IC
+// MARKETS, dst) walau simbolnya ada, karena tiap broker punya likuiditas/
+// spread beda yang bikin harga antar simbol nggak apple-to-apple. MT5
+// sekarang murni buat history/candle (fetchMt5History, D1Cache) + calendar
+// - 0% dipakai buat live tick lagi (lihat mt5Only() di routes/market.js).
 const FINNHUB_TO_INTERNAL = {
   "OANDA:EUR_USD": "EURUSD",
   "OANDA:GBP_USD": "GBPUSD",
@@ -33,6 +36,7 @@ const FINNHUB_TO_INTERNAL = {
   "OANDA:NZD_USD": "NZDUSD",
   "OANDA:XAU_USD": "XAUUSD",
   "OANDA:XAG_USD": "XAGUSD",
+  "OANDA:WTICO_USD": "XTIUSD",
   "BINANCE:BTCUSDT": "BTCUSD",
   "BINANCE:ETHUSDT": "ETHUSD",
 };
