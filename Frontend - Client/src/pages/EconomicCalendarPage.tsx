@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarClock, RefreshCw, Info, Filter, X } from "lucide-react";
 import { useShellContext } from "../components/layout/TerminalShellLayout";
 import { fetchEconomicCalendar, type CalendarEvent } from "../api/marketClient";
+import { onLogout } from "../lib/authEvents";
 
 const IMPACT_DOT: Record<CalendarEvent["importance"], string> = {
   high: "bg-[var(--danger)]",
@@ -189,8 +190,10 @@ export function EconomicCalendarPage() {
       debounceTimer = setTimeout(() => load(true), 500);
     });
     es.onerror = () => {};
+    const unsubscribeLogout = onLogout(() => es.close());
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
+      unsubscribeLogout();
       es.close();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

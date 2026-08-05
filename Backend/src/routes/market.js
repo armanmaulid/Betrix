@@ -17,6 +17,17 @@ import { requireAuth } from "../middleware/auth.js";
 import { validateSession } from "../services/sessionStore.js";
 import { getSymbolsFromDb } from "../services/symbolStore.js";
 import { logger } from "../utils/logger.js";
+import { FINNHUB_COVERED_SYMBOLS } from "../services/finnhubClient.js";
+
+// MT5 cuma perlu diminta nge-track simbol yang BUKAN tanggung jawab
+// Finnhub. Simbol yang sudah di-cover Finnhub tetap dapat live tick (lewat
+// updatePrice() yang nulis ke latestPrices yang sama) tanpa MT5 perlu tahu
+// apa-apa soal itu — jadi MT5 fokus history/candle + calendar seperti yang
+// dimaksud, live tick sepenuhnya tanggung jawab Finnhub untuk simbol yang
+// dia cover.
+function mt5Only(symbols) {
+  return symbols.filter((s) => !FINNHUB_COVERED_SYMBOLS.has(s));
+}
 
 const router = Router();
 // In-memory cache untuk meminimalkan beban polling ke MT5
@@ -128,7 +139,7 @@ router.get("/stream", async (req, res) => {
   const wantsCalendar = req.query.calendar === "1" || req.query.calendar === "true";
 
   if (symbolsToTrack) {
-    subscribeToSymbols(symbolsToTrack);
+    subscribeToSymbols(mt5Only(symbolsToTrack));
   }
   if (wantsCalendar) {
     syncCalendarIfNeeded(); // no-op kalau bulan ini+depan udah ada di DB
@@ -174,7 +185,7 @@ router.get("/stream", async (req, res) => {
   req.on("close", () => {
     removePriceListener(listener);
     if (calendarListener) removeCalendarListener(calendarListener);
-    if (symbolsToTrack) unsubscribeFromSymbols(symbolsToTrack);
+    if (symbolsToTrack) unsubscribeFromSymbols(mt5Only(symbolsToTrack));
 
     const remaining = (activeStreamsByUser.get(user.id) || 1) - 1;
     if (remaining <= 0) {
@@ -222,7 +233,9 @@ router.get("/candles", async (req, res) => {
     const limit = Math.min(Math.max(count, 1), 1000); // Batasi 1-1000 candle
 
     const mt5Symbol = symbol.toUpperCase();
-    subscribeToSymbol(mt5Symbol); // Ensure MT5 starts streaming this symbol
+    if (!FINNHUB_COVERED_SYMBOLS.has(mt5Symbol)) {
+      subscribeToSymbol(mt5Symbol); // Ensure MT5 starts streaming this symbol (skip kalau udah dicover Finnhub)
+    }
 
     const tfMap = {
       "M1": "M1",
@@ -417,7 +430,9 @@ router.get("/ticker", (req, res) => {
   const { symbol } = req.query;
   if (symbol) {
     const mt5Symbol = symbol.toUpperCase();
-    subscribeToSymbol(mt5Symbol); // Ensure MT5 starts streaming this symbol
+    if (!FINNHUB_COVERED_SYMBOLS.has(mt5Symbol)) {
+      subscribeToSymbol(mt5Symbol); // Ensure MT5 starts streaming this symbol (skip kalau udah dicover Finnhub)
+    }
 
     if (latestPrices[mt5Symbol]) {
       return res.json({ symbol: mt5Symbol, ...latestPrices[mt5Symbol] });

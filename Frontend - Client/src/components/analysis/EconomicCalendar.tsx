@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { CalendarClock, RefreshCw, Info, Filter, X } from "lucide-react";
 import { fetchEconomicCalendar, type CalendarEvent } from "../../api/marketClient";
+import { onLogout } from "../../lib/authEvents";
 
 const IMPACT_DOT: Record<CalendarEvent["importance"], string> = {
   high: "bg-[var(--danger)]",
@@ -197,8 +198,11 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
       // EventSource sudah auto-reconnect bawaan browser, cukup diamkan.
     };
 
+    const unsubscribeLogout = onLogout(() => es.close());
+
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
+      unsubscribeLogout();
       es.close();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

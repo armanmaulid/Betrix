@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { fetchCandles } from "../api/marketClient";
+import { onLogout } from "../lib/authEvents";
 
 export interface TickerSymbol {
   symbol: string; // Nama persis di MT5 Market Watch broker kamu
@@ -27,6 +28,24 @@ let globalBaseData: Record<string, { prevClose: number }> = {};
 let currentPrices: Record<string, TickerPrice> = {};
 const listeners = new Set<(data: Record<string, TickerPrice>) => void>();
 let restartTimeout: ReturnType<typeof setTimeout>;
+
+// State di atas hidup di luar siklus hidup komponen React (sengaja, biar
+// koneksi stream di-share antar komponen yang sama-sama butuh ticker).
+// Konsekuensinya: dia TIDAK otomatis ikut nutup saat user logout, karena
+// tidak ada dependency ke sessionToken/user. Sebelumnya nutupnya numpang
+// efek samping unmount (ProtectedRoute redirect ke /login) — jalan, tapi
+// implisit dan rapuh kalau suatu saat ada consumer yang tidak dibungkus
+// ProtectedRoute. Sekarang subscribe langsung ke event logout supaya
+// eksplisit: begitu logout() dipanggil, stream langsung ditutup dan
+// refcount di-reset, apapun status mount komponennya.
+onLogout(() => {
+  clearTimeout(restartTimeout);
+  if (globalEventSource) {
+    globalEventSource.close();
+    globalEventSource = null;
+  }
+  activeSymbolRefs = {};
+});
 
 function getActiveSymbolKey() {
   return Object.keys(activeSymbolRefs).sort().join(",");

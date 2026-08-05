@@ -161,6 +161,21 @@ export function unsubscribeFromSymbols(symbols) {
   }
 }
 
+// Dipakai buat nulis harga baru + broadcast ke semua priceListeners (SSE
+// consumers di market.js). Dedup di sini (skip kalau price-nya sama persis
+// dengan yang terakhir) supaya SSE nggak nge-spam event kalau upstream
+// ngirim tick "kosong" (harga belum berubah). Dipakai bareng-bareng oleh
+// handler WS MT5 di bawah DAN finnhubClient.js — biar satu sumber
+// kebenaran buat latestPrices + broadcast, apapun upstream-nya (MT5 vs
+// Finnhub).
+export function updatePrice(symbol, priceObj) {
+  const oldPrice = latestPrices[symbol];
+  if (!oldPrice || oldPrice.price !== priceObj.price) {
+    latestPrices[symbol] = priceObj;
+    priceListeners.forEach(fn => fn(symbol, priceObj));
+  }
+}
+
 export function initializeMt5Client() {
   let reconnectTimer;
   let reconnectAttempt = 0;
@@ -200,12 +215,7 @@ export function initializeMt5Client() {
              ask: payload.ask,
              timestamp: Date.now() // Use Node.js local timestamp to avoid timezone issues
            };
-           
-           const oldPrice = latestPrices[payload.symbol];
-           if (!oldPrice || oldPrice.price !== priceObj.price) {
-             latestPrices[payload.symbol] = priceObj;
-             priceListeners.forEach(fn => fn(payload.symbol, priceObj));
-           }
+           updatePrice(payload.symbol, priceObj);
         } else if (payload.type === "calendar_update" && Array.isArray(payload.events)) {
            // Tulis-tembus ke Postgres (upsertEvents idempotent by value_id),
            // lalu kasih tau listener SSE - jangan blok pemrosesan pesan WS

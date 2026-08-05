@@ -29,6 +29,7 @@ import { normalizeRequestIP } from "./middleware/normalizeIP.js";
 import { logger } from "./utils/logger.js";
 import { pool } from "./db/pool.js";
 import { initializeMt5Client } from "./services/mt5Client.js";
+import { initializeFinnhubClient } from "./services/finnhubClient.js";
 import { syncBrokerSymbols } from "./services/symbolStore.js";
 import { syncCalendarIfNeeded, cleanupOldCalendarEvents } from "./services/calendarStore.js";
 import "./config/passport.js";
@@ -223,6 +224,10 @@ const server = app.listen(PORT, async () => {
     // Tahap 3: BARU buka koneksi realtime WebSocket ke MT5
     initializeMt5Client();
     logger.info("MT5 Bridge Client initialized", { context: "MT5" });
+
+    // Sumber harga tambahan buat TickerBarPrice (daftar simbol tetap, lihat
+    // finnhubClient.js). No-op kalau FINNHUB_API_KEY belum di-set.
+    initializeFinnhubClient();
 
     // ── Auto Re-warmup D1 Cache ──────────────────────────────────
     // Jadwalkan refresh otomatis D1 cache setiap pergantian hari broker

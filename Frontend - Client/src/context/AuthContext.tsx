@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import * as authApi from "../api/authClient";
 import type { AuthUser } from "../api/authClient";
+import { emitLogout } from "../lib/authEvents";
 
 // Only the session token lives in localStorage — user profile is always
 // re-fetched from /api/auth/me on load rather than cached, so a change made
@@ -93,6 +94,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [sessionToken, user?.id]);
 
+  useEffect(() => {
+    // Sumber kebenaran tunggal untuk "tutup semua stream": begitu
+    // sessionToken jadi null — apapun sebabnya (klik logout, sesi dicabut
+    // paksa oleh admin lewat event 'logout' di atas, atau restoreSession
+    // gagal saat mount) — broadcast ke semua consumer. emitLogout() aman
+    // dipanggil berkali-kali (menutup EventSource yang sudah tertutup itu
+    // no-op), jadi tidak masalah kalau ini beririsan dengan panggilan
+    // eksplisit di logout() di bawah.
+    if (!sessionToken) {
+      emitLogout();
+    }
+  }, [sessionToken]);
+
   async function login(email: string, password: string) {
     const result = await authApi.login(email, password); // throws AuthApiError on failure
     localStorage.setItem(STORAGE_KEY, result.sessionToken);
@@ -108,6 +122,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
+    // Tutup semua stream (me/stream, market/stream ticker & calendar,
+    // news/stream) SEKARANG JUGA — jangan nunggu network round-trip ke
+    // backend atau nunggu ProtectedRoute unmount komponen yang makai stream.
+    emitLogout();
+
     if (sessionToken) {
       // Best-effort — even if this network call fails, forget the token
       // locally so the user isn't stuck "logged in" on this device.
