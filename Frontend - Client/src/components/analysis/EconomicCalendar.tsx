@@ -189,6 +189,23 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
     const es = new EventSource(`${BACKEND_URL}/api/market/stream?calendar=1&token=${token}`);
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
+    // FIX: /stream cuma push delta LIVE, gak pernah kirim snapshot pas
+    // connect/reconnect. EventSource browser auto-reconnect sendiri kalau
+    // disconnect (wifi putus, tab background, dst) - tapi begitu
+    // reconnect, dia cuma mulai dengerin delta BARU ke depan. Perubahan
+    // kalender yang kejadian PAS disconnect bakal kelewat sampai ada
+    // event live berikutnya (bisa lama kalau lagi sepi rilis data).
+    // onopen fire di KONEKSI PERTAMA juga, jadi ref ini nyegah dobel
+    // fetch sama useEffect load() di atas - cuma refresh pas ini beneran
+    // RECONNECT (bukan koneksi pertama).
+    let hasConnectedBefore = false;
+    es.onopen = () => {
+      if (hasConnectedBefore) {
+        load(true);
+      }
+      hasConnectedBefore = true;
+    };
+
     es.addEventListener("calendar_update", () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => load(true), 500);

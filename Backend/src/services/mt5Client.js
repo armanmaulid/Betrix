@@ -9,6 +9,21 @@ const rawBridgeUrl = process.env.MT5_BRIDGE_URL || "127.0.0.1:8890";
 const MT5_HTTP_BASE = process.env.MT5_HTTP_URL || (rawBridgeUrl.startsWith("http") ? rawBridgeUrl : `http://${rawBridgeUrl}`);
 const MT5_WS_BASE = process.env.MT5_WS_URL || (rawBridgeUrl.startsWith("ws") ? rawBridgeUrl : `ws://${rawBridgeUrl}`);
 
+// Header Cloudflare Access Service Token - WAJIB kalau bridge diekspos
+// lewat cloudflared tunnel publik (mis. betrix.dpdns.org), supaya cuma
+// request yang bawa token ini yang ditembusin Cloudflare ke PC lokal.
+// Kosong/no-op kalau CF_ACCESS_CLIENT_ID/SECRET belum di-set (local dev
+// langsung ke 127.0.0.1:8890 gak butuh ini). Satu sumber kebenaran, dipakai
+// di semua request ke bridge (fetch DAN koneksi WebSocket) - lihat
+// calendarStore.js juga.
+export const CF_ACCESS_HEADERS =
+  process.env.CF_ACCESS_CLIENT_ID && process.env.CF_ACCESS_CLIENT_SECRET
+    ? {
+        "CF-Access-Client-Id": process.env.CF_ACCESS_CLIENT_ID,
+        "CF-Access-Client-Secret": process.env.CF_ACCESS_CLIENT_SECRET,
+      }
+    : {};
+
 export const latestPrices = {};
 
 // FIX (CPU spike di MT5 setelah reconnect): dulu trackedSymbols itu Set
@@ -62,7 +77,7 @@ async function sendTrackRequest() {
   try {
     const res = await fetch(`${MT5_HTTP_BASE}/v1/track/prices`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...CF_ACCESS_HEADERS },
       body: JSON.stringify({ symbols: Array.from(trackedSymbols.keys()) })
     });
     if (!res.ok) {
@@ -98,7 +113,7 @@ async function sendTrackCalendarRequest() {
   try {
     const res = await fetch(`${MT5_HTTP_BASE}/v1/track/calendar`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...CF_ACCESS_HEADERS },
       // Sengaja tanpa filter - biar backend yang filter, EA cukup broadcast semua.
       body: JSON.stringify({ min_importance: "low" }),
     });
@@ -176,6 +191,23 @@ export function updatePrice(symbol, priceObj) {
   }
 }
 
+// FIX (bug nyata, laporan user): "sendTrackRequest()"/"sendTrackCalendarRequest()"
+// sebelumnya cuma dikirim SEKALI pas WS "open", tanpa retry kalau HTTP
+// POST-nya sendiri gagal (misal EA lagi sama-sama kena gangguan socket
+// pas momen reconnect - lihat error 10053 di log EA). Kalau POST itu
+// gagal, WS-nya tetap keliatan konek normal dari sisi Node (jadi gak ada
+// reconnect lagi yang natural-nya nge-trigger resend), tapi EA gak pernah
+// tau harus nge-track apa - hasilnya data (terutama calendar) berhenti
+// update "selamanya" walau koneksinya sendiri sehat.
+//
+// Solusinya: re-assert PERIODIK, bukan nambah retry per-call. Selama WS
+// masih konek, kirim ulang kedua request ini tiap REASSERT_INTERVAL_MS -
+// idempotent (EA cuma nyimpen state, dikirim berkali-kali gak masalah),
+// dan nutup SEMUA skenario race (gagal pas reconnect, state EA kereset
+// diam-diam, dst), bukan cuma satu titik gagal yang kepikiran sekarang.
+const REASSERT_INTERVAL_MS = 3 * 60 * 1000; // 3 menit
+let reassertTimer = null;
+
 export function initializeMt5Client() {
   let reconnectTimer;
   let reconnectAttempt = 0;
@@ -190,7 +222,7 @@ export function initializeMt5Client() {
     const wsUrl = MT5_WS_BASE.endsWith('/') ? MT5_WS_BASE : `${MT5_WS_BASE}/`;
     
     logger.info(`Connecting to MT5 WebSocket at ${wsUrl}...`, { context: "MT5" });
-    wsConnection = new WebSocket(wsUrl);
+    wsConnection = new WebSocket(wsUrl, { headers: CF_ACCESS_HEADERS });
 
     wsConnection.on("open", async () => {
       logger.info("Connected to WebSocket for Live Ticks", { context: "MT5" });
@@ -203,6 +235,16 @@ export function initializeMt5Client() {
       // yang dipanggil di server.js saat startup - di sini cukup subscribe
       // buat delta live-nya aja.
       await sendTrackCalendarRequest();
+
+      // Re-assert periodik (lihat komentar REASSERT_INTERVAL_MS di atas) -
+      // jaga-jaga kalau 2 POST di atas gagal diam-diam atau state di EA
+      // kereset tanpa WS-nya sendiri putus.
+      clearInterval(reassertTimer);
+      reassertTimer = setInterval(() => {
+        sendTrackRequest();
+        sendTrackCalendarRequest();
+      }, REASSERT_INTERVAL_MS);
+      reassertTimer.unref?.();
     });
 
     wsConnection.on("message", (data) => {
@@ -232,6 +274,7 @@ export function initializeMt5Client() {
     });
 
     wsConnection.on("close", () => {
+      clearInterval(reassertTimer);
       const delay = getBackoffDelay();
       reconnectAttempt++;
       logger.warn(`Live Ticks connection lost. Reconnecting in ${Math.round(delay / 1000)}s (attempt ${reconnectAttempt})...`, { context: "MT5" });
@@ -252,7 +295,7 @@ export function initializeMt5Client() {
 // REST API Helper for OHLC History
 export async function fetchMt5History(symbol, timeframe, fromDate, toDate) {
   const url = `${MT5_HTTP_BASE}/v1/history/prices?symbol=${encodeURIComponent(symbol)}&time_frame=${encodeURIComponent(timeframe)}&from_date=${fromDate}&to_date=${toDate}`;
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: CF_ACCESS_HEADERS });
   if (!response.ok) {
     const errorText = await response.text().catch(() => "");
     throw new Error(`MT5 Bridge responded with ${response.status}: ${errorText}`);
@@ -263,7 +306,7 @@ export async function fetchMt5History(symbol, timeframe, fromDate, toDate) {
 // REST API Helper to get all available symbols from MT5
 export async function fetchMt5Symbols() {
   const url = `${MT5_HTTP_BASE}/v1/symbol/list`;
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: CF_ACCESS_HEADERS });
   if (!response.ok) {
     throw new Error(`MT5 Bridge responded with ${response.status}`);
   }
@@ -279,7 +322,7 @@ export async function fetchMt5Symbols() {
 // REST API Helper to get just the symbol count from MT5 (cheap, no full list build)
 export async function fetchMt5SymbolCount() {
   const url = `${MT5_HTTP_BASE}/v1/symbol/count`;
-  const response = await fetch(url);
+  const response = await fetch(url, { headers: CF_ACCESS_HEADERS });
   if (!response.ok) {
     throw new Error(`MT5 Bridge responded with ${response.status}`);
   }

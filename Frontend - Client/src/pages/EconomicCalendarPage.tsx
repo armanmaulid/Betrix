@@ -84,7 +84,7 @@ function formatValue(val: string | null): string {
 
 // Template grid bersama header kolom & baris event, selaras seperti tabel
 // Investing.com: Time | Cur(flag+code) | Imp | Event | Actual | Forecast | Previous
-const CAL_COLS = "grid grid-cols-[44px_54px_48px_1fr_64px_64px_64px] items-center gap-2";
+const CAL_COLS = "grid grid-cols-[44px_54px_48px_1fr_64px_64px_64px] items-center gap-2 page-container";
 
 function ImpactDots({ importance }: { importance: CalendarEvent["importance"] }) {
   const level = IMPACT_LEVEL[importance];
@@ -185,6 +185,16 @@ export function EconomicCalendarPage() {
 
     const es = new EventSource(`${BACKEND_URL}/api/market/stream?calendar=1&token=${token}`);
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    // FIX: nutup celah event kalender yang kelewat pas SSE reconnect
+    // (lihat komentar lengkap di EconomicCalendar.tsx). onopen fire di
+    // koneksi pertama juga, flag ini nyegah dobel fetch sama load() awal.
+    let hasConnectedBefore = false;
+    es.onopen = () => {
+      if (hasConnectedBefore) {
+        load(true);
+      }
+      hasConnectedBefore = true;
+    };
     es.addEventListener("calendar_update", () => {
       if (debounceTimer) clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => load(true), 500);
@@ -263,10 +273,10 @@ export function EconomicCalendarPage() {
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-[#050505]">
       {/* Header */}
-      <div className="flex items-center justify-between border-b border-b-[var(--border)] bg-[var(--surface)] py-2.5">
-        <span className="bx-section-tag">
-          <CalendarClock size={14} />
-          ECONOMIC CALENDAR
+      <div className="flex items-center justify-between border-b border-l-2 border-b-[var(--border)] border-l-[var(--accent)] bg-[var(--surface)] page-container py-2.5">
+        <span className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-cyan-400">
+          <CalendarClock size={14} className="text-[var(--accent)]" />
+          Economic Calendar
         </span>
         <div className="flex items-center gap-2">
           <select
@@ -317,14 +327,14 @@ export function EconomicCalendarPage() {
       {/* List */}
       <div ref={listContainerRef} className="flex-1 overflow-y-auto">
         {isLoading ? (
-          <p className="py-3 text-xs text-[var(--text-muted)]">Memuat...</p>
+          <p className="page-container py-3 text-xs text-[var(--text-muted)]">Memuat...</p>
         ) : error ? (
-          <div className="flex items-start gap-1.5 py-3 text-xs text-[var(--danger)]">
+          <div className="flex items-start gap-1.5 page-container py-3 text-xs text-[var(--danger)]">
             <Info size={12} className="mt-0.5 flex-shrink-0" />
             <span>{error}</span>
           </div>
         ) : filtered.length === 0 ? (
-          <div className="py-6 text-center">
+          <div className="page-container py-6 text-center">
             <p className="text-xs text-[var(--text-muted)]">
               Tidak ada event di {PERIOD_LABELS[filter.period]} dengan filter ini
             </p>
@@ -335,7 +345,7 @@ export function EconomicCalendarPage() {
         ) : (
           Object.entries(groups).map(([dateKey, groupEvents]) => (
             <div key={dateKey} data-date-key={dateKey}>
-              <div className="sticky top-0 z-[5] border-b border-[var(--border)] bg-[var(--surface)] py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">
+              <div className="sticky top-0 z-[5] border-b border-[var(--border)] bg-[var(--surface)] page-container py-1 text-[10px] font-bold uppercase tracking-wider text-[var(--accent)]">
                 {formatDate(dateKey)}
               </div>
               {groupEvents.map((ev, i) => (
@@ -359,7 +369,7 @@ export function EconomicCalendarPage() {
 
       {/* Footer */}
       {generatedAt && !isLoading && (
-        <div className="border-t border-[var(--border)] px-3 py-1 text-[9px] text-[var(--text-muted)]">
+        <div className="border-t border-[var(--border)] page-container py-1 text-[9px] text-[var(--text-muted)]">
           Data dari MT5 · {new Date(generatedAt).toLocaleString("id-ID")} · {filtered.length} events
         </div>
       )}
@@ -368,7 +378,7 @@ export function EconomicCalendarPage() {
       {filterPanelOpen && (
         <div className="absolute inset-y-0 right-0 z-50 w-64 animate-[slide-in-right_0.2s_ease-out] border-l border-[var(--border)] bg-[var(--surface)] shadow-[0_0_24px_rgba(0,0,0,0.6)]">
           <div className="flex h-full flex-col">
-            <div className="flex items-center justify-between border-b border-[var(--border)] px-3 py-2">
+            <div className="flex items-center justify-between border-b border-[var(--border)] page-container py-2">
               <span className="text-[10px] font-bold uppercase tracking-wide text-[var(--accent)]">Filter Options</span>
               <button
                 onClick={() => setFilterPanelOpen(false)}
@@ -379,7 +389,7 @@ export function EconomicCalendarPage() {
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-3 py-3">
+            <div className="flex-1 overflow-y-auto page-container py-3">
               <div className="mb-4">
                 <div className="mb-2 text-[10px] font-bold uppercase tracking-wide text-[var(--text-muted)]">Priority</div>
                 <div className="space-y-1">
@@ -444,7 +454,7 @@ export function EconomicCalendarPage() {
               </div>
             </div>
 
-            <div className="border-t border-[var(--border)] px-3 py-2">
+            <div className="border-t border-[var(--border)] page-container py-2">
               <button
                 onClick={resetFilters}
                 className="w-full border border-[var(--border)] py-1.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--text-muted)] hover:border-[var(--accent)] hover:text-[var(--accent)]"

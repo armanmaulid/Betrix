@@ -188,7 +188,7 @@ export function NewsPage() {
     <>
       <div className="flex h-full flex-col bg-[#050505]">
         {/* HEADER */}
-        <div className="flex flex-wrap items-center justify-between border-b border-[#222] py-2">
+        <div className="flex flex-wrap items-center justify-between border-b border-[#222] py-2 page-container">
           <div className="flex items-center gap-3">
             <span className="bx-section-tag">
               News
@@ -297,7 +297,7 @@ export function NewsPage() {
           <div className="bx-right-sidebar bg-[#050505]">
             {/* FEED STATUS */}
             <div className="flex max-h-[280px] shrink-0 flex-col border-b border-[#222]">
-              <div className="flex shrink-0 items-center justify-between border-b border-[#222] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#ff9900]">
+              <div className="flex shrink-0 items-center justify-between border-b border-[#222] page-container py-2 text-[10px] font-bold uppercase tracking-widest text-[#ff9900]">
                 <span className="flex items-center gap-1.5">
                   <div className="h-1.5 w-1.5 bg-[#ff9900]"></div>
                   FEED STATUS
@@ -324,7 +324,7 @@ export function NewsPage() {
 
             {/* NEWSWIRE */}
             <div className="flex flex-1 flex-col overflow-hidden">
-              <div className="flex items-center justify-between border-b border-[#222] px-3 py-2 text-[10px] font-bold uppercase tracking-widest text-[#00ff00]">
+              <div className="flex items-center justify-between border-b border-[#222] page-container py-2 text-[10px] font-bold uppercase tracking-widest text-[#00ff00]">
                 <span className="flex items-center gap-1.5">
                   <div className="h-1.5 w-1.5 bg-[#00ff00]"></div>
                   NEWSWIRE

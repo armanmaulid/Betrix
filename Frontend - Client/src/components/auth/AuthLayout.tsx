@@ -61,7 +61,7 @@ export function AuthLayout({
       </div>
 
       {/* Center form card with glass morphism */}
-      <div className="relative z-20 w-full max-w-md animate-[form-expand_0.6s_ease-out] px-6">
+      <div className="relative z-20 w-full max-w-md animate-[form-expand_0.6s_ease-out] page-container">
         <div className="border border-[var(--border)] bg-[var(--surface)]/80 p-8 shadow-[0_8px_32px_rgba(0,0,0,0.6)] backdrop-blur-md">
           {/* Eyebrow + Title */}
           <div className="mb-6 border-b border-[var(--border)] pb-4">

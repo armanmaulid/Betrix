@@ -451,7 +451,7 @@ export function AnalyzePage() {
       onClick={() => inputRef.current?.focus()}
     >
       {/* TABS */}
-      <div className={`flex items-center gap-4 ${isChat ? 'px-4 pt-3' : 'px-4 pt-2'}`}>
+      <div className={`flex items-center gap-4 ${isChat ? 'page-container pt-3' : 'page-container pt-2'}`}>
         <div className="flex border border-[#333] text-[9px] font-bold tracking-wider rounded-sm overflow-hidden bg-[#111]">
           {["AUTO", "EQUITY", "MACRO", "NEWS"].map(tab => (
             <button 
@@ -466,7 +466,7 @@ export function AnalyzePage() {
       </div>
 
       {/* INPUT AREA */}
-      <div className="flex items-center px-4 py-3 gap-3 group cursor-text relative">
+      <div className="flex items-center page-container py-3 gap-3 group cursor-text relative">
         
         {/* SLASH COMMAND POPOVER */}
         {showCommands && filteredShortcuts.length > 0 && (
@@ -570,7 +570,7 @@ export function AnalyzePage() {
       </div>
 
       {/* BOTTOM TOOLBAR */}
-      <div className="flex items-center justify-between px-4 py-2 border-t border-[#222] bg-[#080808]">
+      <div className="flex items-center justify-between page-container py-2 border-t border-[#222] bg-[#080808]">
         <span className="text-[10px] text-[#555]">Type <span className="text-[#888]">/</span> for commands</span>
         
         <div className="flex items-center gap-1.5">
@@ -738,7 +738,7 @@ export function AnalyzePage() {
             {/* PRIVATE DATAROOM */}
             <div className="flex flex-col gap-2 mt-1">
               <h2 className="text-[#00ffff] font-bold tracking-widest text-[11px]">PRIVATE DATAROOM {'>'}</h2>
-              <div className="flex items-center justify-between border border-[#222] bg-[#0a0a0a] px-4 py-3 cursor-pointer hover:border-[#444] transition-colors shadow-sm">
+              <div className="flex items-center justify-between border border-[#222] bg-[#0a0a0a] page-container py-3 cursor-pointer hover:border-[#444] transition-colors shadow-sm">
                 <div className="flex items-center gap-2 text-[#555]">
                   <Lock size={14} className="text-[#ff9900]" />
                   <span className="text-[11px]">No documents uploaded. Click to open dataroom.</span>
@@ -751,10 +751,10 @@ export function AnalyzePage() {
             <div className="flex flex-col gap-2 mt-1 mb-6">
               <h2 className="text-[#00ffff] font-bold tracking-widest text-[11px]">RECENT SESSIONS {'>'}</h2>
               {recentSessions.length === 0 ? (
-                <div className="text-[#555] text-[11px] italic px-4 py-2">No recent sessions found.</div>
+                <div className="text-[#555] text-[11px] italic page-container py-2">No recent sessions found.</div>
               ) : (
                 recentSessions.map((session: any) => (
-                  <div key={session.session_id || session.id} className="flex items-center justify-between border border-[#222] bg-[#0a0a0a] px-4 py-2 group hover:border-[#444] transition-colors shadow-sm">
+                  <div key={session.session_id || session.id} className="flex items-center justify-between border border-[#222] bg-[#0a0a0a] page-container py-2 group hover:border-[#444] transition-colors shadow-sm">
                     <div className="flex items-center gap-2 text-[#ccc] w-full max-w-[80%]">
                       <MessageSquare size={14} className="text-[#ff9900] shrink-0" />
                       <span onClick={() => loadSession(session)} className="text-[11px] truncate hover:text-white cursor-pointer transition-colors w-full">

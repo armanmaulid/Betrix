@@ -430,13 +430,13 @@ export function SettingsPage() {
           <div className="p-4 text-center text-[var(--text-muted)] text-[12px]">Tidak ada riwayat sesi ditemukan.</div>
         ) : (
           <div className="w-full">
-            <div className="bx-table-header px-4 border-t-0">
+            <div className="bx-table-header page-container border-t-0">
               <div className="bx-table-cell flex-[2]">DEVICE ID</div>
               <div className="bx-table-cell flex-[2]">LAST SEEN</div>
               <div className="bx-table-cell flex-[1] text-right">ACTION</div>
             </div>
             {sessions.map((session, idx) => (
-              <div key={idx} className="bx-table-row px-4">
+              <div key={idx} className="bx-table-row page-container">
                 <div className="bx-table-cell flex-[2] text-cyan-400 font-mono">{session.fingerprint.substring(0, 16)}...</div>
                 <div className="bx-table-cell flex-[2] text-[var(--text-muted)]">{formatDate(session.lastSeenAt)}</div>
                 <div className="bx-table-cell flex-[1] flex justify-end">
@@ -619,7 +619,7 @@ export function SettingsPage() {
         )}
 
         {/* Content Header (e.g. PROFILE block with configure button) */}
-        <div className="flex justify-between items-center bg-[#0a0a0a] border border-[var(--border)] border-l-4 border-l-[var(--accent)] px-4 py-2">
+        <div className="flex justify-between items-center bg-[#0a0a0a] border border-[var(--border)] border-l-4 border-l-[var(--accent)] page-container py-2">
           <div className="flex items-center gap-2 text-[var(--accent)] font-bold text-[12px] tracking-widest">
             {activeTab === "PROFILE" && <User size={14} />}
             {activeTab === "SECURITY" && <Shield size={14} />}
