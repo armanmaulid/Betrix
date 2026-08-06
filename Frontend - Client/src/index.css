@@ -979,3 +979,7 @@ button:hover::after {
   padding-left: 1rem;
   padding-right: 1rem;
 }
+
+.page-container:has(.bx-right-sidebar) {
+  padding-right: 0;
+}
