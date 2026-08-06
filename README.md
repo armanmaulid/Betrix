@@ -4,14 +4,14 @@ Betrix is a full-stack web application featuring a robust backend API and two di
 
 ## Project Architecture
 
-The repository is structured into three main packages:
+The repository is structured into four main packages:
 
 ### 1. Backend (`/Backend`)
 A Node.js/Express server providing the core API services.
 - **Key Features:**
   - Authentication & Authorization (Session-based)
   - AI Client integration (Chat & Streaming)
-  - Real-time Market Data & News (MT5 Client, AlphaVantage)
+  - Real-time Market Data & News (MT5 Client, Finnhub)
   - Administrative endpoints (Audit logs, usage tracking, user management)
   - Database integrations (PostgreSQL with pooling, Redis for caching)
 
@@ -30,13 +30,20 @@ A React application built with Vite tailored for platform administrators.
   - User & Access Management (Audit logs, User details)
   - Broadcast messaging system
 
+### 4. MT5 Websocket (`/MT5 Websocket`)
+A MetaTrader 5 Expert Advisor (MQL5) that exposes the MT5 engine via local APIs.
+- **Key Features:**
+  - Local REST API for trading operations and account info
+  - Real-time WebSocket streaming for price ticks, OHLC, and calendar
+
 ## Getting Started
 
 ### Prerequisites
 - Node.js (v18+ recommended)
 - PostgreSQL
 - Redis
-- API Keys for third-party services (AI models, AlphaVantage, etc.)
+- MetaTrader 5 Terminal (for SocketBridge EA)
+- API Keys for third-party services (AI models, Finnhub, etc.)
 
 ### Installation & Setup
 
@@ -46,7 +53,10 @@ A React application built with Vite tailored for platform administrators.
    cd Betrix
    ```
 
-2. **Backend Setup:**
+2. **MT5 Websocket Setup:**
+   See `/MT5 Websocket/README.md` for compiling and running `SocketBridgeEA.mq5` in your MetaTrader 5 terminal.
+
+3. **Backend Setup:**
    ```bash
    cd Backend
    npm install
@@ -54,7 +64,7 @@ A React application built with Vite tailored for platform administrators.
    npm run start # or npm run dev
    ```
 
-3. **Frontend Client Setup:**
+4. **Frontend Client Setup:**
    ```bash
    cd "Frontend - Client"
    npm install
@@ -62,7 +72,7 @@ A React application built with Vite tailored for platform administrators.
    npm run dev
    ```
 
-4. **Frontend Admin Setup:**
+5. **Frontend Admin Setup:**
    ```bash
    cd "Frontend - Admin"
    npm install
@@ -73,4 +83,4 @@ A React application built with Vite tailored for platform administrators.
 ## Technologies Used
 - **Backend:** Node.js, Express.js, PostgreSQL, Redis
 - **Frontend:** React, Vite, Tailwind CSS, TypeScript
-- **Integrations:** AI API Clients, AlphaVantage, MetaTrader 5 (MT5) Client
+- **Integrations:** AI API Clients, Finnhub, MetaTrader 5 (MT5) Client

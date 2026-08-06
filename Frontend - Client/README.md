@@ -33,7 +33,6 @@ npm install
 cp .env.example .env.local
 # Edit .env.local:
 # - VITE_API_BASE_URL: URL backend API (default http://localhost:3000/api)
-# - VITE_MT5_BRIDGE_URL: default http://localhost:8000 (sesuaikan jika perlu)
 
 npm run dev
 ```
@@ -93,16 +92,23 @@ src/
 ├── App.tsx                           # routing & AuthProvider wrapper
 ├── index.css                         # design tokens (charcoal-amber theme)
 ├── vite-env.d.ts
-├── api/
+├── api/                              # HTTP clients ke backend API
 │   ├── authClient.ts                 # axios client dengan auth interceptor
-│   └── mt5Bridge.ts                  # MT5 bridge: candles + calendar
+│   ├── chatClient.ts
+│   ├── marketClient.ts               # koneksi market data (melalui backend)
+│   ├── newsClient.ts
+│   └── usageClient.ts
 ├── context/
 │   └── AuthContext.tsx               # session management, user state
 ├── pages/
-│   ├── LoginPage.tsx
-│   ├── RegisterPage.tsx
+│   ├── AnalyzePage.tsx               # main analysis page dengan chart
+│   ├── AuthCallbackPage.tsx          # handler OAuth Google
 │   ├── DashboardPage.tsx
-│   └── AnalyzePage.tsx               # main analysis page dengan chart
+│   ├── EconomicCalendarPage.tsx
+│   ├── LoginPage.tsx
+│   ├── NewsPage.tsx
+│   ├── RegisterPage.tsx
+│   └── SettingsPage.tsx
 ├── components/
 │   ├── auth/
 │   │   ├── AuthLayout.tsx
@@ -122,8 +128,11 @@ src/
 │       ├── EconomicCalendar.tsx      # MT5 calendar
 │       └── TradingViewWidget.tsx     # TradingView embed (optional)
 ├── hooks/
-│   └── useTickerPrices.ts            # price polling hook
+│   ├── useTickerPrices.ts            # price polling hook
+│   └── useVisibilityPoll.ts
 └── lib/
+    ├── analyzePageHelpers.tsx
+    ├── authEvents.ts
     └── tradingViewSymbols.ts         # symbol mapping utils
 ```
 
@@ -131,9 +140,9 @@ src/
 
 `KLineChartWidget.tsx` render candle pakai library
 [klinecharts](https://github.com/klinecharts/KLineChart) (open-source,
-gratis), datanya ditarik dari **`mt5-bridge`** — server Python lokal yang
-baca langsung dari MT5 terminal kamu. Lihat `mt5-bridge/README.md` buat
-detail setup.
+gratis), datanya ditarik dari **Backend Node.js** (yang meneruskannya dari `mt5-bridge` lokal).
+Sekarang frontend tidak langsung "ngobrol" dengan Python, melainkan melalui endpoint `/api/market/*` di backend.
+Lihat `mt5-bridge/README.md` buat detail setup bridge-nya.
 
 **Kenapa nggak pakai API data pihak ketiga buat chart** (cerita 2 dead-end
 yang kejadian beneran pas riset ini, biar nggak keulang):
