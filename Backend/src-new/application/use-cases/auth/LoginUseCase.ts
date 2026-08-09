@@ -5,13 +5,13 @@ import { DeviceRepository } from "@domain/repositories/DeviceRepository.js";
 import { LoginAttemptRepository } from "@domain/repositories/LoginAttemptRepository.js";
 import { DeviceSessionRepository } from "@domain/repositories/DeviceSessionRepository.js";
 import { User, UserStatus } from "@domain/entities/User.js";
-import { Email } from "@domain/value-objects/Email.js";
-import { DeviceFingerprint } from "@domain/value-objects/DeviceFingerprint.js";
+import { Email } from "@domain/value-objects";
+import { DeviceFingerprint } from "@domain/value-objects";
 import { Session } from "@domain/entities/Session.js";
 import { AuthenticationError, ValidationError, ConflictError, InternalError } from "@core/errors/index.js";
 import { verifyPassword, hashPassword, generateSecureToken, getDeviceFingerprint } from "@core/utils/index.js";
 import { isDeviceEnforcementEnabled } from "@config/deviceEnforcement.js";
-import { establishAuthenticatedSession } from "@domain/services/AuthDomainService.js";
+import { AuthDomainService } from "@domain/services/AuthDomainServiceImpl.js";
 import { logUserActivity } from "@domain/services/ActivityLogger.js";
 import { LIMITS } from "@core/constants/index.js";
 
@@ -33,7 +33,8 @@ export class LoginUseCase {
     @inject("SessionRepository") private sessionRepo: SessionRepository,
     @inject("DeviceRepository") private deviceRepo: DeviceRepository,
     @inject("LoginAttemptRepository") private loginAttemptRepo: LoginAttemptRepository,
-    @inject("DeviceSessionRepository") private deviceSessionRepo: DeviceSessionRepository
+    @inject("DeviceSessionRepository") private deviceSessionRepo: DeviceSessionRepository,
+    @inject("AuthDomainService") private authDomainService: AuthDomainService
   ) {}
 
   async execute(input: LoginInput): Promise<LoginOutput> {
@@ -73,7 +74,7 @@ export class LoginUseCase {
       throw new AuthenticationError("Email not verified. Check your inbox.");
     }
 
-    const result = await establishAuthenticatedSession(user, input.request);
+    const result = await this.authDomainService.establishAuthenticatedSession(user, input.request);
     if (!result.ok) {
       throw new AuthenticationError(result.error, { 
         ...(result.hasActiveSession ? { hasActiveSession: true } : {}) 

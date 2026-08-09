@@ -31,3 +31,4 @@ export * from "./user/SendMessageUseCase.js";
 export * from "./user/UpdateNotificationPrefsUseCase.js";
 export * from "./market/GetSymbolsUseCase.js";
 export * from "./market/GetCalendarUseCase.js";
+export * from "./market/WarmupMarketCacheUseCase.js";

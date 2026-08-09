@@ -37,7 +37,7 @@ export class UserController {
 
   async sendMessage(req: Request, res: Response, next: NextFunction) {
     try {
-      const useCase = container.resolve(SendMessageUseCase);
+      const useCase = container.resolve("SendUserMessageUseCase");
       const result = await useCase.execute({
         fromUserId: req.user.userId,
         toEmail: req.body.toEmail,

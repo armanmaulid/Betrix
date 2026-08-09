@@ -1,6 +1,7 @@
 import { stripThinkingTags, createThinkingStreamFilter } from "@domain/services/thinkingFilter.js";
 import { logger } from "@core/logging/logger.js";
 import { env } from "@config/env";
+import { AiMessage } from "@application/ports/index.js";
 
 const BASE_URL = env.AI_BASE_URL;
 const API_KEY = env.AI_API_KEY;
@@ -47,7 +48,7 @@ export class AiGatewayClient {
     model: string;
     maxTokens: number;
     system: string;
-    messages: Array<{ role: "user" | "assistant" | "system"; content: string | Array<{ type: string; text?: string; image_url?: { url: string } }> };
+    messages: AiMessage[];
   }): Promise<{ text: string; usage?: { inputTokens: number; outputTokens: number } }> {
     if (!BASE_URL) throw new Error("AI_BASE_URL not set");
 
@@ -108,7 +109,7 @@ export class AiGatewayClient {
     model: string;
     maxTokens: number;
     system: string;
-    messages: Array<{ role: "user" | "assistant" | "system"; content: string | Array<{ type: string; text?: string; image_url?: { url: string } }> };
+    messages: AiMessage[];
     onToken: (token: string) => void;
     signal?: AbortSignal;
   }): Promise<{ text: string; usage?: { inputTokens: number; outputTokens: number } }> {

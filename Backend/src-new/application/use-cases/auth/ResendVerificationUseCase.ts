@@ -1,9 +1,9 @@
 import { inject, injectable } from "tsyringe";
 import { UserRepository } from "@domain/repositories/UserRepository.js";
 import { VerificationRepository } from "@domain/repositories/VerificationRepository.js";
-import { EmailPort } from "@application/ports/EmailPort.js";
+import { EmailPort } from "@application/ports";
 import { User } from "@domain/entities/User.js";
-import { Email } from "@domain/value-objects/Email.js";
+import { Email } from "@domain/value-objects";
 import { ValidationError, NotFoundError } from "@core/errors/index.js";
 import { generateSecureToken } from "@core/utils/index.js";
 import { LIMITS } from "@core/constants/index.js";

@@ -18,8 +18,8 @@ export class ValidationError extends AppError {
 }
 
 export class AuthenticationError extends AppError {
-  constructor(message = "Authentication required") {
-    super("UNAUTHENTICATED", 401, message);
+  constructor(message = "Authentication required", details?: Record<string, unknown>) {
+    super("UNAUTHENTICATED", 401, message, details);
   }
 }
 

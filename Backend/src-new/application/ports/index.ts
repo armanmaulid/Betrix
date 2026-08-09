@@ -8,12 +8,17 @@ export interface EmailPort {
   sendBroadcast(subject: string, body: string, recipients: Array<{ email: string; name: string }>): Promise<void>;
 }
 
+export interface AiMessage {
+  role: "user" | "assistant" | "system";
+  content: string | Array<{ type: string; text?: string; image_url?: { url: string } }>;
+}
+
 export interface AiPort {
   callModel(params: {
     model: string;
     maxTokens: number;
     system: string;
-    messages: Array<{ role: "user" | "assistant" | "system"; content: string | Array<{ type: string; text?: string; image_url?: { url: string } }> };
+    messages: AiMessage[];
   }): Promise<{
     text: string;
     usage?: { inputTokens: number; outputTokens: number };
@@ -23,7 +28,7 @@ export interface AiPort {
     model: string;
     maxTokens: number;
     system: string;
-    messages: Array<{ role: "user" | "assistant" | "system"; content: string | Array<{ type: string; text?: string; image_url?: { url: string } }> };
+    messages: AiMessage[];
     onToken: (token: string) => void;
     signal?: AbortSignal;
   }): Promise<{

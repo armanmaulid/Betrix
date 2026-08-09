@@ -3,10 +3,12 @@ import { UserRepository } from "@domain/repositories/UserRepository.js";
 import { SessionRepository } from "@domain/repositories/SessionRepository.js";
 import { DeviceRepository } from "@domain/repositories/DeviceRepository.js";
 import { VerificationRepository } from "@domain/repositories/VerificationRepository.js";
-import { EmailPort } from "@application/ports/EmailPort.js";
+import { EmailPort } from "@application/ports";
 import { User, UserStatus } from "@domain/entities/User.js";
-import { Email } from "@domain/value-objects/Email.js";
-import { DeviceFingerprint } from "@domain/value-objects/DeviceFingerprint.js";
+import { Session } from "@domain/entities/Session.js";
+import { Device } from "@domain/entities/Device.js";
+import { Email } from "@domain/value-objects";
+import { DeviceFingerprint } from "@domain/value-objects";
 import { ValidationError, ConflictError, InternalError } from "@core/errors/index.js";
 import { hashPassword, generateSecureToken, getDeviceFingerprint } from "@core/utils/index.js";
 import { isDeviceEnforcementEnabled } from "@config/deviceEnforcement.js";
@@ -42,7 +44,7 @@ export class RegisterUseCase {
     }
 
     if (isDeviceEnforcementEnabled()) {
-      const fingerprint = new DeviceFingerprint(getDeviceFingerprint(input.request));
+      const fingerprint = getDeviceFingerprint(input.request);
       const existingUserId = await this.deviceRepo.findUserByFingerprint(fingerprint);
       if (existingUserId) {
         throw new ConflictError("This device is already registered to another account");
@@ -66,7 +68,7 @@ export class RegisterUseCase {
     await this.userRepo.save(user);
 
     if (isDeviceEnforcementEnabled()) {
-      const fingerprint = new DeviceFingerprint(getDeviceFingerprint(input.request));
+      const fingerprint = getDeviceFingerprint(input.request);
       await this.deviceRepo.bind(Device.create({ userId: user.id, fingerprint }));
     }
 

@@ -58,11 +58,12 @@ import { BroadcastMessageUseCase } from "@application/use-cases/admin/BroadcastM
 
 import { GetUsageUseCase } from "@application/use-cases/user/GetUsageUseCase.js";
 import { GetMessagesUseCase } from "@application/use-cases/user/GetMessagesUseCase.js";
-import { SendMessageUseCase } from "@application/use-cases/user/SendMessageUseCase.js";
+import { SendMessageUseCase as SendUserMessageUseCase } from "@application/use-cases/user/SendMessageUseCase.js";
 import { UpdateNotificationPrefsUseCase } from "@application/use-cases/user/UpdateNotificationPrefsUseCase.js";
 
 import { GetSymbolsUseCase } from "@application/use-cases/market/GetSymbolsUseCase.js";
 import { GetCalendarUseCase } from "@application/use-cases/market/GetCalendarUseCase.js";
+import { WarmupMarketCacheUseCase } from "@application/use-cases/market/WarmupMarketCacheUseCase.js";
 
 // Controllers
 import { AuthController } from "@presentation/controllers/AuthController.js";
@@ -127,11 +128,12 @@ export function registerDependencies() {
 
   container.register("GetUsageUseCase", { useClass: GetUsageUseCase });
   container.register("GetMessagesUseCase", { useClass: GetMessagesUseCase });
-  container.register("SendMessageUseCase", { useClass: SendMessageUseCase });
+  container.register("SendUserMessageUseCase", { useClass: SendUserMessageUseCase });
   container.register("UpdateNotificationPrefsUseCase", { useClass: UpdateNotificationPrefsUseCase });
 
   container.register("GetSymbolsUseCase", { useClass: GetSymbolsUseCase });
   container.register("GetCalendarUseCase", { useClass: GetCalendarUseCase });
+  container.register("WarmupMarketCacheUseCase", { useClass: WarmupMarketCacheUseCase });
 
   // Controllers
   container.register("AuthController", { useClass: AuthController });

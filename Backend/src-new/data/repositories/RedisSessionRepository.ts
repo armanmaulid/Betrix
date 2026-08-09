@@ -73,13 +73,14 @@ export class RedisSessionRepository implements SessionRepository {
     return session;
   }
 
-  async delete(token: string): Promise<void> {
+  async delete(token: string): Promise<string | null> {
     const userId = await redisClient.get(`session:${token}`);
     if (userId) {
       await redisClient.srem(`user_sessions:${userId}`, token);
     }
     await redisClient.del(`session:${token}`);
     sessionMemoryCache.delete(token);
+    return userId as string | null;
   }
 
   async deleteByUserId(userId: string, exceptToken?: string): Promise<number> {

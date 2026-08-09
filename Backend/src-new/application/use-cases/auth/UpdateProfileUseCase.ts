@@ -18,6 +18,15 @@ interface UpdateProfileOutput {
   user: User;
 }
 
+type ProfileUpdates = {
+  name?: string;
+  phone?: string;
+  address?: string;
+  birthdate?: Date;
+  gender?: string;
+  bio?: string;
+};
+
 @injectable()
 export class UpdateProfileUseCase {
   constructor(
@@ -36,7 +45,7 @@ export class UpdateProfileUseCase {
       throw new NotFoundError("User");
     }
 
-    const updates: Partial<Pick<User, "name" | "phone" | "address" | "birthdate" | "gender" | "bio">> = {};
+    const updates: ProfileUpdates = {};
     if (input.name !== undefined) updates.name = input.name;
     if (input.phone !== undefined) updates.phone = input.phone;
     if (input.address !== undefined) updates.address = input.address;
