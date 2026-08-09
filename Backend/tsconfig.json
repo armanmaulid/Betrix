@@ -1,0 +1,35 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2022"],
+    "outDir": "./dist",
+    "rootDir": "./src-new",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src-new/*"],
+      "@config/*": ["src-new/config/*"],
+      "@core/*": ["src-new/core/*"],
+      "@domain/*": ["src-new/domain/*"],
+      "@data/*": ["src-new/data/*"],
+      "@application/*": ["src-new/application/*"],
+      "@presentation/*": ["src-new/presentation/*"],
+      "@bootstrap/*": ["src-new/bootstrap/*"],
+      "@background/*": ["src-new/background/*"]
+    },
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["src-new/**/*"],
+  "exclude": ["node_modules", "dist", "src"]
+}
