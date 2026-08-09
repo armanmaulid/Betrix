@@ -8,3 +8,5 @@ export * from "./MessageRepository.js";
 export * from "./NewsRepository.js";
 export * from "./SymbolRepository.js";
 export * from "./CalendarRepository.js";
+export * from "./LoginAttemptRepository.js";
+export * from "./DeviceSessionRepository.js";
