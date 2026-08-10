@@ -115,7 +115,7 @@ export class Mt5Client {
         this.ws.onerror = (err) => {
           // ErrorEvent is not an Error - convert to proper Error for rejection
           const error = err instanceof Error ? err : new Error(`WebSocket error: ${err?.message || "Unknown error"}`);
-          logger.error("MT5 WebSocket error", { context: "MT5", error: error.message });
+          logger.debug("MT5 WebSocket error", { context: "MT5", error: error.message });
           reject(error);
         };
       } catch (err) {
@@ -128,16 +128,16 @@ export class Mt5Client {
 
   private scheduleReconnect(): void {
     if (this.reconnectAttempts >= this.MAX_RECONNECT_ATTEMPTS) {
-      logger.error("Max MT5 reconnect attempts reached", { context: "MT5" });
+      logger.warn("Max MT5 reconnect attempts reached, stopping (HTTP API still works)", { context: "MT5" });
       return;
     }
     
     this.reconnectAttempts++;
     const delay = this.RECONNECT_DELAY * Math.min(this.reconnectAttempts, 5);
-    logger.info(`Reconnecting to MT5 in ${delay}ms (attempt ${this.reconnectAttempts})`, { context: "MT5" });
+    logger.debug(`Reconnecting to MT5 in ${delay}ms (attempt ${this.reconnectAttempts})`, { context: "MT5" });
     setTimeout(() => {
       this.connect().catch(err => {
-        logger.error("MT5 reconnection failed", { context: "MT5", error: (err as Error).message });
+        logger.debug("MT5 reconnection failed", { context: "MT5", error: (err as Error).message });
       });
     }, delay);
   }

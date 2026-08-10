@@ -31,11 +31,11 @@ export async function runStartupJobs() {
     }
   });
 
-  // Connect to MT5 and wait for connection
-  await mt5Client.connect().catch(err => 
-    logger.error("MT5 connection failed", { context: "MT5", error: err.message })
+  // Connect to MT5 WebSocket (non-blocking - HTTP works for all operations)
+  mt5Client.connect().catch(err => 
+    logger.warn("MT5 WebSocket connection failed (HTTP API still works)", { context: "MT5", error: err.message })
   );
-  logger.info("MT5 Bridge Client initialized", { context: "MT5" });
+  logger.info("MT5 Bridge Client initialized (HTTP mode)", { context: "MT5" });
 
   // Warmup market cache
   const warmupUseCase = container.resolve(WarmupMarketCacheUseCase);
