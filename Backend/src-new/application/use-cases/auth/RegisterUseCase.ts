@@ -13,12 +13,13 @@ import { ValidationError, ConflictError, InternalError } from "@core/errors/inde
 import { hashPassword, generateSecureToken, getDeviceFingerprint } from "@core/utils/index.js";
 import { isDeviceEnforcementEnabled } from "@config/deviceEnforcement.js";
 import { LIMITS } from "@core/constants/index.js";
+import { RequestInput } from "@core/utils/request.js";
 
 interface RegisterInput {
   email: string;
   password: string;
   name?: string;
-  request: { ip: string; headers: { "user-agent": string } };
+  request: RequestInput;
 }
 
 interface RegisterOutput {
@@ -44,7 +45,7 @@ export class RegisterUseCase {
     }
 
     if (isDeviceEnforcementEnabled()) {
-      const fingerprint = getDeviceFingerprint(input.request);
+      const fingerprint = new DeviceFingerprint(getDeviceFingerprint(input.request));
       const existingUserId = await this.deviceRepo.findUserByFingerprint(fingerprint);
       if (existingUserId) {
         throw new ConflictError("This device is already registered to another account");
@@ -68,8 +69,8 @@ export class RegisterUseCase {
     await this.userRepo.save(user);
 
     if (isDeviceEnforcementEnabled()) {
-      const fingerprint = getDeviceFingerprint(input.request);
-      await this.deviceRepo.bind(Device.create({ userId: user.id, fingerprint }));
+      const fingerprint = new DeviceFingerprint(getDeviceFingerprint(input.request));
+      await this.deviceRepo.bind(Device.create({ userId: user.id, fingerprint: fingerprint.value }));
     }
 
     const token = generateSecureToken(LIMITS.VERIFICATION_TOKEN_BYTES);
@@ -82,7 +83,7 @@ export class RegisterUseCase {
       token: sessionToken,
       deviceFingerprint: isDeviceEnforcementEnabled() ? getDeviceFingerprint(input.request) : null,
       ip: input.request.ip,
-      userAgent: input.request.headers["user-agent"],
+      userAgent: input.request.userAgent,
     }));
 
     return { user, sessionToken };

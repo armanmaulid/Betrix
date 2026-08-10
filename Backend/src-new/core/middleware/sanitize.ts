@@ -26,13 +26,13 @@ function sanitizeValue(value: unknown): unknown {
 
 export function sanitizeInput(req: Request, _res: Response, next: NextFunction) {
   if (req.body) {
-    req.body = sanitizeValue(req.body) as Record<string, unknown>;
+    req.body = sanitizeValue(req.body) as typeof req.body;
   }
   if (req.query) {
-    req.query = sanitizeValue(req.query) as Record<string, unknown>;
+    req.query = sanitizeValue(req.query) as typeof req.query;
   }
   if (req.params) {
-    req.params = sanitizeValue(req.params) as Record<string, unknown>;
+    req.params = sanitizeValue(req.params) as typeof req.params;
   }
   next();
 }

@@ -11,13 +11,13 @@ export function requireCredits(cost: number, action: CreditAction) {
     }
 
     try {
-      const creditRepo = container.resolve(CreditRepository);
+      const creditRepo = container.resolve("CreditRepository") as CreditRepository;
       const newBalance = await creditRepo.deduct(req.user.userId, cost, action);
       (req as any).newCreditBalance = newBalance;
       (req as any).creditsDeducted = { amount: cost, action };
       next();
     } catch (err) {
-      if (err.message === "Insufficient credits") {
+      if (err instanceof Error && err.message === "Insufficient credits") {
         return res.status(402).json({ error: "Insufficient credits to perform this action", code: "INSUFFICIENT_CREDITS" });
       }
       next(err);

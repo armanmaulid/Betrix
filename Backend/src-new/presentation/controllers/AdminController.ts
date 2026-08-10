@@ -11,8 +11,21 @@ import { GetSystemInfoUseCase } from "@application/use-cases/admin/GetSystemInfo
 import { GetAuditLogsUseCase } from "@application/use-cases/admin/GetAuditLogsUseCase.js";
 import { ExportAuditLogsUseCase } from "@application/use-cases/admin/ExportAuditLogsUseCase.js";
 import { BroadcastMessageUseCase } from "@application/use-cases/admin/BroadcastMessageUseCase.js";
+import { Session } from "@domain/entities/Session.js";
+import { RequestInput } from "@core/utils/request.js";
 
 export class AdminController {
+  private getUser(req: Request): Session {
+    return req.user as Session;
+  }
+
+  private getRequestInput(req: Request): RequestInput {
+    return {
+      ip: req.ip!,
+      userAgent: req.headers["user-agent"] ?? "",
+    };
+  }
+
   async getUsers(req: Request, res: Response, next: NextFunction) {
     try {
       const useCase = container.resolve(GetUsersUseCase);
@@ -46,11 +59,12 @@ export class AdminController {
     try {
       const useCase = container.resolve(UpdateUserUseCase);
       const result = await useCase.execute({
-        adminId: req.user.userId,
+        adminId: this.getUser(req).userId,
         targetUserId: req.params.id,
         status: req.body.status,
         isAdmin: req.body.isAdmin,
-        request: { ip: req.ip!, headers: req.headers },
+        requestIp: this.getRequestInput(req).ip,
+        requestUserAgent: this.getRequestInput(req).userAgent,
       });
       res.json(result);
     } catch (err) {
@@ -62,9 +76,10 @@ export class AdminController {
     try {
       const useCase = container.resolve(DeleteUserUseCase);
       await useCase.execute({
-        adminId: req.user.userId,
+        adminId: this.getUser(req).userId,
         targetUserId: req.params.id,
-        request: { ip: req.ip!, headers: req.headers },
+        requestIp: this.getRequestInput(req).ip,
+        requestUserAgent: this.getRequestInput(req).userAgent,
       });
       res.json({ message: "User deleted" });
     } catch (err) {
@@ -76,10 +91,11 @@ export class AdminController {
     try {
       const useCase = container.resolve(ResetUserPasswordUseCase);
       const result = await useCase.execute({
-        adminId: req.user.userId,
+        adminId: this.getUser(req).userId,
         targetUserId: req.params.id,
         sendEmail: req.body.sendEmail ?? true,
-        request: { ip: req.ip!, headers: req.headers },
+        requestIp: this.getRequestInput(req).ip,
+        requestUserAgent: this.getRequestInput(req).userAgent,
       });
       res.json(result);
     } catch (err) {
@@ -166,11 +182,12 @@ export class AdminController {
     try {
       const useCase = container.resolve(BroadcastMessageUseCase);
       const result = await useCase.execute({
-        adminId: req.user.userId,
+        adminId: this.getUser(req).userId,
         subject: req.body.subject,
         body: req.body.body,
         recipients: req.body.recipients,
-        request: { ip: req.ip!, headers: req.headers },
+        requestIp: this.getRequestInput(req).ip,
+        requestUserAgent: this.getRequestInput(req).userAgent,
       });
       res.json(result);
     } catch (err) {

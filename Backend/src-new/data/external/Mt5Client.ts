@@ -124,13 +124,15 @@ export class Mt5Client {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return [];
     return new Promise((resolve) => {
       const timeout = setTimeout(() => resolve([]), 5000);
-      this.ws!.once("message", (data) => {
+      const handler = (event: MessageEvent) => {
         clearTimeout(timeout);
+        this.ws?.removeEventListener("message", handler);
         try {
-          const msg = JSON.parse(data.toString());
+          const msg = JSON.parse(event.data.toString());
           if (msg.type === "symbols") resolve(msg.data);
         } catch {}
-      });
+      };
+      this.ws!.addEventListener("message", handler, { once: true });
       this.ws!.send(JSON.stringify({ action: "get_symbols" }));
     });
   }
@@ -139,13 +141,15 @@ export class Mt5Client {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return [];
     return new Promise((resolve) => {
       const timeout = setTimeout(() => resolve([]), 5000);
-      this.ws!.once("message", (data) => {
+      const handler = (event: MessageEvent) => {
         clearTimeout(timeout);
+        this.ws?.removeEventListener("message", handler);
         try {
-          const msg = JSON.parse(data.toString());
+          const msg = JSON.parse(event.data.toString());
           if (msg.type === "calendar") resolve(msg.data);
         } catch {}
-      });
+      };
+      this.ws!.addEventListener("message", handler, { once: true });
       this.ws!.send(JSON.stringify({ action: "get_calendar" }));
     });
   }

@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { UAParser } from "ua-parser-js";
-import { Request } from "express";
+import { RequestInput } from "./request.js";
 
 export function normalizeIP(ip: string): string {
   if (ip.startsWith("::ffff:")) {
@@ -12,8 +12,8 @@ export function normalizeIP(ip: string): string {
   return ip;
 }
 
-export function getDeviceFingerprint(req: Request): string {
-  const parser = new UAParser(req.headers["user-agent"]);
+export function getDeviceFingerprint(req: RequestInput): string {
+  const parser = new UAParser(req.userAgent);
   const ua = parser.getResult();
 
   const fingerprint = [

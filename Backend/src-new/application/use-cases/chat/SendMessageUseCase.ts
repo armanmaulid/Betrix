@@ -56,8 +56,9 @@ export class SendMessageUseCase {
     try {
       await this.creditRepo.deduct(user.id, cost, `chat_${tier}` as CreditAction);
       creditsDeducted = true;
-    } catch (err) {
-      if (err.message === "Insufficient credits") {
+    } catch (err: unknown) {
+      const error = err as Error;
+      if (error.message === "Insufficient credits") {
         throw new InsufficientCreditsError();
       }
       throw err;
@@ -103,7 +104,7 @@ export class SendMessageUseCase {
         type: "chat_completion",
         taskType: input.taskType,
         modelUsed: model.id,
-        latencyMs: result.usage ? 0 : 0, // Will be filled by aiPort
+        latencyMs: result.usage ? 0 : 0,
         inputTokens: result.usage?.inputTokens,
         outputTokens: result.usage?.outputTokens,
         userId: user.id,
@@ -122,13 +123,13 @@ export class SendMessageUseCase {
 
       await logChat({
         userId: user.id,
-        sessionId: input.sessionId,
+        sessionId: input.sessionId ?? null,
         taskType: input.taskType,
         modelUsed: model.id,
         message: input.displayMessage || input.message,
         reply: result.text,
         latencyMs: 0,
-        usage: result.usage,
+        usage: result.usage ?? null,
       });
 
       await logUserActivity({

@@ -4,13 +4,18 @@ import { GetUsageUseCase } from "@application/use-cases/user/GetUsageUseCase.js"
 import { GetMessagesUseCase } from "@application/use-cases/user/GetMessagesUseCase.js";
 import { SendMessageUseCase } from "@application/use-cases/user/SendMessageUseCase.js";
 import { UpdateNotificationPrefsUseCase } from "@application/use-cases/user/UpdateNotificationPrefsUseCase.js";
+import { Session } from "@domain/entities/Session.js";
 
 export class UserController {
+  private getUser(req: Request): Session {
+    return req.user as Session;
+  }
+
   async getUsage(req: Request, res: Response, next: NextFunction) {
     try {
       const useCase = container.resolve(GetUsageUseCase);
       const result = await useCase.execute({
-        userId: req.user.userId,
+        userId: this.getUser(req).userId,
         days: parseInt(req.query.days as string) || 30,
       });
       res.json(result);
@@ -23,7 +28,7 @@ export class UserController {
     try {
       const useCase = container.resolve(GetMessagesUseCase);
       const result = await useCase.execute({
-        userId: req.user.userId,
+        userId: this.getUser(req).userId,
         limit: parseInt(req.query.limit as string) || 50,
         offset: parseInt(req.query.offset as string) || 0,
         unread: req.query.unread === "true",
@@ -39,7 +44,7 @@ export class UserController {
     try {
       const useCase = container.resolve("SendUserMessageUseCase");
       const result = await useCase.execute({
-        fromUserId: req.user.userId,
+        fromUserId: this.getUser(req).userId,
         toEmail: req.body.toEmail,
         subject: req.body.subject,
         body: req.body.body,
@@ -55,7 +60,7 @@ export class UserController {
     try {
       const useCase = container.resolve(UpdateNotificationPrefsUseCase);
       await useCase.execute({
-        userId: req.user.userId,
+        userId: this.getUser(req).userId,
         emailEnabled: req.body.emailEnabled,
       });
       res.json({ message: "Preferences updated" });

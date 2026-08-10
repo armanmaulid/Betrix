@@ -3,14 +3,14 @@ import { pgClient } from "@data/orm/pgClient.js";
 import { redisClient } from "@data/orm/redisClient.js";
 import { logger } from "@core/logging/logger.js";
 import { secondsUntilBrokerMidnight } from "@core/utils/date.js";
-import { warmupMarketCache } from "@application/use-cases/market/WarmupMarketCacheUseCase.js"; // To be created
-import { syncBrokerSymbols } from "@domain/services/SymbolService.js"; // To be created
-import { syncCalendarIfNeeded, cleanupOldCalendarEvents } from "@domain/services/CalendarService.js"; // To be created
-import { fetchAndStoreNews, cleanupOldNews } from "@domain/services/NewsService.js"; // To be created
-import { cleanupExpiredSessions, cleanupOldFailedAttempts, cleanupExpiredTokens, cleanupOldUsageRecords } from "@domain/services/CleanupService.js"; // To be created
+import { WarmupMarketCacheUseCase } from "@application/use-cases/market/WarmupMarketCacheUseCase.js";
+import { SymbolService } from "@domain/services/SymbolService.js";
+import { CalendarService } from "@domain/services/CalendarService.js";
+import { NewsService } from "@domain/services/NewsService.js";
+import { cleanupExpiredSessions, cleanupOldFailedAttempts, cleanupExpiredTokens, cleanupOldUsageRecords, cleanupOldNews } from "@domain/services/CleanupService.js";
 import { sendHeartbeat } from "@domain/services/sseManager.js";
-import { initializeMt5Client } from "@data/external/Mt5Client.js";
-import { initializeFinnhubClient } from "@data/external/FinnhubClient.js";
+import { Mt5Client } from "@data/external/Mt5Client.js";
+import { FinnhubClient } from "@data/external/FinnhubClient.js";
 
 export async function runStartupJobs() {
   // Cleanup jobs
@@ -30,24 +30,31 @@ export async function runStartupJobs() {
   logger.info(`Startup cleanup: ${cleanupSummary}`, { context: "Startup" });
 
   // Warmup market cache
-  await warmupMarketCache().catch(err => 
+  const warmupUseCase = container.resolve(WarmupMarketCacheUseCase);
+  await warmupUseCase.execute().catch(err => 
     logger.error("Warmup market cache failed", { context: "Startup", error: err.message })
   );
 
   // Sync symbols and calendar
-  await syncBrokerSymbols().catch(err => 
+  const symbolService = container.resolve(SymbolService);
+  await symbolService.syncBrokerSymbols().catch(err => 
     logger.error("Sync broker symbols failed", { context: "Startup", error: err.message })
   );
   
-  await syncCalendarIfNeeded().catch(err => 
+  const calendarService = container.resolve(CalendarService);
+  await calendarService.syncIfNeeded().catch(err => 
     logger.error("Sync calendar failed", { context: "Startup", error: err.message })
   );
 
   // Initialize MT5 and Finnhub
-  initializeMt5Client();
+  const mt5Client = container.resolve(Mt5Client);
+  mt5Client.connect().catch(err => 
+    logger.error("MT5 connection failed", { context: "MT5", error: err.message })
+  );
   logger.info("MT5 Bridge Client initialized", { context: "MT5" });
   
-  initializeFinnhubClient();
+  container.resolve(FinnhubClient);
+  logger.info("Finnhub Client initialized", { context: "Finnhub" });
 
   // Schedule D1 cache refresh
   scheduleD1CacheRefresh();
@@ -69,15 +76,17 @@ export async function runHourlyCleanup() {
 }
 
 export async function runDailyJobs() {
-  await syncBrokerSymbols().catch(err => 
+  const symbolService = container.resolve(SymbolService);
+  await symbolService.syncBrokerSymbols().catch(err => 
     logger.error("Daily sync broker symbols failed", { context: "DailyJob", error: err.message })
   );
   
-  await syncCalendarIfNeeded().catch(err => 
+  const calendarService = container.resolve(CalendarService);
+  await calendarService.syncIfNeeded().catch(err => 
     logger.error("Daily sync calendar failed", { context: "DailyJob", error: err.message })
   );
   
-  await cleanupOldCalendarEvents().catch(err => 
+  await calendarService.cleanupOldEvents().catch(err => 
     logger.error("Daily cleanup calendar failed", { context: "DailyJob", error: err.message })
   );
 }
@@ -88,7 +97,8 @@ export async function runNewsPolling() {
     return;
   }
   
-  await fetchAndStoreNews().catch(err => 
+  const newsService = container.resolve(NewsService);
+  await newsService.fetchAndStoreNews().catch(err => 
     logger.error("Fetch news failed", { context: "News", error: err.message })
   );
 }
@@ -106,7 +116,8 @@ function scheduleD1CacheRefresh() {
   const timer = setTimeout(async () => {
     logger.info("Starting auto D1 cache refresh (broker day change)...", { context: "D1Cache" });
     try {
-      await warmupMarketCache();
+      const warmupUseCase = container.resolve(WarmupMarketCacheUseCase);
+      await warmupUseCase.execute();
     } catch (err) {
       logger.error(`Auto D1 cache refresh failed: ${(err as Error).message}`, { context: "D1Cache" });
     }

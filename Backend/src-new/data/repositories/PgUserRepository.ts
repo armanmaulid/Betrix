@@ -2,7 +2,7 @@ import { injectable } from "tsyringe";
 import { pgClient } from "../orm/pgClient.js";
 import { UserRepository } from "@domain/repositories/UserRepository.js";
 import { User, UserStatus } from "@domain/entities/User.js";
-import { Email } from "@domain/value-objects/Email.js";
+import { Email } from "@domain/value-objects";
 
 @injectable()
 export class PgUserRepository implements UserRepository {
@@ -93,6 +93,7 @@ export class PgUserRepository implements UserRepository {
     verified?: boolean;
     sortBy: string;
     order: "ASC" | "DESC";
+    offset?: number;
   }): Promise<{ users: User[]; total: number }> {
     const conditions: string[] = [];
     const values: unknown[] = [];

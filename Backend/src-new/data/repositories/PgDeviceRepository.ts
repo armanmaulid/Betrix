@@ -2,7 +2,7 @@ import { injectable } from "tsyringe";
 import { pgClient } from "../orm/pgClient.js";
 import { DeviceRepository } from "@domain/repositories/DeviceRepository.js";
 import { Device } from "@domain/entities/Device.js";
-import { DeviceFingerprint } from "@domain/value-objects/DeviceFingerprint.js";
+import { DeviceFingerprint } from "@domain/value-objects";
 
 @injectable()
 export class PgDeviceRepository implements DeviceRepository {

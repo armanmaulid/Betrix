@@ -3,7 +3,7 @@ import { pgClient } from "../orm/pgClient.js";
 import { CreditRepository } from "@domain/repositories/CreditRepository.js";
 import { CreditTransaction, CreditAction } from "@domain/entities/CreditTransaction.js";
 import { logger } from "@core/logging/logger.js";
-import { broadcastToUser } from "../../services/sseManager.js";
+import { broadcastToUser } from "@domain/services/sseManager.js";
 
 @injectable()
 export class PgCreditRepository implements CreditRepository {

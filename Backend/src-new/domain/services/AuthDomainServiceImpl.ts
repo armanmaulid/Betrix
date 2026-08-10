@@ -49,7 +49,7 @@ export class AuthDomainService {
     if (isDeviceEnforcementEnabled()) {
       const fingerprint = new DeviceFingerprint(request.headers["user-agent"]);
       await this.deviceSessionRepo.setSessionForDevice(user.id, fingerprint.value, sessionToken);
-      await this.deviceRepo.bind(Device.create({ userId: user.id, fingerprint }));
+      await this.deviceRepo.bind(Device.create({ userId: user.id, fingerprint: fingerprint.value }));
     }
 
     return { ok: true, user, sessionToken };

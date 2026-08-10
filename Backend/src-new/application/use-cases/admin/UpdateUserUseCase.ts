@@ -3,7 +3,6 @@ import { UserRepository } from "@domain/repositories/UserRepository.js";
 import { SessionRepository } from "@domain/repositories/SessionRepository.js";
 import { User, UserStatus } from "@domain/entities/User.js";
 import { NotFoundError, ValidationError } from "@core/errors/index.js";
-import { pgClient } from "@data/orm/pgClient.js";
 import { broadcastToUser } from "@domain/services/sseManager.js";
 
 interface UpdateUserInput {
@@ -11,7 +10,8 @@ interface UpdateUserInput {
   targetUserId: string;
   status?: UserStatus;
   isAdmin?: boolean;
-  request: { ip: string; headers: { "user-agent": string } };
+  requestIp: string;
+  requestUserAgent: string;
 }
 
 interface UpdateUserOutput {
@@ -41,21 +41,19 @@ export class UpdateUserUseCase {
       throw new NotFoundError("User");
     }
 
-    const updates: Partial<Pick<User, "status" | "isAdmin">> = {};
-    if (input.status !== undefined) updates.status = input.status;
-    if (input.isAdmin !== undefined) updates.isAdmin = input.isAdmin;
+    let updatedUser = user;
+    if (input.status !== undefined) {
+      updatedUser = updatedUser.withStatus(input.status);
+    }
+    if (input.isAdmin !== undefined) {
+      updatedUser = updatedUser.withIsAdmin(input.isAdmin);
+    }
 
-    if (Object.keys(updates).length === 0) {
+    if (updatedUser === user) {
       throw new ValidationError("No updates provided");
     }
 
-    const updatedUser = await this.userRepo.updateStatus(input.targetUserId, updates.status!);
-    if (updates.isAdmin !== undefined) {
-      await pgClient.query(
-        `UPDATE users SET is_admin = $1 WHERE id = $2`,
-        [updates.isAdmin, input.targetUserId]
-      );
-    }
+    await this.userRepo.save(updatedUser);
 
     // Revoke sessions if banned/suspended
     if (input.status === UserStatus.BANNED || input.status === UserStatus.SUSPENDED) {
@@ -65,11 +63,11 @@ export class UpdateUserUseCase {
 
     return {
       user: {
-        id: updatedUser!.id,
-        email: updatedUser!.email,
-        name: updatedUser!.name,
-        isAdmin: updates.isAdmin ?? updatedUser!.isAdmin,
-        status: updatedUser!.status,
+        id: updatedUser.id,
+        email: updatedUser.email,
+        name: updatedUser.name,
+        isAdmin: updatedUser.isAdmin,
+        status: updatedUser.status,
       },
     };
   }

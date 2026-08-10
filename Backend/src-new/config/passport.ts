@@ -1,49 +1,40 @@
 import passport from "passport";
-import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+import { Strategy as GoogleStrategy, Profile, VerifyCallback } from "passport-google-oauth20";
 import { container } from "tsyringe";
 import { UserRepository } from "@domain/repositories/UserRepository.js";
 import { env } from "@config/env";
+import { User, UserStatus } from "@domain/entities/User.js";
 
 const googleOAuthConfigured = Boolean(env.GOOGLE_CLIENT_ID) && Boolean(env.GOOGLE_CLIENT_SECRET) && Boolean(env.GOOGLE_CALLBACK_URL);
 
 if (googleOAuthConfigured) {
   passport.use(new GoogleStrategy(
     {
-      clientID: env.GOOGLE_CLIENT_ID,
-      clientSecret: env.GOOGLE_CLIENT_SECRET,
-      callbackURL: env.GOOGLE_CALLBACK_URL,
+      clientID: env.GOOGLE_CLIENT_ID!,
+      clientSecret: env.GOOGLE_CLIENT_SECRET!,
+      callbackURL: env.GOOGLE_CALLBACK_URL!,
     },
-    async (accessToken, refreshToken, profile, done) => {
+    async (accessToken: string, refreshToken: string, profile: Profile, done: VerifyCallback) => {
       try {
         const email = profile.emails?.[0]?.value;
         if (!email) {
           return done(new Error("Email not available from Google"), undefined);
         }
 
-        const userRepo = container.resolve(UserRepository);
+        const userRepo = container.resolve("UserRepository") as UserRepository;
         let user = await userRepo.findByEmail({ value: email } as any);
 
         if (!user) {
           try {
-            user = await userRepo.save({
+            const newUser = User.create({
               id: crypto.randomUUID(),
               email,
               passwordHash: null,
               name: profile.displayName,
-              isAdmin: false,
-              status: "active",
               emailVerified: true,
-              credits: 100,
-              createdAt: new Date(),
-              lastActive: null,
               googleId: profile.id,
-              phone: null,
-              address: null,
-              birthdate: null,
-              gender: null,
-              bio: null,
-              verifiedAt: new Date(),
-            } as any);
+            });
+            user = await userRepo.save(newUser);
           } catch (createErr: any) {
             if (createErr.code === '23505') {
               user = await userRepo.findByEmail({ value: email } as any);
@@ -67,7 +58,7 @@ if (googleOAuthConfigured) {
 passport.serializeUser((user: any, done) => done(null, user.id));
 passport.deserializeUser(async (id: string, done) => {
   try {
-    const userRepo = container.resolve(UserRepository);
+    const userRepo = container.resolve("UserRepository") as UserRepository;
     const user = await userRepo.findById(id);
     done(null, user);
   } catch (err) {

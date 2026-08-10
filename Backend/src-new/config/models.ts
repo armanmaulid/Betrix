@@ -27,7 +27,7 @@ export const TASK_TIER_MAP = {
   risk_narrative: "deep",
 };
 
-export const TIER_CREDIT_COST = { cheap: 1, balanced: 3, deep: 5 };
+export const TIER_CREDIT_COST: Record<string, number> = { cheap: 1, balanced: 3, deep: 5 };
 
 export function resolveTier(taskType: string, tierOverride?: string): string {
   if (tierOverride && MODELS[tierOverride as keyof typeof MODELS]) return tierOverride;

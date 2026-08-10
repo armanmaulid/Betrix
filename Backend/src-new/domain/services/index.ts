@@ -1,5 +1,4 @@
-export * from "./AuthDomainService.js";
-export * from "./AuthDomainServiceImpl.js";
+export { AuthDomainService } from "./AuthDomainServiceImpl.js";
 export * from "./CreditDomainService.js";
 export * from "./DeviceDomainService.js";
 export * from "./ChatDomainService.js";

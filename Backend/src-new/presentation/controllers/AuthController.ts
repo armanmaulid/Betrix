@@ -11,8 +11,16 @@ import { GetProfileUseCase } from "@application/use-cases/auth/GetProfileUseCase
 import { UpdateProfileUseCase } from "@application/use-cases/auth/UpdateProfileUseCase.js";
 import { GetSessionsUseCase } from "@application/use-cases/auth/GetSessionsUseCase.js";
 import { RevokeSessionUseCase } from "@application/use-cases/auth/RevokeSessionUseCase.js";
+import { RequestInput } from "@core/utils/request.js";
 
 export class AuthController {
+  private getRequestInput(req: Request): RequestInput {
+    return {
+      ip: req.ip!,
+      userAgent: req.headers["user-agent"] ?? "",
+    };
+  }
+
   async register(req: Request, res: Response, next: NextFunction) {
     try {
       const useCase = container.resolve(RegisterUseCase);
@@ -20,7 +28,7 @@ export class AuthController {
         email: req.body.email,
         password: req.body.password,
         name: req.body.name,
-        request: { ip: req.ip!, headers: req.headers },
+        request: this.getRequestInput(req),
       });
       
       res.status(201).json({
@@ -39,7 +47,7 @@ export class AuthController {
       const result = await useCase.execute({
         email: req.body.email,
         password: req.body.password,
-        request: { ip: req.ip!, headers: req.headers },
+        request: this.getRequestInput(req),
       });
       
       res.json({
@@ -56,7 +64,7 @@ export class AuthController {
       const useCase = container.resolve(LogoutUseCase);
       await useCase.execute({
         sessionToken: req.body.sessionToken,
-        request: { ip: req.ip!, headers: req.headers },
+        request: this.getRequestInput(req),
       });
       res.json({ message: "Logout successful" });
     } catch (err) {
@@ -88,11 +96,11 @@ export class AuthController {
     try {
       const useCase = container.resolve(ChangePasswordUseCase);
       await useCase.execute({
-        userId: req.user.userId,
+        userId: req.user!.userId,
         sessionToken: req.headers.authorization?.replace("Bearer ", "")!,
         currentPassword: req.body.currentPassword,
         newPassword: req.body.newPassword,
-        request: { ip: req.ip!, headers: req.headers },
+        request: this.getRequestInput(req),
       });
       res.json({ message: "Password changed successfully" });
     } catch (err) {
@@ -104,10 +112,10 @@ export class AuthController {
     try {
       const useCase = container.resolve(ChangeEmailUseCase);
       const result = await useCase.execute({
-        userId: req.user.userId,
+        userId: req.user!.userId,
         currentPassword: req.body.currentPassword,
         newEmail: req.body.newEmail,
-        request: { ip: req.ip!, headers: req.headers },
+        request: this.getRequestInput(req),
       });
       res.json({ message: "Confirmation email sent to new address", pendingEmail: result.pendingEmail });
     } catch (err) {
@@ -159,7 +167,7 @@ export class AuthController {
       await useCase.execute({
         sessionToken: req.headers.authorization?.replace("Bearer ", "")!,
         fingerprint: req.params.fingerprint,
-        request: { ip: req.ip!, headers: req.headers },
+        request: this.getRequestInput(req),
       });
       res.json({ message: "Session revoked" });
     } catch (err) {

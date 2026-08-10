@@ -1,13 +1,13 @@
 import { inject, injectable } from "tsyringe";
 import { SessionRepository } from "@domain/repositories/SessionRepository.js";
 import { DeviceSessionRepository } from "@domain/repositories/DeviceSessionRepository.js";
-import { Session } from "@domain/entities/Session.js";
 import { getDeviceFingerprint } from "@core/utils/index.js";
 import { logUserActivity } from "@domain/services/ActivityLogger.js";
+import { RequestInput } from "@core/utils/request.js";
 
 interface LogoutInput {
   sessionToken: string;
-  request: { ip: string; headers: { "user-agent": string } };
+  request: RequestInput;
 }
 
 @injectable()
@@ -28,7 +28,7 @@ export class LogoutUseCase {
         userId,
         action: "logout",
         ip: input.request.ip,
-        userAgent: input.request.headers["user-agent"] ?? null,
+        userAgent: input.request.userAgent ?? null,
       });
     }
   }

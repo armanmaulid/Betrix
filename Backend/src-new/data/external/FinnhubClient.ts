@@ -1,8 +1,19 @@
 import { env } from "@config/env";
 import { logger } from "@core/logging/logger.js";
 
+interface FinnhubQuoteResponse {
+  c: number;
+  d: number;
+  dp: number;
+  h: number;
+  l: number;
+  o: number;
+  pc: number;
+  t: number;
+}
+
 export class FinnhubClient {
-  private cache = new Map<string, { data: any; expires: number }>();
+  private cache = new Map<string, { data: { price: number; change: number; changePercent: number }; expires: number }>();
   private readonly CACHE_TTL = 60000; // 1 minute
 
   async fetchQuote(symbol: string): Promise<{ price: number; change: number; changePercent: number } | null> {
@@ -16,7 +27,7 @@ export class FinnhubClient {
     try {
       const res = await fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${env.FINNHUB_API_KEY}`);
       if (!res.ok) throw new Error(`Finnhub error ${res.status}`);
-      const data = await res.json();
+      const data = await res.json() as FinnhubQuoteResponse;
       
       const result = {
         price: data.c,

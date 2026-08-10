@@ -40,6 +40,11 @@ export class SessionToken {
   constructor(public readonly value: string) {}
 
   static generate(): SessionToken {
+    const crypto = require("crypto");
+    return new SessionToken(crypto.randomBytes(32).toString("hex"));
+  }
+
+  static async generateAsync(): Promise<SessionToken> {
     const crypto = await import("crypto");
     return new SessionToken(crypto.randomBytes(32).toString("hex"));
   }

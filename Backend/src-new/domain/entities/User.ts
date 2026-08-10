@@ -111,4 +111,14 @@ export class User {
       this.verifiedAt
     );
   }
+
+  withIsAdmin(isAdmin: boolean): User {
+    return new User(
+      this.id, this.email, this.passwordHash, this.name,
+      isAdmin, this.status, this.emailVerified, this.credits,
+      this.createdAt, this.lastActive, this.googleId,
+      this.phone, this.address, this.birthdate, this.gender, this.bio,
+      this.verifiedAt
+    );
+  }
 }

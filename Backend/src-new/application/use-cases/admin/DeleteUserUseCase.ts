@@ -12,7 +12,8 @@ import { logAdminAction } from "@domain/services/ActivityLogger.js";
 interface DeleteUserInput {
   adminId: string;
   targetUserId: string;
-  request: { ip: string; headers: { "user-agent": string } };
+  requestIp: string;
+  requestUserAgent: string;
 }
 
 @injectable()
@@ -42,8 +43,8 @@ export class DeleteUserUseCase {
       targetType: "user",
       targetId: input.targetUserId,
       details: { email: rows[0].email },
-      ip: input.request.ip,
-      userAgent: input.request.headers["user-agent"] ?? null,
+      ip: input.requestIp,
+      userAgent: input.requestUserAgent,
     });
   }
 }

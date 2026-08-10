@@ -9,7 +9,7 @@ export async function adminMiddleware(req: Request, res: Response, next: NextFun
   }
 
   try {
-    const userRepo = container.resolve(UserRepository);
+    const userRepo = container.resolve("UserRepository") as UserRepository;
     const user = await userRepo.findById(req.user.userId);
 
     if (!user) {

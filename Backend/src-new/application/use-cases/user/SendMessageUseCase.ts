@@ -69,7 +69,7 @@ export class SendMessageUseCase {
       if (!threadId) {
         await client.query(
           `UPDATE messages SET thread_id = id WHERE id = $1`,
-          [message.id]
+          [message!.id]
         );
       }
       await client.query("COMMIT");
@@ -78,6 +78,10 @@ export class SendMessageUseCase {
       throw txErr;
     } finally {
       client.release();
+    }
+
+    if (!message) {
+      throw new Error("Failed to create message");
     }
 
     // Send email notification if enabled

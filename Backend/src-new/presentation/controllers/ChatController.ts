@@ -5,13 +5,18 @@ import { StreamMessageUseCase } from "@application/use-cases/chat/StreamMessageU
 import { GetChatHistoryUseCase } from "@application/use-cases/chat/GetChatHistoryUseCase.js";
 import { DeleteChatSessionUseCase } from "@application/use-cases/chat/DeleteChatSessionUseCase.js";
 import { ExportChatHistoryUseCase } from "@application/use-cases/chat/ExportChatHistoryUseCase.js";
+import { Session } from "@domain/entities/Session.js";
 
 export class ChatController {
+  private getUser(req: Request): Session {
+    return req.user as Session;
+  }
+
   async sendMessage(req: Request, res: Response, next: NextFunction) {
     try {
       const useCase = container.resolve(SendMessageUseCase);
       const result = await useCase.execute({
-        userId: req.user.userId,
+        userId: this.getUser(req).userId,
         taskType: req.body.taskType,
         message: req.body.message,
         displayMessage: req.body.displayMessage,
@@ -44,7 +49,7 @@ export class ChatController {
 
       const useCase = container.resolve(StreamMessageUseCase);
       const result = await useCase.execute({
-        userId: req.user.userId,
+        userId: this.getUser(req).userId,
         taskType: req.body.taskType,
         message: req.body.message,
         displayMessage: req.body.displayMessage,
@@ -74,7 +79,7 @@ export class ChatController {
     try {
       const useCase = container.resolve(GetChatHistoryUseCase);
       const result = await useCase.execute({
-        userId: req.user.userId,
+        userId: this.getUser(req).userId,
         limit: parseInt(req.query.limit as string) || 50,
         offset: parseInt(req.query.offset as string) || 0,
         taskType: req.query.taskType as any,
@@ -91,7 +96,7 @@ export class ChatController {
     try {
       const useCase = container.resolve(DeleteChatSessionUseCase);
       await useCase.execute({
-        userId: req.user.userId,
+        userId: this.getUser(req).userId,
         sessionId: req.params.sessionId,
       });
       res.json({ message: "Session deleted" });
@@ -104,7 +109,7 @@ export class ChatController {
     try {
       const useCase = container.resolve(ExportChatHistoryUseCase);
       const result = await useCase.execute({
-        userId: req.user.userId,
+        userId: this.getUser(req).userId,
         format: (req.query.format as "json" | "csv") || "json",
         taskType: req.query.taskType as any,
         startDate: req.query.startDate ? new Date(req.query.startDate as string) : undefined,

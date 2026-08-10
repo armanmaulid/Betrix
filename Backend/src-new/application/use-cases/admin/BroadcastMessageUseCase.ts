@@ -8,7 +8,8 @@ interface BroadcastMessageInput {
   subject: string;
   body: string;
   recipients: "all" | string[];
-  request: { ip: string; headers: { "user-agent": string } };
+  requestIp: string;
+  requestUserAgent: string;
 }
 
 interface BroadcastMessageOutput {
@@ -78,14 +79,14 @@ export class BroadcastMessageUseCase {
       adminId: input.adminId,
       action: "broadcast_message",
       targetType: "system",
-      targetId: null,
+      targetId: undefined,
       details: {
         subject: input.subject,
         recipientCount: targetUserIds.length,
         recipientType: input.recipients === "all" ? "all_users" : "selected_users",
       },
-      ip: input.request.ip,
-      userAgent: input.request.headers["user-agent"] ?? null,
+      ip: input.requestIp,
+      userAgent: input.requestUserAgent ?? undefined,
     });
 
     return {

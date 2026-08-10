@@ -27,7 +27,7 @@ export * from "./admin/ExportAuditLogsUseCase.js";
 export * from "./admin/BroadcastMessageUseCase.js";
 export * from "./user/GetUsageUseCase.js";
 export * from "./user/GetMessagesUseCase.js";
-export * from "./user/SendMessageUseCase.js";
+export { SendMessageUseCase as SendUserMessageUseCase } from "./user/SendMessageUseCase.js";
 export * from "./user/UpdateNotificationPrefsUseCase.js";
 export * from "./market/GetSymbolsUseCase.js";
 export * from "./market/GetCalendarUseCase.js";

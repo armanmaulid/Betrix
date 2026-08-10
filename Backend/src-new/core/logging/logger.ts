@@ -9,7 +9,7 @@ const consoleFormat = printf(({ level, message, timestamp, context, ...meta }) =
   const pid = process.pid;
   const appName = chalk.green("[Betrix]");
   
-  const dateObj = new Date(timestamp);
+  const dateObj = new Date(timestamp as string);
   const dateStr = dateObj.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" });
   const timeStr = dateObj.toLocaleTimeString("en-US");
   

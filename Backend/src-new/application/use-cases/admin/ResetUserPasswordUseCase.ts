@@ -13,7 +13,8 @@ interface ResetUserPasswordInput {
   adminId: string;
   targetUserId: string;
   sendEmail: boolean;
-  request: { ip: string; headers: { "user-agent": string } };
+  requestIp: string;
+  requestUserAgent: string;
 }
 
 interface ResetUserPasswordOutput {
@@ -71,8 +72,8 @@ export class ResetUserPasswordUseCase {
       targetType: "user",
       targetId: input.targetUserId,
       details: { email: user.email, emailSent },
-      ip: input.request.ip,
-      userAgent: input.request.headers["user-agent"] ?? null,
+      ip: input.requestIp,
+      userAgent: input.requestUserAgent,
     });
 
     return {

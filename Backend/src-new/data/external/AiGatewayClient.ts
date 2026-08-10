@@ -3,13 +3,29 @@ import { logger } from "@core/logging/logger.js";
 import { env } from "@config/env";
 import { AiMessage } from "@application/ports/index.js";
 
+interface AiResponse {
+  choices?: Array<{
+    message?: {
+      content?: string;
+    };
+    delta?: {
+      content?: string;
+    };
+    finish_reason?: string;
+  }>;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+  };
+}
+
 const BASE_URL = env.AI_BASE_URL;
 const API_KEY = env.AI_API_KEY;
 const REQUEST_TIMEOUT_MS = env.AI_REQUEST_TIMEOUT_MS;
 const STREAM_TIMEOUT_MS = env.AI_STREAM_TIMEOUT_MS;
 const AI_DEBUG_LOGGING = env.AI_DEBUG_LOGGING;
 
-function debugLogPayload(context: string, fullMessages: any[]) {
+function debugLogPayload(context: string, fullMessages: AiMessage[]) {
   if (!AI_DEBUG_LOGGING) return;
   const summary = fullMessages.map((msg) => {
     if (!Array.isArray(msg.content)) {
@@ -17,7 +33,7 @@ function debugLogPayload(context: string, fullMessages: any[]) {
     }
     return {
       role: msg.role,
-      parts: msg.content.map((part: any) => {
+      parts: msg.content.map((part) => {
         if (part.type === "image_url") {
           const url = part.image_url?.url || "";
           const prefixMatch = url.match(/^data:([^;]+);base64,/);
@@ -34,7 +50,7 @@ function debugLogPayload(context: string, fullMessages: any[]) {
   logger.debug(`[AI_DEBUG] outgoing payload (${context})`, { summary });
 }
 
-function debugLogResponse(context: string, data: any) {
+function debugLogResponse(context: string, data: AiResponse) {
   if (!AI_DEBUG_LOGGING) return;
   logger.debug(`[AI_DEBUG] gateway response (${context})`, {
     usage: data.usage ?? null,
@@ -52,8 +68,8 @@ export class AiGatewayClient {
   }): Promise<{ text: string; usage?: { inputTokens: number; outputTokens: number } }> {
     if (!BASE_URL) throw new Error("AI_BASE_URL not set");
 
-    const fullMessages = params.system
-      ? [{ role: "system", content: params.system }, ...params.messages]
+    const fullMessages: AiMessage[] = params.system
+      ? [{ role: "system", content: params.system } as AiMessage, ...params.messages]
       : params.messages;
 
     debugLogPayload("callModel", fullMessages);
@@ -84,7 +100,7 @@ export class AiGatewayClient {
         throw new Error(`AI provider error ${res.status}: ${errText}`);
       }
 
-      const data = await res.json();
+      const data = await res.json() as AiResponse;
       debugLogResponse("callModel", data);
 
       const rawText = data.choices?.[0]?.message?.content ?? "";
@@ -115,8 +131,8 @@ export class AiGatewayClient {
   }): Promise<{ text: string; usage?: { inputTokens: number; outputTokens: number } }> {
     if (!BASE_URL) throw new Error("AI_BASE_URL not set");
 
-    const fullMessages = params.system
-      ? [{ role: "system", content: params.system }, ...params.messages]
+    const fullMessages: AiMessage[] = params.system
+      ? [{ role: "system", content: params.system } as AiMessage, ...params.messages]
       : params.messages;
 
     debugLogPayload("streamModel", fullMessages);

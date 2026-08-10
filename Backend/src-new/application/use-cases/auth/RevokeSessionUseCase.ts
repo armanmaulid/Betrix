@@ -4,13 +4,15 @@ import { SessionRepository } from "@domain/repositories/SessionRepository.js";
 import { DeviceRepository } from "@domain/repositories/DeviceRepository.js";
 import { DeviceSessionRepository } from "@domain/repositories/DeviceSessionRepository.js";
 import { User } from "@domain/entities/User.js";
+import { DeviceFingerprint } from "@domain/value-objects";
 import { NotFoundError, AuthenticationError } from "@core/errors/index.js";
 import { logUserActivity } from "@domain/services/ActivityLogger.js";
+import { RequestInput } from "@core/utils/request.js";
 
 interface RevokeSessionInput {
   sessionToken: string;
   fingerprint: string;
-  request: { ip: string; headers: { "user-agent": string } };
+  request: RequestInput;
 }
 
 @injectable()
@@ -28,20 +30,21 @@ export class RevokeSessionUseCase {
       throw new AuthenticationError("Session not found or expired");
     }
 
-    const targetToken = await this.deviceSessionRepo.getSessionByDevice(session.userId, input.fingerprint);
+    const fingerprint = new DeviceFingerprint(input.fingerprint);
+    const targetToken = await this.deviceSessionRepo.getSessionByDevice(session.userId, fingerprint.value);
     if (targetToken) {
       await this.sessionRepo.delete(targetToken);
-      await this.deviceSessionRepo.removeSessionForDevice(session.userId, input.fingerprint);
+      await this.deviceSessionRepo.removeSessionForDevice(session.userId, fingerprint.value);
     }
 
-    await this.deviceRepo.unbind(session.userId, input.fingerprint);
+    await this.deviceRepo.unbind(session.userId, fingerprint);
 
     await logUserActivity({
       userId: session.userId,
       action: "session_revoked",
       details: { fingerprint: input.fingerprint },
       ip: input.request.ip,
-      userAgent: input.request.headers["user-agent"] ?? null,
+      userAgent: input.request.userAgent ?? null,
     });
   }
 }
