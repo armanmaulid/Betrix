@@ -206,7 +206,14 @@ const migrations = [
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
   );
   CREATE INDEX IF NOT EXISTS idx_calendar_events_event_time ON calendar_events (event_time);
-  CREATE INDEX IF NOT EXISTS idx_calendar_events_country ON calendar_events (country);`,
+  CREATE INDEX IF NOT EXISTS idx_calendar_events_country ON calendar_events (country);
+
+  -- Symbol sync metadata table (for incremental sync)
+  CREATE TABLE IF NOT EXISTS symbol_sync_metadata (
+    key VARCHAR(50) PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+  );`,
 
   `-- Enable pgcrypto for UUID generation
   CREATE EXTENSION IF NOT EXISTS "pgcrypto";`

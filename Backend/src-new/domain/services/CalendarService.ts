@@ -1,9 +1,21 @@
 import { inject, injectable } from "tsyringe";
 import { CalendarRepository } from "@domain/repositories/CalendarRepository.js";
-import { CalendarEvent } from "@domain/entities/CalendarEvent.js";
+import { CalendarEvent, CalendarImportance } from "@domain/entities/CalendarEvent.js";
 import { Mt5Client } from "@data/external/Mt5Client.js";
 import { logger } from "@core/logging/logger.js";
 import { CalendarQuery } from "@domain/repositories/CalendarRepository.js";
+
+interface Mt5CalendarEvent {
+  event_id: number;
+  name: string;
+  country_code: string;
+  currency: string;
+  importance: number;
+  time: string;
+  actual?: number;
+  forecast?: number;
+  previous?: number;
+}
 
 @injectable()
 export class CalendarService {
@@ -21,17 +33,35 @@ export class CalendarService {
       return; // Already synced recently
     }
 
-    const maxEventTime = await this.calendarRepo.getMaxEventTime();
-    const fromDate = maxEventTime || new Date();
+    const rawEvents = await this.mt5Client.fetchCalendar("today");
 
-    const events = await this.mt5Client.fetchCalendar("today");
-
-    if (events.length > 0) {
+    if (rawEvents.length > 0) {
+      const events = rawEvents.map(e => this.transformMt5Event(e));
       await this.calendarRepo.saveMany(events);
       logger.info(`Synced ${events.length} calendar events`, { context: "Calendar" });
     }
 
     this.lastSync = new Date();
+  }
+
+  private transformMt5Event(e: Mt5CalendarEvent): CalendarEvent {
+    // Use event_id as value_id (unique per event)
+    const valueId = e.event_id;
+    const importanceMap: CalendarImportance[] = [CalendarImportance.NONE, CalendarImportance.LOW, CalendarImportance.MEDIUM, CalendarImportance.HIGH];
+    const importance = importanceMap[e.importance] || CalendarImportance.NONE;
+
+    return CalendarEvent.create({
+      valueId,
+      eventId: e.event_id,
+      eventTime: new Date(e.time),
+      country: e.country_code,
+      currency: e.currency,
+      eventName: e.name,
+      importance,
+      actual: e.actual?.toString() ?? null,
+      forecast: e.forecast?.toString() ?? null,
+      previous: e.previous?.toString() ?? null,
+    });
   }
 
   async getCalendar(query: CalendarQuery): Promise<CalendarEvent[]> {
