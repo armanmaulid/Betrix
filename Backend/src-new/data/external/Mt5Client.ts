@@ -296,20 +296,66 @@ export class Mt5Client {
   }
 
   // REST API methods for fetching data
+  private async fetchWithRetry<T>(url: string, maxRetries = 3, baseDelay = 2000): Promise<T> {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return await response.json() as T;
+      } catch (err) {
+        logger.warn(`Request failed (attempt ${attempt}/${maxRetries})`, { context: "MT5", url, error: (err as Error).message });
+        if (attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, baseDelay * attempt));
+        }
+      }
+    }
+    throw new Error(`Failed after ${maxRetries} retries: ${url}`);
+  }
+
   async fetchSymbolCount(): Promise<number> {
-    const response = await fetch(`${this.getHttpBase()}/v1/symbol/count`);
-    const data = await response.json() as { count: number };
+    const data = await this.fetchWithRetry<{ count: number }>(`${this.getHttpBase()}/v1/symbol/count`);
     return data.count;
   }
 
   async fetchSymbols(): Promise<any[]> {
-    const response = await fetch(`${this.getHttpBase()}/v1/symbol/list`);
-    return response.json() as Promise<any[]>;
+    // Retry with backoff for slow EA symbol list generation
+    const maxRetries = 3;
+    const baseDelay = 2000;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await fetch(`${this.getHttpBase()}/v1/symbol/list`);
+        
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const data = await response.json() as any[];
+        
+        if (data.length > 0) {
+          return data;
+        }
+        
+        logger.warn(`fetchSymbols returned empty array (attempt ${attempt}/${maxRetries})`, { context: "MT5" });
+      } catch (err) {
+        logger.warn(`fetchSymbols attempt ${attempt}/${maxRetries} failed`, { context: "MT5", error: (err as Error).message });
+      }
+      
+      if (attempt < maxRetries) {
+        const delay = baseDelay * attempt;
+        logger.info(`Retrying fetchSymbols in ${delay}ms...`, { context: "MT5" });
+        await new Promise(r => setTimeout(r, delay));
+      }
+    }
+    
+    logger.error("fetchSymbols failed after all retries", { context: "MT5" });
+    return [];
   }
 
   async fetchCalendar(period = "today"): Promise<any[]> {
-    const response = await fetch(`${this.getHttpBase()}/v1/calendar?period=${period}`);
-    const data = await response.json() as unknown;
+    const data = await this.fetchWithRetry<any>(`${this.getHttpBase()}/v1/calendar?period=${period}`);
     return Array.isArray(data) ? data : (data && typeof data === 'object' && 'data' in data ? (data as { data?: any[] }).data ?? [] : []);
   }
 
