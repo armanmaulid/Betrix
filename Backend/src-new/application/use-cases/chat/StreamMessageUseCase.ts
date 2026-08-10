@@ -80,44 +80,15 @@ export class StreamMessageUseCase {
         signal: input.signal,
       });
 
-      await logMetrics({
-        type: "chat_stream",
-        taskType: input.taskType,
-        modelUsed: model.id,
-        latencyMs: result.usage ? 0 : 0,
-        inputTokens: result.usage?.inputTokens,
-        outputTokens: result.usage?.outputTokens,
-        userId: user.id,
-      });
-
-      if (result.usage) {
-        await logTokenUsage({
-          userId: user.id,
-          taskType: input.taskType,
-          modelUsed: model.id,
-          inputTokens: result.usage.inputTokens,
-          outputTokens: result.usage.outputTokens,
-          latencyMs: 0,
-        });
-      }
-
-      await logChat({
-        userId: user.id,
-        sessionId: input.sessionId ?? null,
-        taskType: input.taskType,
-        modelUsed: model.id,
-        message: input.displayMessage || input.message,
-        reply: result.text,
-        latencyMs: 0,
-        usage: result.usage ?? null,
-      });
-
-      await logUserActivity({
-        userId: user.id,
-        action: "chat_message",
-        details: { model: model.id, taskType: input.taskType },
-        ip: "unknown",
-        userAgent: "unknown",
+      // Primary operation succeeded - tokens already streamed to client
+      // Fire-and-forget logging side effects - don't let them affect the response
+      this.fireAndForgetLogging({
+        user,
+        input,
+        result,
+        model,
+        cost,
+        tier,
       });
 
       return {
@@ -127,11 +98,66 @@ export class StreamMessageUseCase {
         usage: result.usage ?? null,
       };
     } catch (err) {
+      // Only refund if AI call itself failed (not logging failures)
       if (creditsDeducted) {
         await this.creditRepo.add(user.id, cost, `refund_chat_${tier}` as CreditAction);
       }
       throw new InternalError("Failed to stream AI model");
     }
+  }
+
+  private fireAndForgetLogging(params: {
+    user: User;
+    input: StreamMessageInput;
+    result: { text: string; modelUsed: string; usage?: { inputTokens: number; outputTokens: number } };
+    model: { id: string; maxTokens: number };
+    cost: number;
+    tier: string;
+  }): void {
+    const { user, input, result, model, cost, tier } = params;
+
+    // Use Promise.allSettled to ensure all logging completes independently
+    Promise.allSettled([
+      logMetrics({
+        type: "chat_stream",
+        taskType: input.taskType,
+        modelUsed: model.id,
+        latencyMs: 0,
+        inputTokens: result.usage?.inputTokens,
+        outputTokens: result.usage?.outputTokens,
+        userId: user.id,
+      }).catch(err => console.error("logMetrics failed:", err)),
+
+      result.usage ? logTokenUsage({
+        userId: user.id,
+        taskType: input.taskType,
+        modelUsed: model.id,
+        inputTokens: result.usage.inputTokens,
+        outputTokens: result.usage.outputTokens,
+        latencyMs: 0,
+      }).catch(err => console.error("logTokenUsage failed:", err)) : Promise.resolve(),
+
+      logChat({
+        userId: user.id,
+        sessionId: input.sessionId ?? null,
+        taskType: input.taskType,
+        modelUsed: model.id,
+        message: input.displayMessage || input.message,
+        reply: result.text,
+        latencyMs: 0,
+        usage: result.usage ?? null,
+      }).catch(err => console.error("logChat failed:", err)),
+
+      logUserActivity({
+        userId: user.id,
+        action: "chat_message",
+        details: { model: model.id, taskType: input.taskType },
+        ip: "unknown",
+        userAgent: "unknown",
+      }).catch(err => console.error("logUserActivity failed:", err)),
+    ]).then(() => {
+      // Logging complete
+    });
   }
 
   private getSystemPrompt(taskType: ChatTaskType): string {
