@@ -62,6 +62,7 @@ src-new/
 - **Chat credit double-deduction fixed**: Removed redundant middleware; use case now owns full deduct→call→refund lifecycle
 - **Session token hashing**: Tokens hashed with SHA-256 before Redis storage (SHA-256)
 - **Dead code removed**: Unused `CreditDomainService` interface deleted
+- **MT5 Bridge integration**: Real-time market data with WebSocket streaming, Redis caching, and REST endpoints
 
 ## Quick Start
 
@@ -118,6 +119,8 @@ SMTP_PASS=xxx
 # External
 FINNHUB_API_KEY=xxx
 MT5_BRIDGE_URL=127.0.0.1:8890
+MT5_WS_URL=ws://127.0.0.1:8890
+MT5_HTTP_URL=http://127.0.0.1:8890
 MT5_BROKER_UTC_OFFSET=3
 ```
 
@@ -147,7 +150,7 @@ All endpoints prefixed with `/api/v1`
 | **Chat** | `POST /chat`, `POST /chat/stream`, `GET /chat/history`, `DELETE /chat/session/:id`, `GET /chat/export` |
 | **Admin** | `GET /admin/users`, `GET /admin/users/:id`, `PUT /admin/users/:id`, `DELETE /admin/users/:id`, `POST /admin/users/:id/reset-password`, `GET /admin/metrics`, `GET /admin/analytics`, `GET /admin/system`, `GET /admin/actions`, `POST /admin/broadcast` |
 | **User** | `GET /me/usage`, `GET /me/usage/current-month`, `GET /me/messages`, `POST /me/messages`, `GET/POST /me/messages/preferences` |
-| **Market** | `GET /market/symbols`, `GET /market/calendar` |
+| **Market** | `GET /market/symbols`, `GET /market/symbols/:symbol`, `GET /market/symbols/category/:category`, `GET /market/calendar`, `GET /market/prices/:symbol`, `GET /market/prices?symbols=EURUSD,GBPUSD`, `GET /market/prices/all`, `GET /market/ohlc/:symbol/:timeframe`, `GET /market/ohlc/all?timeframe=M5`, `GET /market/mbook/:symbol`, `GET /market/mbook/all` |
 | **Health** | `GET /health` |
 
 ## Credit System
@@ -177,6 +180,96 @@ When `DEVICE_ENFORCEMENT=true`:
 | Calendar Sync | Daily 03:00 | Fetch economic calendar |
 | News Polling | 10s | Finnhub news (if API key set) |
 | D1 Cache Warmup | Broker midnight | Pre-fetch daily candles |
+
+## Background Jobs
+
+| Job | Schedule | Description |
+|-----|----------|-------------|
+| Cleanup | Hourly | Expired sessions, failed logins, tokens, usage, old news |
+| Symbol Sync | Daily 02:00 | Fetch symbols from MT5 |
+| Calendar Sync | Daily 03:00 | Fetch economic calendar |
+| News Polling | 10s | Finnhub news (if API key set) |
+| D1 Cache Warmup | Broker midnight | Pre-fetch daily candles |
+
+## MT5 Bridge Integration
+
+The backend integrates with an MT5 Bridge service for real-time market data via WebSocket and REST API.
+
+### Configuration
+
+```env
+MT5_WS_URL=ws://your-mt5-bridge:8890
+MT5_BRIDGE_URL=127.0.0.1:8890
+MT5_BROKER_UTC_OFFSET=3
+```
+
+### WebSocket Streaming
+
+The backend connects to the MT5 Bridge via WebSocket (`ws://host:8890`) and receives real-time updates:
+
+| Message Type | Description |
+|--------------|-------------|
+| `price_update` | Real-time bid/ask updates for tracked symbols |
+| `ohlc_update` | New OHLC bar formed for tracked timeframes |
+| `track_mbook` | Market book / Depth of Market updates |
+| `calendar_update` | Economic calendar event updates |
+
+### REST API Endpoints (Market Data)
+
+All endpoints prefixed with `/api/v1/market`:
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /prices/:symbol` | Get real-time price for a symbol |
+| `GET /prices?symbols=EURUSD,GBPUSD` | Get multiple prices at once |
+| `GET /prices/all` | Get all cached prices |
+| `GET /ohlc/:symbol/:timeframe` | Get OHLC data (e.g., M5, H1, D1) |
+| `GET /ohlc/all?timeframe=M5` | Get all OHLC for a timeframe |
+| `GET /mbook/:symbol` | Get market book / DOM for symbol |
+| `GET /mbook/all` | Get all cached market books |
+| `GET /symbols` | Get all trading symbols |
+| `GET /symbols/:symbol` | Get symbol details |
+| `GET /symbols/category/:category` | Get symbols by category |
+| `GET /calendar` | Get economic calendar events |
+
+### Tracking Subscriptions
+
+On startup, the backend automatically subscribes to:
+- **Price tracking**: Up to 100 active symbols
+- **OHLC tracking**: M5 timeframe for top 20 symbols
+- **Market book**: Top 10 symbols
+- **Calendar updates**: All events
+
+Data is cached in Redis with appropriate TTLs:
+- Prices: 60 seconds
+- OHLC: 5 minutes
+- Market book: 60 seconds
+
+### Market Data Service
+
+The `MarketDataService` provides programmatic access to cached market data:
+
+```typescript
+const marketData = container.resolve(MarketDataService);
+
+// Get single price
+const price = await marketData.getPrice("EURUSD");
+
+// Get multiple prices
+const prices = await marketData.getPrices(["EURUSD", "GBPUSD", "XAUUSD"]);
+
+// Get OHLC
+const ohlc = await marketData.getOHLC("EURUSD", "M5");
+
+// Get market book
+const mbook = await marketData.getMarketBook("EURUSD");
+
+// Get all symbols
+const symbols = await marketData.getSymbols(true);
+
+// Get all cached prices
+const allPrices = await marketData.getAllPrices();
+```
 
 ## Testing
 
