@@ -3,6 +3,7 @@ import { redisClient } from "../orm/redisClient.js";
 import { SessionRepository } from "@domain/repositories/SessionRepository.js";
 import { Session } from "@domain/entities/Session.js";
 import { logger } from "@core/logging/logger.js";
+import { hashToken } from "@core/utils/crypto.js";
 
 const SESSION_LOOKUP_TIMEOUT_MS = 5000;
 const SESSION_MEMORY_CACHE_TTL_MS = 5000;
@@ -26,16 +27,21 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise
   ]);
 }
 
+function hashSessionToken(token: string): string {
+  return hashToken(token);
+}
+
 @injectable()
 export class RedisSessionRepository implements SessionRepository {
   async findByToken(token: string): Promise<Session | null> {
-    const cached = sessionMemoryCache.get(token);
+    const hashedToken = hashSessionToken(token);
+    const cached = sessionMemoryCache.get(hashedToken);
     if (cached && Date.now() - cached.timestamp < SESSION_MEMORY_CACHE_TTL_MS) {
       return cached.session;
     }
 
     const userId = await withTimeout(
-      redisClient.get(`session:${token}`),
+      redisClient.get(`session:${hashedToken}`),
       SESSION_LOOKUP_TIMEOUT_MS,
       "Redis session lookup"
     );
@@ -51,7 +57,7 @@ export class RedisSessionRepository implements SessionRepository {
       null, null, null
     );
 
-    sessionMemoryCache.set(token, { session, timestamp: Date.now() });
+    sessionMemoryCache.set(hashedToken, { session, timestamp: Date.now() });
     return session;
   }
 
@@ -66,26 +72,30 @@ export class RedisSessionRepository implements SessionRepository {
   }
 
   async save(session: Session): Promise<Session> {
-    await redisClient.setex(`session:${session.token}`, 24 * 60 * 60, session.userId);
-    await redisClient.sadd(`user_sessions:${session.userId}`, session.token);
+    const hashedToken = hashSessionToken(session.token);
+    await redisClient.setex(`session:${hashedToken}`, 24 * 60 * 60, session.userId);
+    await redisClient.sadd(`user_sessions:${session.userId}`, hashedToken);
     await redisClient.expire(`user_sessions:${session.userId}`, 24 * 60 * 60);
-    sessionMemoryCache.set(session.token, { session, timestamp: Date.now() });
+    sessionMemoryCache.set(hashedToken, { session, timestamp: Date.now() });
     return session;
   }
 
   async delete(token: string): Promise<string | null> {
-    const userId = await redisClient.get(`session:${token}`);
+    const hashedToken = hashSessionToken(token);
+    const userId = await redisClient.get(`session:${hashedToken}`);
     if (userId) {
-      await redisClient.srem(`user_sessions:${userId}`, token);
+      await redisClient.srem(`user_sessions:${userId}`, hashedToken);
     }
-    await redisClient.del(`session:${token}`);
-    sessionMemoryCache.delete(token);
+    await redisClient.del(`session:${hashedToken}`);
+    sessionMemoryCache.delete(hashedToken);
     return userId as string | null;
   }
 
   async deleteByUserId(userId: string, exceptToken?: string): Promise<number> {
     const tokens = await redisClient.smembers(`user_sessions:${userId}`);
-    const tokensToDelete = exceptToken ? tokens.filter(t => t !== exceptToken) : tokens;
+    const hashedTokens = tokens.map(hashSessionToken);
+    const hashedExceptToken = exceptToken ? hashSessionToken(exceptToken) : undefined;
+    const tokensToDelete = hashedExceptToken ? hashedTokens.filter(t => t !== hashedExceptToken) : hashedTokens;
 
     if (tokensToDelete.length > 0) {
       const keysToDelete = tokensToDelete.map(token => `session:${token}`);
