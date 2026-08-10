@@ -14,6 +14,7 @@ import { env } from "@config/env";
 import { logger } from "@core/logging/logger.js";
 import { closePgClient } from "@data/orm/pgClient.js";
 import { closeRedisClient } from "@data/orm/redisClient.js";
+import { runStartupJobs, startBackgroundJobs } from "@background/jobs/index.js";
 import "../config/passport.js";
 
 export async function createApp() {
@@ -70,6 +71,10 @@ export async function startServer() {
   const server = app.listen(env.PORT, () => {
     logger.info(`Server started on port ${env.PORT}`, { context: "Server" });
   });
+  
+  // Initialize background jobs (MT5, Finnhub, cleanup, etc.)
+  await runStartupJobs();
+  startBackgroundJobs();
   
   // Graceful shutdown
   const shutdown = async (signal: string) => {
