@@ -1,7 +1,7 @@
 import { stripThinkingTags, createThinkingStreamFilter } from "@domain/services/thinkingFilter.js";
 import { logger } from "@core/logging/logger.js";
 import { env } from "@config/env";
-import { AiMessage } from "@application/ports/index.js";
+import type { AiMessage } from "@application/ports/index.js";
 
 interface AiResponse {
   choices?: Array<{

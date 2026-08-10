@@ -1,6 +1,6 @@
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { env } from "@config/env";
-import { Request } from "express";
+import type { Request } from "express";
 
 function createIpKeyGenerator() {
   return (req: Request) => ipKeyGenerator(req.ip || "unknown");

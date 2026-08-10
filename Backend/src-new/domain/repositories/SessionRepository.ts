@@ -1,4 +1,4 @@
-import { Session } from "../entities/Session.js";
+import type { Session } from "../entities/Session.js";
 
 export interface SessionRepository {
   findByToken(token: string): Promise<Session | null>;

@@ -1,4 +1,4 @@
-import { Application } from "express";
+import type { Application } from "express";
 import v1Routes from "@presentation/routes/v1/index.js";
 
 export function registerRoutes(app: Application) {

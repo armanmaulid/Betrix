@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction } from "express";
 import { container } from "tsyringe";
 import { GetUsersUseCase } from "@application/use-cases/admin/GetUsersUseCase.js";
 import { GetUserDetailUseCase } from "@application/use-cases/admin/GetUserDetailUseCase.js";
@@ -11,8 +11,8 @@ import { GetSystemInfoUseCase } from "@application/use-cases/admin/GetSystemInfo
 import { GetAuditLogsUseCase } from "@application/use-cases/admin/GetAuditLogsUseCase.js";
 import { ExportAuditLogsUseCase } from "@application/use-cases/admin/ExportAuditLogsUseCase.js";
 import { BroadcastMessageUseCase } from "@application/use-cases/admin/BroadcastMessageUseCase.js";
-import { User } from "@domain/entities/User.js";
-import { RequestInput } from "@core/utils/request.js";
+import type { User } from "@domain/entities/User.js";
+import type { RequestInput } from "@core/utils/request.js";
 
 export class AdminController {
   private getUser(req: Request): User {

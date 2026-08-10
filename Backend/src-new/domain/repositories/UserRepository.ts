@@ -1,5 +1,5 @@
-import { User, UserStatus } from "../entities/User.js";
-import { Email } from "../value-objects/index.js";
+import type { User, UserStatus } from "../entities/User.js";
+import type { Email } from "../value-objects/index.js";
 
 export interface UserRepository {
   findById(id: string): Promise<User | null>;

@@ -1,7 +1,7 @@
-import { User } from "../entities/User.js";
-import { Session } from "../entities/Session.js";
+import type { User } from "../entities/User.js";
+import type { Session } from "../entities/Session.js";
 import { Device } from "../entities/Device.js";
-import { DeviceFingerprint } from "../value-objects/index.js";
+import type { DeviceFingerprint } from "../value-objects/index.js";
 
 export interface AuthDomainService {
   register(data: {

@@ -1,4 +1,4 @@
-import { ChatMessage, ChatTaskType } from "../entities/ChatMessage.js";
+import type { ChatMessage, ChatTaskType } from "../entities/ChatMessage.js";
 
 export interface ChatRepository {
   save(message: ChatMessage): Promise<ChatMessage>;

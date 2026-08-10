@@ -1,6 +1,6 @@
-import { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction } from "express";
 import { container } from "tsyringe";
-import { UserRepository } from "@domain/repositories/UserRepository.js";
+import type { UserRepository } from "@domain/repositories/UserRepository.js";
 import { User } from "@domain/entities/User.js";
 import { AuthorizationError, AuthenticationError } from "@core/errors/index.js";
 

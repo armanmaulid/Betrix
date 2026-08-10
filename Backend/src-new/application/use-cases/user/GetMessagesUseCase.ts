@@ -64,7 +64,7 @@ export class GetMessagesUseCase {
     }
     countQuery += ` WHERE m.to_user_id = $1 AND m.deleted_at IS NULL`;
     const countParams = [input.userId];
-    let countParamIndex = 2;
+    const countParamIndex = 2;
 
     if (input.unread) {
       countQuery += ` AND m.read_at IS NULL`;

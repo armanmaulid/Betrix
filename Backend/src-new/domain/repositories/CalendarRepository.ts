@@ -1,4 +1,4 @@
-import { CalendarEvent, CalendarImportance } from "../entities/CalendarEvent.js";
+import type { CalendarEvent, CalendarImportance } from "../entities/CalendarEvent.js";
 
 export interface CalendarQuery {
   startDate?: Date;

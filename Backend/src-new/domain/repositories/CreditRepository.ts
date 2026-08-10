@@ -1,4 +1,4 @@
-import { CreditTransaction, CreditAction } from "../entities/CreditTransaction.js";
+import type { CreditTransaction, CreditAction } from "../entities/CreditTransaction.js";
 
 export interface CreditRepository {
   deduct(userId: string, amount: number, action: CreditAction): Promise<number>;

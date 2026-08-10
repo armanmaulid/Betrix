@@ -1,4 +1,4 @@
-import { BrokerSymbol } from "../entities/BrokerSymbol.js";
+import type { BrokerSymbol } from "../entities/BrokerSymbol.js";
 
 export interface SymbolRepository {
   save(symbol: BrokerSymbol): Promise<BrokerSymbol>;

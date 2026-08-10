@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { UAParser } from "ua-parser-js";
-import { RequestInput } from "./request.js";
+import type { RequestInput } from "./request.js";
 
 export function normalizeIP(ip: string): string {
   if (ip.startsWith("::ffff:")) {

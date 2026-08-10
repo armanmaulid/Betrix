@@ -1,5 +1,5 @@
-import { Device } from "../entities/Device.js";
-import { DeviceFingerprint } from "../value-objects/index.js";
+import type { Device } from "../entities/Device.js";
+import type { DeviceFingerprint } from "../value-objects/index.js";
 
 export interface DeviceDomainService {
   checkBinding(fingerprint: DeviceFingerprint): Promise<string | null>;

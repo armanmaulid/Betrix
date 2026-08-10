@@ -1,4 +1,4 @@
-import { NewsArticle } from "../entities/NewsArticle.js";
+import type { NewsArticle } from "../entities/NewsArticle.js";
 
 export interface NewsRepository {
   save(article: NewsArticle): Promise<NewsArticle>;
