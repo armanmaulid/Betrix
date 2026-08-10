@@ -48,12 +48,16 @@ export class RedisSessionRepository implements SessionRepository {
 
     if (!userId) return null;
 
+    // Fetch real TTL from Redis
+    const ttl = await redisClient.ttl(`session:${hashedToken}`);
+    const expiresAt = ttl > 0 ? new Date(Date.now() + ttl * 1000) : new Date(Date.now() + 24 * 60 * 60 * 1000);
+
     const session = new Session(
       token,
       userId as string,
       token,
       new Date(),
-      new Date(Date.now() + 24 * 60 * 60 * 1000),
+      expiresAt,
       null, null, null
     );
 
@@ -110,6 +114,9 @@ export class RedisSessionRepository implements SessionRepository {
   }
 
   async deleteExpired(): Promise<number> {
+    // Redis handles TTL-based expiration automatically
+    // This method is kept for interface compatibility but does nothing
+    // since Redis handles TTL-based expiration automatically
     return 0;
   }
 }

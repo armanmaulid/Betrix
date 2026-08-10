@@ -109,7 +109,7 @@ export class StreamMessageUseCase {
   private fireAndForgetLogging(params: {
     user: User;
     input: StreamMessageInput;
-    result: { text: string; modelUsed: string; usage?: { inputTokens: number; outputTokens: number } };
+    result: { text: string; usage?: { inputTokens: number; outputTokens: number } };
     model: { id: string; maxTokens: number };
     cost: number;
     tier: string;
