@@ -1,5 +1,5 @@
-import { Device } from "../entities/Device.js";
-import { DeviceFingerprint } from "../value-objects";
+import type { Device } from "../entities/Device.js";
+import type { DeviceFingerprint } from "../value-objects";
 
 export interface DeviceRepository {
   findByFingerprint(fingerprint: DeviceFingerprint): Promise<Device | null>;

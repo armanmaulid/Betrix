@@ -51,25 +51,13 @@ export class SendMessageUseCase {
     const model = resolveModel(input.taskType, tier);
     const cost = TIER_CREDIT_COST[tier];
 
-    // Deduct credits
-    let creditsDeducted = false;
-    try {
-      await this.creditRepo.deduct(user.id, cost, `chat_${tier}` as CreditAction);
-      creditsDeducted = true;
-    } catch (err: unknown) {
-      const error = err as Error;
-      if (error.message === "Insufficient credits") {
-        throw new InsufficientCreditsError();
-      }
-      throw err;
-    }
-
     const cleanHistory = sanitizeHistory(input.history);
     const messages = [...cleanHistory, { role: "user" as const, content: input.message.substring(0, LIMITS.MESSAGE_MAX_LENGTH) }];
 
-    const cacheKey = input.message;
+    const cacheKey = `${input.userId}:${input.message}`;
     const isCacheable = ["general", "quick_summary", "classify_signal"].includes(input.taskType) && messages.length === 1;
-    
+
+    // Check cache BEFORE deducting credits
     if (isCacheable) {
       const cached = this.cachePort.get(input.taskType, cacheKey);
       if (cached) {
@@ -80,6 +68,19 @@ export class SendMessageUseCase {
           usage: cached.usage ?? null,
         };
       }
+    }
+
+    // Deduct credits only if not cached
+    let creditsDeducted = false;
+    try {
+      await this.creditRepo.deduct(user.id, cost, `chat_${tier}` as CreditAction);
+      creditsDeducted = true;
+    } catch (err: unknown) {
+      const error = err as Error;
+      if (error.message === "Insufficient credits") {
+        throw new InsufficientCreditsError();
+      }
+      throw err;
     }
 
     const systemPrompt = this.getSystemPrompt(input.taskType);
@@ -100,44 +101,15 @@ export class SendMessageUseCase {
         });
       }
 
-      await logMetrics({
-        type: "chat_completion",
-        taskType: input.taskType,
-        modelUsed: model.id,
-        latencyMs: result.usage ? 0 : 0,
-        inputTokens: result.usage?.inputTokens,
-        outputTokens: result.usage?.outputTokens,
-        userId: user.id,
-      });
-
-      if (result.usage) {
-        await logTokenUsage({
-          userId: user.id,
-          taskType: input.taskType,
-          modelUsed: model.id,
-          inputTokens: result.usage.inputTokens,
-          outputTokens: result.usage.outputTokens,
-          latencyMs: 0,
-        });
-      }
-
-      await logChat({
-        userId: user.id,
-        sessionId: input.sessionId ?? null,
-        taskType: input.taskType,
-        modelUsed: model.id,
-        message: input.displayMessage || input.message,
-        reply: result.text,
-        latencyMs: 0,
-        usage: result.usage ?? null,
-      });
-
-      await logUserActivity({
-        userId: user.id,
-        action: "chat_message",
-        details: { model: model.id, taskType: input.taskType },
-        ip: "unknown",
-        userAgent: "unknown",
+      // Primary operation succeeded
+      // Fire-and-forget logging side effects
+      this.fireAndForgetLogging({
+        user,
+        input,
+        result,
+        model,
+        cost,
+        tier,
       });
 
       return {
@@ -147,12 +119,66 @@ export class SendMessageUseCase {
         usage: result.usage ?? null,
       };
     } catch (err) {
-      // Refund credits on failure
+      // Only refund if AI call itself failed (not logging failures)
       if (creditsDeducted) {
         await this.creditRepo.add(user.id, cost, `refund_chat_${tier}` as CreditAction);
       }
       throw new InternalError("Failed to call AI model");
     }
+  }
+
+  private fireAndForgetLogging(params: {
+    user: User;
+    input: SendMessageInput;
+    result: { text: string; usage?: { inputTokens: number; outputTokens: number } };
+    model: { id: string; maxTokens: number };
+    cost: number;
+    tier: string;
+  }): void {
+    const { user, input, result, model, cost, tier } = params;
+
+    // Use Promise.allSettled to ensure all logging completes independently
+    Promise.allSettled([
+      logMetrics({
+        type: "chat_completion",
+        taskType: input.taskType,
+        modelUsed: model.id,
+        latencyMs: 0,
+        inputTokens: result.usage?.inputTokens,
+        outputTokens: result.usage?.outputTokens,
+        userId: user.id,
+      }).catch(err => console.error("logMetrics failed:", err)),
+
+      result.usage ? logTokenUsage({
+        userId: user.id,
+        taskType: input.taskType,
+        modelUsed: model.id,
+        inputTokens: result.usage.inputTokens,
+        outputTokens: result.usage.outputTokens,
+        latencyMs: 0,
+      }).catch(err => console.error("logTokenUsage failed:", err)) : Promise.resolve(),
+
+      logChat({
+        userId: user.id,
+        sessionId: input.sessionId ?? null,
+        taskType: input.taskType,
+        modelUsed: model.id,
+        message: input.displayMessage || input.message,
+        reply: result.text,
+        latencyMs: 0,
+        usage: result.usage ?? null,
+      }).catch(err => console.error("logChat failed:", err)),
+
+      logUserActivity({
+        userId: user.id,
+        action: "chat_message",
+        details: { model: model.id, taskType: input.taskType },
+        ip: "unknown",
+        userAgent: "unknown",
+      }).catch(err => console.error("logUserActivity failed:", err)),
+    ]).then(() => {
+      // Logging complete
+    });
   }
 
   private getSystemPrompt(taskType: ChatTaskType): string {

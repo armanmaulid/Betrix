@@ -1,5 +1,5 @@
 import "reflect-metadata";
-import { container } from "tsyringe";
+import { container, Lifecycle } from "tsyringe";
 import { pgClient } from "@data/orm/pgClient.js";
 import { redisClient } from "@data/orm/redisClient.js";
 
@@ -94,7 +94,7 @@ export function registerDependencies() {
   container.register("EmailPort", { useClass: EmailService });
   container.register("FinnhubClient", { useClass: FinnhubClient });
   container.register("Mt5Client", { useClass: Mt5Client });
-  container.register("CachePort", { useClass: GeneralCacheStore });
+  container.register("CachePort", { useClass: GeneralCacheStore }, { lifecycle: Lifecycle.Singleton });
 
   // Use cases
   container.register("RegisterUseCase", { useClass: RegisterUseCase });

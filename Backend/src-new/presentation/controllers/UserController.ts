@@ -1,10 +1,10 @@
-import { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction } from "express";
 import { container } from "tsyringe";
 import { GetUsageUseCase } from "@application/use-cases/user/GetUsageUseCase.js";
 import { GetMessagesUseCase } from "@application/use-cases/user/GetMessagesUseCase.js";
-import { SendMessageUseCase } from "@application/use-cases/user/SendMessageUseCase.js";
+import type { SendMessageUseCase } from "@application/use-cases/user/SendMessageUseCase.js";
 import { UpdateNotificationPrefsUseCase } from "@application/use-cases/user/UpdateNotificationPrefsUseCase.js";
-import { User } from "@domain/entities/User.js";
+import type { User } from "@domain/entities/User.js";
 
 export class UserController {
   private getUser(req: Request): User {

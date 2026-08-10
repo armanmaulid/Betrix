@@ -1,11 +1,11 @@
-import { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction } from "express";
 import { container } from "tsyringe";
 import { SendMessageUseCase } from "@application/use-cases/chat/SendMessageUseCase.js";
 import { StreamMessageUseCase } from "@application/use-cases/chat/StreamMessageUseCase.js";
 import { GetChatHistoryUseCase } from "@application/use-cases/chat/GetChatHistoryUseCase.js";
 import { DeleteChatSessionUseCase } from "@application/use-cases/chat/DeleteChatSessionUseCase.js";
 import { ExportChatHistoryUseCase } from "@application/use-cases/chat/ExportChatHistoryUseCase.js";
-import { User } from "@domain/entities/User.js";
+import type { User } from "@domain/entities/User.js";
 
 export class ChatController {
   private getUser(req: Request): User {

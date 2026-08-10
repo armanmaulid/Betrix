@@ -1,4 +1,4 @@
-import { AdminAction, AdminActionType } from "../entities/AdminAction.js";
+import type { AdminAction, AdminActionType } from "../entities/AdminAction.js";
 
 export interface AdminActionRepository {
   save(action: AdminAction): Promise<AdminAction>;

@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction } from "express";
 import { container } from "tsyringe";
 import { MarketDataService } from "@domain/services/MarketDataService.js";
 import { CalendarService } from "@domain/services/CalendarService.js";

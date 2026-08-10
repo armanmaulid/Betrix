@@ -1,7 +1,7 @@
-import { User } from "../entities/User.js";
-import { Session } from "../entities/Session.js";
-import { ChatTaskType } from "../entities/ChatMessage.js";
-import { CreditAction } from "../entities/CreditTransaction.js";
+import type { User } from "../entities/User.js";
+import type { Session } from "../entities/Session.js";
+import type { ChatTaskType } from "../entities/ChatMessage.js";
+import type { CreditAction } from "../entities/CreditTransaction.js";
 
 export interface DomainEvent {
   readonly type: string;

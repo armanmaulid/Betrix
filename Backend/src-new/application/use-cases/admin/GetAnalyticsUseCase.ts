@@ -19,7 +19,7 @@ interface GetAnalyticsOutput {
 export class GetAnalyticsUseCase {
   async execute(input: GetAnalyticsInput): Promise<GetAnalyticsOutput> {
     let dateCondition: string;
-    let params: unknown[] = [];
+    const params: unknown[] = [];
     let paramCount = 1;
 
     if (input.fromDate && input.toDate) {

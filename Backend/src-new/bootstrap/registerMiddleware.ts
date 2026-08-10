@@ -1,4 +1,4 @@
-import { Application } from "express";
+import type { Application } from "express";
 import { globalLimiter, authLimiter, registerLimiter, perUserLimiter } from "@core/middleware/rateLimiter.js";
 
 export function registerMiddleware(app: Application) {

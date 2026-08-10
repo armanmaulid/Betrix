@@ -1,3 +1,4 @@
+import { injectable, singleton } from "tsyringe";
 import { env } from "@config/env";
 import { logger } from "@core/logging/logger.js";
 import { BrokerSymbol } from "@domain/entities/BrokerSymbol.js";
@@ -40,6 +41,8 @@ interface CalendarUpdate {
   previous: string | null;
 }
 
+@injectable()
+@singleton()
 export class Mt5Client {
   private ws: WebSocket | null = null;
   private reconnectAttempts = 0;
@@ -50,10 +53,10 @@ export class Mt5Client {
   private calendarRepo: any;
 
   // Callbacks for real-time data
-  private onPriceTick: ((tick: PriceTick) => void) | null = null;
-  private onOHLCUpdate: ((update: OHLCUpdate) => void) | null = null;
-  private onMarketBookUpdate: ((update: MarketBookUpdate) => void) | null = null;
-  private onCalendarUpdate: ((update: CalendarUpdate) => void) | null = null;
+  private onPriceTick: ((tick: any) => void) | null = null;
+  private onOHLCUpdate: ((update: any) => void) | null = null;
+  private onMarketBookUpdate: ((update: any) => void) | null = null;
+  private onCalendarUpdate: ((update: any) => void) | null = null;
 
   constructor() {
     this.symbolRepo = null;
@@ -66,10 +69,10 @@ export class Mt5Client {
   }
 
   setCallbacks(callbacks: {
-    onPriceTick?: (tick: PriceTick) => void;
-    onOHLCUpdate?: (update: OHLCUpdate) => void;
-    onMarketBookUpdate?: (update: MarketBookUpdate) => void;
-    onCalendarUpdate?: (update: CalendarUpdate) => void;
+    onPriceTick?: (tick: any) => void;
+    onOHLCUpdate?: (update: any) => void;
+    onMarketBookUpdate?: (update: any) => void;
+    onCalendarUpdate?: (update: any) => void;
   }) {
     this.onPriceTick = callbacks.onPriceTick || null;
     this.onOHLCUpdate = callbacks.onOHLCUpdate || null;
@@ -82,29 +85,34 @@ export class Mt5Client {
 
     const wsUrl = env.MT5_WS_URL || `ws://${env.MT5_BRIDGE_URL}`;
     
-    try {
-      this.ws = new WebSocket(wsUrl);
-      
-      this.ws.onopen = () => {
-        logger.info("MT5 WebSocket connected", { context: "MT5" });
-        this.reconnectAttempts = 0;
-        this.subscribeToSymbols();
-      };
+    return new Promise((resolve, reject) => {
+      try {
+        this.ws = new WebSocket(env.MT5_WS_URL || `ws://${env.MT5_BRIDGE_URL}`);
+        
+        this.ws.onopen = () => {
+          logger.info("MT5 WebSocket connected", { context: "MT5" });
+          this.reconnectAttempts = 0;
+          this.subscribeToSymbols();
+          resolve();
+        };
 
-      this.ws.onmessage = (event) => this.handleMessage(event.data);
-      
-      this.ws.onclose = () => {
-        logger.warn("MT5 WebSocket disconnected", { context: "MT5" });
+        this.ws.onmessage = (event) => this.handleMessage(event.data);
+        
+        this.ws.onclose = () => {
+          logger.warn("MT5 WebSocket disconnected", { context: "MT5" });
+          this.scheduleReconnect();
+        };
+
+        this.ws.onerror = (err) => {
+          logger.error("MT5 WebSocket error", { context: "MT5", error: err });
+          reject(err);
+        };
+      } catch (err) {
+        logger.error("Failed to connect to MT5", { context: "MT5", error: (err as Error).message });
         this.scheduleReconnect();
-      };
-
-      this.ws.onerror = (err) => {
-        logger.error("MT5 WebSocket error", { context: "MT5", error: err });
-      };
-    } catch (err) {
-      logger.error("Failed to connect to MT5", { context: "MT5", error: (err as Error).message });
-      this.scheduleReconnect();
-    }
+        reject(err);
+      }
+    });
   }
 
   private scheduleReconnect(): void {
@@ -131,7 +139,7 @@ export class Mt5Client {
       const msg = JSON.parse(data);
       
       switch (msg.type) {
-        case "tick":
+        case "price_update": // Fixed: was "tick", now matches EA protocol
           this.handlePriceTick(msg);
           break;
         case "ohlc_update":
@@ -143,12 +151,7 @@ export class Mt5Client {
         case "calendar_update":
           this.handleCalendarUpdate(msg);
           break;
-        case "symbols":
-          this.handleSymbols(msg.data);
-          break;
-        case "calendar":
-          this.handleCalendar(msg.data);
-          break;
+        // Removed "symbols" and "calendar" cases - these are now handled via HTTP
       }
     } catch (err) {
       logger.error("Failed to parse MT5 message", { context: "MT5", error: (err as Error).message });
@@ -156,7 +159,7 @@ export class Mt5Client {
   }
 
   private async handlePriceTick(msg: any): Promise<void> {
-    const tick: PriceTick = {
+    const tick = {
       symbol: msg.symbol,
       bid: msg.bid,
       ask: msg.ask,
@@ -177,7 +180,7 @@ export class Mt5Client {
   }
 
   private async handleOHLCUpdate(msg: any): Promise<void> {
-    const update: OHLCUpdate = {
+    const update = {
       symbol: msg.symbol,
       timeframe: msg.timeframe,
       time: msg.time,
@@ -198,7 +201,7 @@ export class Mt5Client {
   }
 
   private async handleMarketBookUpdate(msg: any): Promise<void> {
-    const update: MarketBookUpdate = {
+    const update = {
       symbol: msg.symbol,
       bids: msg.bids || [],
       asks: msg.asks || []
@@ -214,7 +217,7 @@ export class Mt5Client {
   }
 
   private async handleCalendarUpdate(msg: any): Promise<void> {
-    const update: CalendarUpdate = {
+    const update = {
       event_id: msg.event_id,
       actual: msg.actual,
       forecast: msg.forecast,
@@ -226,121 +229,90 @@ export class Mt5Client {
     }
   }
 
-  private async handleSymbols(data: any[]): Promise<void> {
-    if (!this.symbolRepo) return;
-    
-    for (const s of data) {
-      const symbol = {
-        symbol: s.symbol,
-        description: s.description,
-        path: s.path,
-        category: s.category,
-        trade_mode: s.trade_mode,
-        is_active: s.is_active,
-        created_at: new Date(),
-        updated_at: new Date()
-      };
-      await this.symbolRepo.save(symbol);
-    }
+  // HTTP-based tracking subscriptions (not WebSocket)
+  private getHttpBase(): string {
+    return env.MT5_HTTP_URL || `http://${env.MT5_BRIDGE_URL}`;
   }
 
-  private async handleCalendar(data: any[]): Promise<void> {
-    if (!this.calendarRepo) return;
-    
-    for (const c of data) {
-      const event = {
-        value_id: c.value_id,
-        event_id: c.event_id,
-        event_time: new Date(c.event_time),
-        country: c.country,
-        currency: c.currency,
-        event_name: c.event_name,
-        importance: c.importance,
-        actual: c.actual,
-        forecast: c.forecast,
-        previous: c.previous,
-        created_at: new Date(),
-        updated_at: new Date()
-      };
-      await this.calendarRepo.save(event);
-    }
-  }
-
-  // REST API methods for tracking subscriptions
   async trackPrices(symbols: string[]): Promise<void> {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    this.ws.send(JSON.stringify({ action: "track_prices", symbols }));
+    const response = await fetch(`${this.getHttpBase()}/v1/track/prices`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbols }),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to track prices: ${response.statusText}`);
+    }
   }
 
   async trackOHLC(requests: Array<{ symbol: string; timeframe: string; depth: number }>): Promise<void> {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    this.ws.send(JSON.stringify({ action: "track_ohlc", ohlc: requests }));
+    const response = await fetch(`${this.getHttpBase()}/v1/track/ohlc`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ohlc: requests.map(r => ({ symbol: r.symbol, time_frame: r.timeframe, depth: r.depth })),
+      }),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to track OHLC: ${response.statusText}`);
+    }
   }
 
   async trackMarketBook(symbols: string[]): Promise<void> {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    this.ws.send(JSON.stringify({ action: "track_mbook", symbols }));
+    const response = await fetch(`${this.getHttpBase()}/v1/track/mbook`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ symbols }),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to track market book: ${response.statusText}`);
+    }
   }
 
   async trackCalendar(country?: string, currency?: string): Promise<void> {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    this.ws.send(JSON.stringify({ 
-      action: "track_calendar", 
-      country: country || "", 
-      currency: currency || "" 
-    }));
+    const response = await fetch(`${this.getHttpBase()}/v1/track/calendar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ country: country || "", currency: currency || "" }),
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to track calendar: ${response.statusText}`);
+    }
   }
 
   // REST API methods for fetching data
+  async fetchSymbolCount(): Promise<number> {
+    const response = await fetch(`${this.getHttpBase()}/v1/symbol/count`);
+    const data = await response.json() as { count: number };
+    return data.count;
+  }
+
   async fetchSymbols(): Promise<any[]> {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return [];
-    return new Promise((resolve) => {
-      const timeout = setTimeout(() => resolve([]), 5000);
-      const handler = (event: MessageEvent) => {
-        clearTimeout(timeout);
-        this.ws?.removeEventListener("message", handler);
-        try {
-          const msg = JSON.parse(event.data.toString());
-          if (msg.type === "symbols") resolve(msg.data);
-        } catch {}
-      };
-      this.ws!.addEventListener("message", handler, { once: true });
-      this.ws!.send(JSON.stringify({ action: "get_symbols" }));
-    });
+    const response = await fetch(`${this.getHttpBase()}/v1/symbol/list`);
+    return response.json() as Promise<any[]>;
   }
 
-  async fetchCalendar(): Promise<any[]> {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return [];
-    return new Promise((resolve) => {
-      const timeout = setTimeout(() => resolve([]), 5000);
-      const handler = (event: MessageEvent) => {
-        clearTimeout(timeout);
-        this.ws?.removeEventListener("message", handler);
-        try {
-          const msg = JSON.parse(event.data.toString());
-          if (msg.type === "calendar") resolve(msg.data);
-        } catch {}
-      };
-      this.ws!.addEventListener("message", handler, { once: true });
-      this.ws!.send(JSON.stringify({ action: "get_calendar" }));
-    });
+  async fetchCalendar(period = "today"): Promise<any[]> {
+    const response = await fetch(`${this.getHttpBase()}/v1/calendar?period=${period}`);
+    const data = await response.json() as unknown;
+    return Array.isArray(data) ? data : (data && typeof data === 'object' && 'data' in data ? (data as { data?: any[] }).data ?? [] : []);
   }
 
-  async getPrice(symbol: string): Promise<PriceTick | null> {
+  async getPrice(symbol: string) {
     const cacheKey = `mt5:price:${symbol}`;
     const data = await redisClient.get<string | null>(cacheKey);
     if (data) return JSON.parse(data);
     return null;
   }
 
-  async getOHLC(symbol: string, timeframe: string): Promise<OHLCUpdate | null> {
+  async getOHLC(symbol: string, timeframe: string) {
     const cacheKey = `mt5:ohlc:${symbol}:${timeframe}`;
     const data = await redisClient.get<string | null>(cacheKey);
     if (data) return JSON.parse(data);
     return null;
   }
 
-  async getMarketBook(symbol: string): Promise<MarketBookUpdate | null> {
+  async getMarketBook(symbol: string) {
     const cacheKey = `mt5:mbook:${symbol}`;
     const data = await redisClient.get<string | null>(cacheKey);
     if (data) return JSON.parse(data);

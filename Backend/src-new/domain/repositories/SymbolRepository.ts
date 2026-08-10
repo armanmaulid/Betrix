@@ -1,4 +1,4 @@
-import { BrokerSymbol } from "../entities/BrokerSymbol.js";
+import type { BrokerSymbol } from "../entities/BrokerSymbol.js";
 
 export interface SymbolRepository {
   save(symbol: BrokerSymbol): Promise<BrokerSymbol>;
@@ -7,4 +7,6 @@ export interface SymbolRepository {
   findActive(): Promise<BrokerSymbol[]>;
   findByCategory(category: string): Promise<BrokerSymbol[]>;
   findById(symbol: string): Promise<BrokerSymbol | null>;
+  getStoredCount(): Promise<number>;
+  setStoredCount(count: number): Promise<void>;
 }

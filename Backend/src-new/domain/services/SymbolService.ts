@@ -12,15 +12,25 @@ export class SymbolService {
   ) {}
 
   async syncBrokerSymbols(): Promise<void> {
+    // Check symbol count first (incremental sync pattern)
+    const count = await this.mt5Client.fetchSymbolCount();
+    const storedCount = await this.symbolRepo.getStoredCount();
+    
+    if (count === storedCount) {
+      logger.info("Symbol count unchanged, skipping full sync", { context: "Symbols" });
+      return;
+    }
+
     const symbols = await this.mt5Client.fetchSymbols();
 
     if (symbols.length > 0) {
       await this.symbolRepo.saveMany(symbols);
+      await this.symbolRepo.setStoredCount(count);
       logger.info(`Synced ${symbols.length} broker symbols`, { context: "Symbols" });
     }
   }
 
-  async getActiveSymbols(): Promise<BrokerSymbol[]> {
+  async getActiveSymbols(): Promise<any[]> {
     return this.symbolRepo.findActive();
   }
 }

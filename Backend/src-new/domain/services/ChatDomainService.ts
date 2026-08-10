@@ -1,4 +1,5 @@
-import { ChatMessage, ChatTaskType, ModelTier } from "../entities/ChatMessage.js";
+import type { ChatTaskType, ModelTier } from "../entities/ChatMessage.js";
+import { ChatMessage } from "../entities/ChatMessage.js";
 
 export interface ChatDomainService {
   sendMessage(data: {

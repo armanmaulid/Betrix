@@ -88,6 +88,24 @@ export class PgSymbolRepository implements SymbolRepository {
     return rows[0] ? this.mapRow(rows[0]) : null;
   }
 
+  async getStoredCount(): Promise<number> {
+    const { rows } = await pgClient.query(
+      `SELECT COUNT(*) as count FROM broker_symbols`
+    );
+    return parseInt(rows[0]?.count || "0");
+  }
+
+  async setStoredCount(count: number): Promise<void> {
+    // Store the count in a metadata table or use a simple key-value approach
+    // For simplicity, we'll use a simple key-value approach in a metadata table
+    await pgClient.query(
+      `INSERT INTO symbol_sync_metadata (key, value, updated_at)
+       VALUES ('stored_count', $1, CURRENT_TIMESTAMP)
+       ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = CURRENT_TIMESTAMP`,
+      [String(count)]
+    );
+  }
+
   private mapRow(row: any): BrokerSymbol {
     return new BrokerSymbol(
       row.symbol, row.description, row.path, row.category,

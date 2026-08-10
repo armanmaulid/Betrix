@@ -1,4 +1,4 @@
-import { Request, Response, NextFunction } from "express";
+import type { Request, Response, NextFunction } from "express";
 import { container } from "tsyringe";
 import { RegisterUseCase } from "@application/use-cases/auth/RegisterUseCase.js";
 import { LoginUseCase } from "@application/use-cases/auth/LoginUseCase.js";
@@ -11,7 +11,7 @@ import { GetProfileUseCase } from "@application/use-cases/auth/GetProfileUseCase
 import { UpdateProfileUseCase } from "@application/use-cases/auth/UpdateProfileUseCase.js";
 import { GetSessionsUseCase } from "@application/use-cases/auth/GetSessionsUseCase.js";
 import { RevokeSessionUseCase } from "@application/use-cases/auth/RevokeSessionUseCase.js";
-import { RequestInput } from "@core/utils/request.js";
+import type { RequestInput } from "@core/utils/request.js";
 
 export class AuthController {
   private getRequestInput(req: Request): RequestInput {
