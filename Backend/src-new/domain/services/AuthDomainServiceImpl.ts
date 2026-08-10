@@ -7,7 +7,7 @@ import { User, UserStatus } from "@domain/entities/User.js";
 import { Session } from "@domain/entities/Session.js";
 import { Device } from "@domain/entities/Device.js";
 import { DeviceFingerprint } from "@domain/value-objects/index.js";
-import { AuthenticationError, ConflictError } from "@core/errors/index.js";
+import { AuthenticationError, ConflictError, InternalError } from "@core/errors/index.js";
 import { generateSecureToken } from "@core/utils/index.js";
 import { isDeviceEnforcementEnabled } from "@config/deviceEnforcement.js";
 import { LIMITS } from "@core/constants/index.js";
@@ -30,9 +30,11 @@ export class AuthDomainService {
     sessionToken?: string;
   }> {
     if (isDeviceEnforcementEnabled()) {
-      const fingerprint = new DeviceFingerprint(request.headers["user-agent"]); // Simplified
-      const existingSession = await this.deviceSessionRepo.getSessionByDevice(user.id, fingerprint.value);
-      if (existingSession) {
+      // Atomic check-and-set to prevent TOCTOU race condition
+      const fingerprint = DeviceFingerprint.create(request);
+      const result = await this.deviceSessionRepo.setSessionForDeviceAtomic(user.id, fingerprint.value, ""); // placeholder token
+
+      if (!result.success) {
         return { ok: false, status: 403, error: "Device already has active session", hasActiveSession: true };
       }
     }
@@ -41,14 +43,21 @@ export class AuthDomainService {
     await this.sessionRepo.save(Session.create({
       userId: user.id,
       token: sessionToken,
-      deviceFingerprint: isDeviceEnforcementEnabled() ? request.headers["user-agent"] : null,
+      deviceFingerprint: isDeviceEnforcementEnabled() ? DeviceFingerprint.create(request).value : null,
       ip: request.ip,
       userAgent: request.headers["user-agent"],
     }));
 
     if (isDeviceEnforcementEnabled()) {
-      const fingerprint = new DeviceFingerprint(request.headers["user-agent"]);
-      await this.deviceSessionRepo.setSessionForDevice(user.id, fingerprint.value, sessionToken);
+      const fingerprint = DeviceFingerprint.create(request);
+      // Atomic replace - returns old token if existed
+      const oldToken = await this.deviceSessionRepo.replaceSessionForDevice(user.id, fingerprint.value, sessionToken);
+      
+      // If there was an old session, revoke it
+      if (oldToken) {
+        await this.sessionRepo.delete(oldToken);
+      }
+      
       await this.deviceRepo.bind(Device.create({ userId: user.id, fingerprint: fingerprint.value }));
     }
 
