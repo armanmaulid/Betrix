@@ -1,6 +1,10 @@
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 import { env } from "@config/env";
 import { Request } from "express";
+
+function createIpKeyGenerator() {
+  return (req: Request) => ipKeyGenerator(req.ip || "unknown");
+}
 
 export function createRateLimiter(options: {
   windowMs: number;
@@ -14,7 +18,7 @@ export function createRateLimiter(options: {
     message: { error: options.message },
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: options.keyGenerator || ((req) => req.ip || "unknown"),
+    keyGenerator: options.keyGenerator || createIpKeyGenerator(),
   });
 }
 
@@ -42,6 +46,6 @@ export const perUserLimiter = createRateLimiter({
   message: "Terlalu banyak request untuk akun ini, coba lagi sebentar lagi",
   keyGenerator: (req) => {
     const userId = (req as any).user?.id;
-    return userId ? `user:${userId}` : req.ip || "unknown";
+    return userId ? `user:${userId}` : ipKeyGenerator(req.ip || "unknown");
   },
 });

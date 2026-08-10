@@ -14,7 +14,7 @@ import { env } from "@config/env";
 import { logger } from "@core/logging/logger.js";
 import { closePgClient } from "@data/orm/pgClient.js";
 import { closeRedisClient } from "@data/orm/redisClient.js";
-import "./config/passport.js";
+import "../config/passport.js";
 
 export async function createApp() {
   registerDependencies();

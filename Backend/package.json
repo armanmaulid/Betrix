@@ -5,15 +5,15 @@
   "type": "module",
   "main": "dist/main.js",
   "scripts": {
-    "dev": "tsx watch src/main.ts",
-    "build": "tsc",
+    "dev": "tsx watch src-new/main.ts",
+    "build": "tsc && tsc-alias --resolve-full-paths --resolve-full-extension .js",
     "start": "node dist/main.js",
-    "migrate": "tsx src/data/orm/migrate.ts",
+    "migrate": "tsx src-new/data/orm/migrate.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "lint": "eslint src --ext .ts",
-    "lint:fix": "eslint src --ext .ts --fix"
+    "lint": "eslint src-new --ext .ts",
+    "lint:fix": "eslint src-new --ext .ts --fix"
   },
   "dependencies": {
     "@upstash/redis": "^1.38.0",
@@ -27,11 +27,13 @@
     "fast-xml-parser": "^5.10.1",
     "figlet": "^1.11.3",
     "helmet": "^8.2.0",
+    "module-alias": "^2.3.4",
     "nodemailer": "^9.0.3",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "pg": "^8.12.0",
     "reflect-metadata": "^0.2.2",
+    "tsconfig-paths": "^4.2.0",
     "tsyringe": "^4.8.0",
     "ua-parser-js": "^2.0.10",
     "winston": "^3.19.0",
@@ -56,6 +58,7 @@
     "@vitest/coverage-v8": "^2.0.5",
     "eslint": "^9.9.1",
     "prettier": "^3.3.3",
+    "tsc-alias": "^1.9.1",
     "tsx": "^4.19.0",
     "typescript": "^5.9.3",
     "vitest": "^2.0.5"
