@@ -90,9 +90,9 @@ export class PgSymbolRepository implements SymbolRepository {
 
   async getStoredCount(): Promise<number> {
     const { rows } = await pgClient.query(
-      `SELECT COUNT(*) as count FROM broker_symbols`
+      `SELECT value FROM symbol_sync_metadata WHERE key = 'stored_count'`
     );
-    return parseInt(rows[0]?.count || "0");
+    return rows[0] ? parseInt(rows[0].value) : 0;
   }
 
   async setStoredCount(count: number): Promise<void> {
