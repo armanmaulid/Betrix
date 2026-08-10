@@ -380,7 +380,7 @@ router.get("/candles", async (req, res) => {
         high: q.high,
         low: q.low,
         close: q.close,
-        volume: q.real_volume || q.tick_volume || 0
+        volume: q.volume || 0
       }));
 
       if (candles.length > limit) {

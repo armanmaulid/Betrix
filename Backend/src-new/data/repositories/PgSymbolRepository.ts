@@ -32,10 +32,22 @@ export class PgSymbolRepository implements SymbolRepository {
     try {
       await client.query("BEGIN");
       let count = 0;
-      for (const symbol of symbols) {
+      const chunkSize = 500;
+      
+      for (let i = 0; i < symbols.length; i += chunkSize) {
+        const chunk = symbols.slice(i, i + chunkSize);
+        const values: any[] = [];
+        const placeholders: string[] = [];
+        let pIndex = 1;
+        
+        for (const symbol of chunk) {
+          placeholders.push(`($${pIndex++},$${pIndex++},$${pIndex++},$${pIndex++},$${pIndex++},$${pIndex++},$${pIndex++},$${pIndex++})`);
+          values.push(symbol.symbol, symbol.description, symbol.path, symbol.category, symbol.tradeMode, symbol.isActive, symbol.createdAt, symbol.updatedAt);
+        }
+        
         const { rowCount } = await client.query(
           `INSERT INTO broker_symbols (symbol, description, path, category, trade_mode, is_active, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+           VALUES ${placeholders.join(',')}
            ON CONFLICT (symbol) DO UPDATE SET
              description = EXCLUDED.description,
              path = EXCLUDED.path,
@@ -43,10 +55,7 @@ export class PgSymbolRepository implements SymbolRepository {
              trade_mode = EXCLUDED.trade_mode,
              is_active = EXCLUDED.is_active,
              updated_at = EXCLUDED.updated_at`,
-          [
-            symbol.symbol, symbol.description, symbol.path, symbol.category,
-            symbol.tradeMode, symbol.isActive, symbol.createdAt, symbol.updatedAt
-          ]
+          values
         );
         count += rowCount || 0;
       }

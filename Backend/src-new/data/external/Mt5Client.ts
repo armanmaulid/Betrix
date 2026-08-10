@@ -118,16 +118,7 @@ export class Mt5Client {
     
     return new Promise((resolve, reject) => {
       try {
-        // EA expects "Sec-WebSocket-Key" (capitalized) not "sec-websocket-key" (lowercase)
-        // Node's ws library sends lowercase by default; override with correct case
-        this.ws = new WebSocket(env.MT5_WS_URL || `ws://${env.MT5_BRIDGE_URL}`, {
-          headers: {
-            "Sec-WebSocket-Key": "dGhlIHNhbXBsZSBub25jZQ==", // placeholder; ws lib will replace with real key
-            "Sec-WebSocket-Version": "13",
-            "Connection": "Upgrade",
-            "Upgrade": "websocket",
-          },
-        });
+        this.ws = new WebSocket(env.MT5_WS_URL || `ws://${env.MT5_BRIDGE_URL}`);
         
         this.ws.onopen = () => {
           logger.info("MT5 WebSocket connected", { context: "MT5" });
@@ -226,15 +217,24 @@ export class Mt5Client {
   }
 
   private async handleOHLCUpdate(msg: any): Promise<void> {
+    if (!msg.bars || !Array.isArray(msg.bars) || msg.bars.length === 0) return;
+    
+    // Extract current (0) and previous (1) candle.
+    // MT5 natively skips weekends/holidays, so bars[1] is ALWAYS the last valid trading day.
+    const latestBar = msg.bars[0];
+    const previousBar = msg.bars.length > 1 ? msg.bars[1] : null;
+    
     const update = {
       symbol: msg.symbol,
       timeframe: msg.timeframe,
-      time: msg.time,
-      open: msg.open,
-      high: msg.high,
-      low: msg.low,
-      close: msg.close,
-      volume: msg.volume
+      time: latestBar.time,
+      open: latestBar.open,
+      high: latestBar.high,
+      low: latestBar.low,
+      close: latestBar.close,
+      volume: latestBar.volume,
+      // Include previous close for daily % change calculations
+      prev_close: previousBar ? previousBar.close : latestBar.open
     };
 
     // Cache in Redis
@@ -247,10 +247,23 @@ export class Mt5Client {
   }
 
   private async handleMarketBookUpdate(msg: any): Promise<void> {
+    const bids: Array<{price: number, volume: number}> = [];
+    const asks: Array<{price: number, volume: number}> = [];
+
+    if (msg.market_book && Array.isArray(msg.market_book)) {
+      for (const item of msg.market_book) {
+        if (item.type === "BOOK_TYPE_BUY") {
+          bids.push({ price: item.price, volume: item.volume });
+        } else if (item.type === "BOOK_TYPE_SELL") {
+          asks.push({ price: item.price, volume: item.volume });
+        }
+      }
+    }
+
     const update = {
       symbol: msg.symbol,
-      bids: msg.bids || [],
-      asks: msg.asks || []
+      bids,
+      asks
     };
 
     // Cache in Redis
@@ -263,15 +276,19 @@ export class Mt5Client {
   }
 
   private async handleCalendarUpdate(msg: any): Promise<void> {
-    const update = {
-      event_id: msg.event_id,
-      actual: msg.actual,
-      forecast: msg.forecast,
-      previous: msg.previous
-    };
+    if (!msg.events || !Array.isArray(msg.events)) return;
 
-    if (this.onCalendarUpdate) {
-      this.onCalendarUpdate(update);
+    for (const event of msg.events) {
+      const update = {
+        event_id: event.event_id,
+        actual: event.actual,
+        forecast: event.forecast,
+        previous: event.previous
+      };
+
+      if (this.onCalendarUpdate) {
+        this.onCalendarUpdate(update);
+      }
     }
   }
 

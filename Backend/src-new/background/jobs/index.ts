@@ -58,28 +58,48 @@ export async function runStartupJobs() {
   try {
     const symbolRepo = container.resolve("SymbolRepository") as { findActive: () => Promise<Array<{ symbol: string }>> };
     const activeSymbols = await symbolRepo.findActive();
-    const trackingSymbols = activeSymbols.map(s => s.symbol).slice(0, 100);
+    const trackingSymbols = [
+      "EURUSD", "GBPUSD", "USDJPY", "USDCAD", "AUDUSD", "NZDUSD", "USDCHF", // Forex Majors
+      "XAUUSD", "XAGUSD", // Metals
+      "XTIUSD", // Oil (WTI)
+      "BTCUSD", "ETHUSD"  // Crypto
+    ];
     
     if (trackingSymbols.length > 0) {
-      await container.resolve(Mt5Client).trackPrices(trackingSymbols);
-      logger.info(`Subscribed to price tracking for ${trackingSymbols.length} symbols`, { context: "MT5" });
+      try {
+        await container.resolve(Mt5Client).trackPrices(trackingSymbols);
+        logger.info(`Subscribed to price tracking for ${trackingSymbols.length} major symbols`, { context: "MT5" });
+      } catch (e) {
+        logger.error(`Failed to track prices: ${(e as Error).message}`, { context: "MT5" });
+      }
       
-      const majorSymbols = trackingSymbols.slice(0, 20);
-      const ohlcRequests = majorSymbols.map(symbol => ({
-        symbol,
-        timeframe: "M5",
-        depth: 3
-      }));
-      await container.resolve(Mt5Client).trackOHLC(ohlcRequests);
-      logger.info(`Subscribed to OHLC tracking for ${ohlcRequests.length} symbols`, { context: "MT5" });
+      try {
+        const ohlcRequests = trackingSymbols.map(symbol => ({
+          symbol,
+          timeframe: "D1",
+          depth: 2 // 0: Today (live), 1: Yesterday (completed)
+        }));
+        await container.resolve(Mt5Client).trackOHLC(ohlcRequests);
+        logger.info(`Subscribed to OHLC tracking for ${ohlcRequests.length} symbols`, { context: "MT5" });
+      } catch (e) {
+        logger.error(`Failed to track OHLC: ${(e as Error).message}`, { context: "MT5" });
+      }
       
-      const mbookSymbols = trackingSymbols.slice(0, 10);
-      await container.resolve(Mt5Client).trackMarketBook(mbookSymbols);
-      logger.info(`Subscribed to market book tracking for ${mbookSymbols.length} symbols`, { context: "MT5" });
+      try {
+        // Send empty array to explicitly tell the EA to CLEAR its internal mbook array and stop spamming
+        await container.resolve(Mt5Client).trackMarketBook([]);
+        logger.info(`Disabled market book tracking (Broker does not support it)`, { context: "MT5" });
+      } catch (e) {
+        logger.error(`Failed to clear market book tracking: ${(e as Error).message}`, { context: "MT5" });
+      }
     }
     
-    await container.resolve(Mt5Client).trackCalendar("", "");
-    logger.info("Subscribed to calendar tracking", { context: "MT5" });
+    try {
+      await container.resolve(Mt5Client).trackCalendar("ALL", "ALL");
+      logger.info("Subscribed to calendar tracking", { context: "MT5" });
+    } catch (e) {
+      logger.error(`Failed to track calendar: ${(e as Error).message}`, { context: "MT5" });
+    }
   } catch (err) {
     logger.error("Failed to setup MT5 tracking subscriptions", { context: "MT5", error: (err as Error).message });
   }

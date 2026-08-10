@@ -60,23 +60,19 @@ const consoleFormatter = printf(({ level, message, timestamp, context, ...meta }
     !["level", "message", "timestamp", "context", "pid", "stack"].includes(k)
   );
   
-  if (Object.keys(meta).length > 0) {
+  if (keys.length > 0) {
     const metaObj: Record<string, unknown> = {};
-    for (const key of Object.keys(meta)) {
-      if (!["level", "message", "timestamp", "context", "pid", "stack"].includes(key)) {
-        meta[key as keyof typeof meta] = meta[key];
-      }
+    for (const key of keys) {
+      metaObj[key] = meta[key as keyof typeof meta];
     }
     
-    if (Object.keys(meta).length > 0) {
-      const metaStr = "\n" + JSON.stringify(meta, (_, v) => {
-        if (typeof v === "string" && v.length > 1000) {
-          return truncate(v, 200);
-        }
-        return v;
-      }, 2);
-      msg += chalk.gray(metaStr);
-    }
+    const metaStr = "\n" + JSON.stringify(metaObj, (_, v) => {
+      if (typeof v === "string" && v.length > 1000) {
+        return truncate(v, 200);
+      }
+      return v;
+    }, 2);
+    msg += chalk.gray(metaStr);
   }
 
   if (meta.stack) {
