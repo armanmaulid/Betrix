@@ -4,6 +4,41 @@ import { BrokerSymbol } from "@domain/entities/BrokerSymbol.js";
 import { CalendarEvent } from "@domain/entities/CalendarEvent.js";
 import { SymbolRepository } from "@domain/repositories/SymbolRepository.js";
 import { CalendarRepository } from "@domain/repositories/CalendarRepository.js";
+import { redisClient } from "../orm/redisClient.js";
+
+interface PriceTick {
+  symbol: string;
+  bid: number;
+  ask: number;
+  spread: number;
+  digits: number;
+  volume: number;
+  timestamp: number;
+}
+
+interface OHLCUpdate {
+  symbol: string;
+  timeframe: string;
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+interface MarketBookUpdate {
+  symbol: string;
+  bids: Array<{ price: number; volume: number }>;
+  asks: Array<{ price: number; volume: number }>;
+}
+
+interface CalendarUpdate {
+  event_id: number;
+  actual: string | null;
+  forecast: string | null;
+  previous: string | null;
+}
 
 export class Mt5Client {
   private ws: WebSocket | null = null;
@@ -11,18 +46,35 @@ export class Mt5Client {
   private readonly MAX_RECONNECT_ATTEMPTS = 10;
   private readonly RECONNECT_DELAY = 5000;
 
-  private symbolRepo: SymbolRepository;
-  private calendarRepo: CalendarRepository;
+  private symbolRepo: any;
+  private calendarRepo: any;
+
+  // Callbacks for real-time data
+  private onPriceTick: ((tick: PriceTick) => void) | null = null;
+  private onOHLCUpdate: ((update: OHLCUpdate) => void) | null = null;
+  private onMarketBookUpdate: ((update: MarketBookUpdate) => void) | null = null;
+  private onCalendarUpdate: ((update: CalendarUpdate) => void) | null = null;
 
   constructor() {
-    // Repositories will be injected via container
-    this.symbolRepo = null as any;
-    this.calendarRepo = null as any;
+    this.symbolRepo = null;
+    this.calendarRepo = null;
   }
 
-  setRepositories(symbolRepo: SymbolRepository, calendarRepo: CalendarRepository) {
+  setRepositories(symbolRepo: any, calendarRepo: any) {
     this.symbolRepo = symbolRepo;
     this.calendarRepo = calendarRepo;
+  }
+
+  setCallbacks(callbacks: {
+    onPriceTick?: (tick: PriceTick) => void;
+    onOHLCUpdate?: (update: OHLCUpdate) => void;
+    onMarketBookUpdate?: (update: MarketBookUpdate) => void;
+    onCalendarUpdate?: (update: CalendarUpdate) => void;
+  }) {
+    this.onPriceTick = callbacks.onPriceTick || null;
+    this.onOHLCUpdate = callbacks.onOHLCUpdate || null;
+    this.onMarketBookUpdate = callbacks.onMarketBookUpdate || null;
+    this.onCalendarUpdate = callbacks.onCalendarUpdate || null;
   }
 
   async connect(): Promise<void> {
@@ -80,7 +132,16 @@ export class Mt5Client {
       
       switch (msg.type) {
         case "tick":
-          // Handle price updates
+          this.handlePriceTick(msg);
+          break;
+        case "ohlc_update":
+          this.handleOHLCUpdate(msg);
+          break;
+        case "track_mbook":
+          this.handleMarketBookUpdate(msg);
+          break;
+        case "calendar_update":
+          this.handleCalendarUpdate(msg);
           break;
         case "symbols":
           this.handleSymbols(msg.data);
@@ -94,14 +155,91 @@ export class Mt5Client {
     }
   }
 
+  private async handlePriceTick(msg: any): Promise<void> {
+    const tick: PriceTick = {
+      symbol: msg.symbol,
+      bid: msg.bid,
+      ask: msg.ask,
+      spread: msg.spread,
+      digits: msg.digits,
+      volume: msg.volume,
+      timestamp: msg.timestamp || Date.now()
+    };
+
+    // Cache in Redis for fast access
+    const cacheKey = `mt5:price:${tick.symbol}`;
+    await redisClient.setex(cacheKey, 60, JSON.stringify(tick)); // 60s TTL
+
+    // Fire callback
+    if (this.onPriceTick) {
+      this.onPriceTick(tick);
+    }
+  }
+
+  private async handleOHLCUpdate(msg: any): Promise<void> {
+    const update: OHLCUpdate = {
+      symbol: msg.symbol,
+      timeframe: msg.timeframe,
+      time: msg.time,
+      open: msg.open,
+      high: msg.high,
+      low: msg.low,
+      close: msg.close,
+      volume: msg.volume
+    };
+
+    // Cache in Redis
+    const cacheKey = `mt5:ohlc:${update.symbol}:${update.timeframe}`;
+    await redisClient.setex(cacheKey, 300, JSON.stringify(update)); // 5min TTL
+
+    if (this.onOHLCUpdate) {
+      this.onOHLCUpdate(update);
+    }
+  }
+
+  private async handleMarketBookUpdate(msg: any): Promise<void> {
+    const update: MarketBookUpdate = {
+      symbol: msg.symbol,
+      bids: msg.bids || [],
+      asks: msg.asks || []
+    };
+
+    // Cache in Redis
+    const cacheKey = `mt5:mbook:${update.symbol}`;
+    await redisClient.setex(cacheKey, 60, JSON.stringify(update)); // 60s TTL
+
+    if (this.onMarketBookUpdate) {
+      this.onMarketBookUpdate(update);
+    }
+  }
+
+  private async handleCalendarUpdate(msg: any): Promise<void> {
+    const update: CalendarUpdate = {
+      event_id: msg.event_id,
+      actual: msg.actual,
+      forecast: msg.forecast,
+      previous: msg.previous
+    };
+
+    if (this.onCalendarUpdate) {
+      this.onCalendarUpdate(update);
+    }
+  }
+
   private async handleSymbols(data: any[]): Promise<void> {
     if (!this.symbolRepo) return;
     
     for (const s of data) {
-      const symbol = new BrokerSymbol(
-        s.symbol, s.description, s.path, s.category,
-        s.trade_mode, s.is_active, new Date(), new Date()
-      );
+      const symbol = {
+        symbol: s.symbol,
+        description: s.description,
+        path: s.path,
+        category: s.category,
+        trade_mode: s.trade_mode,
+        is_active: s.is_active,
+        created_at: new Date(),
+        updated_at: new Date()
+      };
       await this.symbolRepo.save(symbol);
     }
   }
@@ -110,17 +248,51 @@ export class Mt5Client {
     if (!this.calendarRepo) return;
     
     for (const c of data) {
-      const event = new CalendarEvent(
-        c.value_id, c.event_id, new Date(c.event_time),
-        c.country, c.currency, c.event_name,
-        c.importance, c.actual, c.forecast, c.previous,
-        new Date(), new Date()
-      );
+      const event = {
+        value_id: c.value_id,
+        event_id: c.event_id,
+        event_time: new Date(c.event_time),
+        country: c.country,
+        currency: c.currency,
+        event_name: c.event_name,
+        importance: c.importance,
+        actual: c.actual,
+        forecast: c.forecast,
+        previous: c.previous,
+        created_at: new Date(),
+        updated_at: new Date()
+      };
       await this.calendarRepo.save(event);
     }
   }
 
-  async fetchSymbols(): Promise<BrokerSymbol[]> {
+  // REST API methods for tracking subscriptions
+  async trackPrices(symbols: string[]): Promise<void> {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.ws.send(JSON.stringify({ action: "track_prices", symbols }));
+  }
+
+  async trackOHLC(requests: Array<{ symbol: string; timeframe: string; depth: number }>): Promise<void> {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.ws.send(JSON.stringify({ action: "track_ohlc", ohlc: requests }));
+  }
+
+  async trackMarketBook(symbols: string[]): Promise<void> {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.ws.send(JSON.stringify({ action: "track_mbook", symbols }));
+  }
+
+  async trackCalendar(country?: string, currency?: string): Promise<void> {
+    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+    this.ws.send(JSON.stringify({ 
+      action: "track_calendar", 
+      country: country || "", 
+      currency: currency || "" 
+    }));
+  }
+
+  // REST API methods for fetching data
+  async fetchSymbols(): Promise<any[]> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return [];
     return new Promise((resolve) => {
       const timeout = setTimeout(() => resolve([]), 5000);
@@ -137,7 +309,7 @@ export class Mt5Client {
     });
   }
 
-  async fetchCalendar(): Promise<CalendarEvent[]> {
+  async fetchCalendar(): Promise<any[]> {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return [];
     return new Promise((resolve) => {
       const timeout = setTimeout(() => resolve([]), 5000);
@@ -152,6 +324,27 @@ export class Mt5Client {
       this.ws!.addEventListener("message", handler, { once: true });
       this.ws!.send(JSON.stringify({ action: "get_calendar" }));
     });
+  }
+
+  async getPrice(symbol: string): Promise<PriceTick | null> {
+    const cacheKey = `mt5:price:${symbol}`;
+    const data = await redisClient.get<string | null>(cacheKey);
+    if (data) return JSON.parse(data);
+    return null;
+  }
+
+  async getOHLC(symbol: string, timeframe: string): Promise<OHLCUpdate | null> {
+    const cacheKey = `mt5:ohlc:${symbol}:${timeframe}`;
+    const data = await redisClient.get<string | null>(cacheKey);
+    if (data) return JSON.parse(data);
+    return null;
+  }
+
+  async getMarketBook(symbol: string): Promise<MarketBookUpdate | null> {
+    const cacheKey = `mt5:mbook:${symbol}`;
+    const data = await redisClient.get<string | null>(cacheKey);
+    if (data) return JSON.parse(data);
+    return null;
   }
 
   disconnect(): void {

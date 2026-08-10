@@ -8,4 +8,5 @@ export * from "./CleanupService.js";
 export * from "./SymbolService.js";
 export * from "./CalendarService.js";
 export * from "./NewsService.js";
+export * from "./MarketDataService.js";
 export * from "./thinkingFilter.js";

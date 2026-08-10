@@ -48,10 +48,46 @@ export async function runStartupJobs() {
 
   // Initialize MT5 and Finnhub
   const mt5Client = container.resolve(Mt5Client);
+  
+  // Get active symbols for tracking
+  // Note: We can't easily get symbols here without SymbolRepository, so we'll skip for now
+  // The MT5 client will subscribe to all symbols via the "subscribe" action
+  
+  // Set up MT5 callbacks for real-time data
+  mt5Client.setCallbacks({
+    onPriceTick: async (tick) => {
+      // Price is already cached in Redis by Mt5Client
+      logger.debug(`Price update: ${tick.symbol} bid=${tick.bid} ask=${tick.ask}`, { context: "MT5" });
+    },
+    onOHLCUpdate: async (update) => {
+      logger.debug(`OHLC update: ${update.symbol} ${update.timeframe}`, { context: "MT5" });
+    },
+    onMarketBookUpdate: async (update) => {
+      logger.debug(`Market book update: ${update.symbol}`, { context: "MT5" });
+    },
+    onCalendarUpdate: async (update) => {
+      logger.debug(`Calendar update: event ${update.event_id}`, { context: "MT5" });
+    }
+  });
+
   mt5Client.connect().catch(err => 
     logger.error("MT5 connection failed", { context: "MT5", error: err.message })
   );
   logger.info("MT5 Bridge Client initialized", { context: "MT5" });
+  
+  // Wait a moment for connection, then subscribe to tracking
+  setTimeout(async () => {
+    try {
+      // The MT5 client subscribes to all symbols via the "subscribe" action on connect
+      // No need to manually track prices here since the MT5 client handles it
+      
+      // Subscribe to calendar updates
+      await mt5Client.trackCalendar("", "");
+      logger.info("Subscribed to calendar tracking", { context: "MT5" });
+    } catch (err) {
+      logger.error("Failed to setup MT5 tracking subscriptions", { context: "MT5", error: (err as Error).message });
+    }
+  }, 2000); // Wait 2 seconds for WebSocket connection
   
   container.resolve(FinnhubClient);
   logger.info("Finnhub Client initialized", { context: "Finnhub" });

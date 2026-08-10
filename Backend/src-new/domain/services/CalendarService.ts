@@ -3,6 +3,7 @@ import { CalendarRepository } from "@domain/repositories/CalendarRepository.js";
 import { CalendarEvent } from "@domain/entities/CalendarEvent.js";
 import { Mt5Client } from "@data/external/Mt5Client.js";
 import { logger } from "@core/logging/logger.js";
+import { CalendarQuery } from "@domain/repositories/CalendarRepository.js";
 
 @injectable()
 export class CalendarService {
@@ -31,6 +32,10 @@ export class CalendarService {
     }
 
     this.lastSync = new Date();
+  }
+
+  async getCalendar(query: CalendarQuery): Promise<CalendarEvent[]> {
+    return this.calendarRepo.findByQuery(query);
   }
 
   async cleanupOldEvents(): Promise<number> {

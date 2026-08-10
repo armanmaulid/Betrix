@@ -71,6 +71,7 @@ import { ChatController } from "@presentation/controllers/ChatController.js";
 import { AdminController } from "@presentation/controllers/AdminController.js";
 import { UserController } from "@presentation/controllers/UserController.js";
 import { MarketController } from "@presentation/controllers/MarketController.js";
+import { MarketDataService } from "@domain/services/MarketDataService.js";
 
 export function registerDependencies() {
   // Repositories
@@ -134,6 +135,9 @@ export function registerDependencies() {
   container.register("GetSymbolsUseCase", { useClass: GetSymbolsUseCase });
   container.register("GetCalendarUseCase", { useClass: GetCalendarUseCase });
   container.register("WarmupMarketCacheUseCase", { useClass: WarmupMarketCacheUseCase });
+
+  // Services
+  container.register("MarketDataService", { useClass: MarketDataService });
 
   // Controllers
   container.register("AuthController", { useClass: AuthController });

@@ -1,6 +1,6 @@
 import { injectable } from "tsyringe";
 import { pgClient } from "../orm/pgClient.js";
-import { CalendarRepository } from "@domain/repositories/CalendarRepository.js";
+import { CalendarRepository, CalendarQuery } from "@domain/repositories/CalendarRepository.js";
 import { CalendarEvent, CalendarImportance } from "@domain/entities/CalendarEvent.js";
 
 @injectable()
@@ -113,6 +113,56 @@ export class PgCalendarRepository implements CalendarRepository {
       `SELECT MAX(event_time) as max_time FROM calendar_events`
     );
     return rows[0]?.max_time || null;
+  }
+
+  async findByQuery(query: CalendarQuery): Promise<CalendarEvent[]> {
+    const conditions: string[] = [];
+    const params: any[] = [];
+    let paramIndex = 1;
+
+    if (query.startDate) {
+      conditions.push(`event_time >= $${paramIndex}`);
+      params.push(query.startDate);
+      paramIndex++;
+    }
+
+    if (query.endDate) {
+      conditions.push(`event_time < $${paramIndex}`);
+      params.push(query.endDate);
+      paramIndex++;
+    }
+
+    if (query.country) {
+      conditions.push(`country = $${paramIndex}`);
+      params.push(query.country);
+      paramIndex++;
+    }
+
+    if (query.currency) {
+      conditions.push(`currency = $${paramIndex}`);
+      params.push(query.currency);
+      paramIndex++;
+    }
+
+    if (query.importance) {
+      conditions.push(`importance = $${paramIndex}`);
+      params.push(query.importance);
+      paramIndex++;
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
+    const limit = query.limit || 100;
+
+    const queryStr = `
+      SELECT * FROM calendar_events 
+      ${whereClause}
+      ORDER BY event_time DESC 
+      LIMIT $${paramIndex}
+    `;
+    params.push(limit);
+
+    const { rows } = await pgClient.query(queryStr, params);
+    return rows.map(this.mapRow);
   }
 
   private mapRow(row: any): CalendarEvent {
