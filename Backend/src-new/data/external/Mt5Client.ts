@@ -87,7 +87,16 @@ export class Mt5Client {
     
     return new Promise((resolve, reject) => {
       try {
-        this.ws = new WebSocket(env.MT5_WS_URL || `ws://${env.MT5_BRIDGE_URL}`);
+        // EA expects "Sec-WebSocket-Key" (capitalized) not "sec-websocket-key" (lowercase)
+        // Node's ws library sends lowercase by default; override with correct case
+        this.ws = new WebSocket(env.MT5_WS_URL || `ws://${env.MT5_BRIDGE_URL}`, {
+          headers: {
+            "Sec-WebSocket-Key": "dGhlIHNhbXBsZSBub25jZQ==", // placeholder; ws lib will replace with real key
+            "Sec-WebSocket-Version": "13",
+            "Connection": "Upgrade",
+            "Upgrade": "websocket",
+          },
+        });
         
         this.ws.onopen = () => {
           logger.info("MT5 WebSocket connected", { context: "MT5" });
