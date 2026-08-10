@@ -20,7 +20,7 @@ src-new/
 ├── domain/                 # Pure business logic (zero framework deps)
 │   ├── entities/          # User, Session, ChatMessage, CreditTransaction, Device, AdminAction, Message, NewsArticle, BrokerSymbol, CalendarEvent
 │   ├── repositories/      # Repository interfaces (ports)
-│   ├── services/          # Domain services (AuthDomainService, CreditDomainService, etc.)
+│   ├── services/          # Domain services (AuthDomainService, DeviceDomainService, ChatDomainService, etc.)
 │   ├── events/            # Domain events (UserRegistered, CreditsDeducted, etc.)
 │   └── value-objects/     # Email, DeviceFingerprint, SessionToken
 ├── data/                   # Infrastructure implementations (adapters)
@@ -31,11 +31,11 @@ src-new/
 ├── application/            # Use cases (orchestration layer)
 │   ├── dtos/              # Zod schemas for request validation
 │   ├── use-cases/         # 30+ use cases organized by feature
-│   ├── ports/             # Output ports (EmailPort, AiPort, CachePort, EventBusPort)
+│   └── ports/             # Output ports (EmailPort, AiPort, CachePort)
 ├── presentation/           # HTTP layer
 │   ├── routes/v1/         # API routes (auth, chat, admin, user, market, health)
 │   ├── middleware/        # auth, admin, credits, validate
-│   ├── controllers/       # Thin adapters: HTTP → UseCase
+│   └── controllers/       # Thin adapters: HTTP → UseCase
 ├── bootstrap/              # App initialization
 │   ├── container.ts       # tsyringe DI registration
 │   ├── registerRoutes.ts
@@ -48,13 +48,20 @@ src-new/
 
 ## Key Features
 
-- **Clean Architecture**: Strict layer separation with dependency inversion
-- **Type Safety**: Full TypeScript with strict mode, Zod validation
-- **Dependency Injection**: tsyringe with decorators
-- **Structured Logging**: Winston with daily rotation, request IDs
-- **Security**: Helmet, CORS whitelist, rate limiting (IP + per-user), input sanitization, device enforcement
-- **AI Integration**: Model routing by task type, streaming, credit-based billing with refunds
-- **Background Jobs**: Cron-based cleanup, symbol/calendar sync, news polling
+| Feature | Implementation |
+|---------|----------------|
+| **Auth** | JWT + Google OAuth, device fingerprinting, email verification, session management |
+| **AI Chat** | Model routing by task type (cheap/balanced/deep), streaming, credit billing with refunds |
+| **Credits** | Pre-deduction, refund on failure, tier-based pricing (1/3/5 credits) |
+| **Device Enforcement** | Optional one-device-per-account via fingerprint (IP + UA + browser + OS) |
+| **Admin** | User management, analytics, audit logs, broadcast messaging |
+| **Market Data** | MT5 symbols, economic calendar, Finnhub news |
+| **Security** | Helmet, CORS, rate limiting (IP + per-user), input sanitization |
+
+### Recent Fixes
+- **Chat credit double-deduction fixed**: Removed redundant middleware; use case now owns full deduct→call→refund lifecycle
+- **Session token hashing**: Tokens hashed with SHA-256 before Redis storage (SHA-256)
+- **Dead code removed**: Unused `CreditDomainService` interface deleted
 
 ## Quick Start
 
