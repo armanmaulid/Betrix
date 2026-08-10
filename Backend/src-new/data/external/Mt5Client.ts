@@ -104,8 +104,10 @@ export class Mt5Client {
         };
 
         this.ws.onerror = (err) => {
-          logger.error("MT5 WebSocket error", { context: "MT5", error: err });
-          reject(err);
+          // ErrorEvent is not an Error - convert to proper Error for rejection
+          const error = err instanceof Error ? err : new Error(`WebSocket error: ${err?.message || "Unknown error"}`);
+          logger.error("MT5 WebSocket error", { context: "MT5", error: error.message });
+          reject(error);
         };
       } catch (err) {
         logger.error("Failed to connect to MT5", { context: "MT5", error: (err as Error).message });
@@ -124,7 +126,11 @@ export class Mt5Client {
     this.reconnectAttempts++;
     const delay = this.RECONNECT_DELAY * Math.min(this.reconnectAttempts, 5);
     logger.info(`Reconnecting to MT5 in ${delay}ms (attempt ${this.reconnectAttempts})`, { context: "MT5" });
-    setTimeout(() => this.connect(), delay);
+    setTimeout(() => {
+      this.connect().catch(err => {
+        logger.error("MT5 reconnection failed", { context: "MT5", error: (err as Error).message });
+      });
+    }, delay);
   }
 
   private subscribeToSymbols(): void {
