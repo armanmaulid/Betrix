@@ -5,7 +5,7 @@ A clean, type-safe backend for the Betrix forex trading platform with AI orchest
 ## Architecture Overview
 
 ```
-src/
+src-new/
 ├── config/                 # Configuration & env validation (Zod)
 │   ├── env.ts             # Validated environment schema
 │   ├── models.ts          # AI model configuration
@@ -15,30 +15,27 @@ src/
 │   ├── errors/            # Typed error classes (AppError, ValidationError, etc.)
 │   ├── logging/           # Winston logger with request ID tracking
 │   ├── middleware/        # errorHandler, requestId, rateLimiter, sanitize
-│   ├── utils/             # crypto, deviceFingerprint, csv, date, chat
+│   ├── utils/             # crypto, deviceFingerprint, csv, date, chat, request
 │   └── constants/         # HTTP status, error codes, limits, task types
 ├── domain/                 # Pure business logic (zero framework deps)
 │   ├── entities/          # User, Session, ChatMessage, CreditTransaction, Device, AdminAction, Message, NewsArticle, BrokerSymbol, CalendarEvent
 │   ├── repositories/      # Repository interfaces (ports)
 │   ├── services/          # Domain services (AuthDomainService, CreditDomainService, etc.)
 │   ├── events/            # Domain events (UserRegistered, CreditsDeducted, etc.)
-│   └── value-objects/     # Email, Password, DeviceFingerprint, SessionToken
+│   └── value-objects/     # Email, DeviceFingerprint, SessionToken
 ├── data/                   # Infrastructure implementations (adapters)
 │   ├── repositories/      # PostgreSQL & Redis implementations
-│   ├── orm/               # pgClient, redisClient, migrations
+│   ├── orm/               # pgClient, redisClient
 │   ├── external/          # AiGatewayClient, EmailService, FinnhubClient, Mt5Client
 │   └── cache/             # GeneralCacheStore (in-memory)
 ├── application/            # Use cases (orchestration layer)
 │   ├── dtos/              # Zod schemas for request validation
-│   ├── validators/        # Shared validation helpers
 │   ├── use-cases/         # 30+ use cases organized by feature
 │   ├── ports/             # Output ports (EmailPort, AiPort, CachePort, EventBusPort)
-│   └── services/          # Application services
 ├── presentation/           # HTTP layer
 │   ├── routes/v1/         # API routes (auth, chat, admin, user, market, health)
 │   ├── middleware/        # auth, admin, credits, validate
 │   ├── controllers/       # Thin adapters: HTTP → UseCase
-│   └── dtos/              # Request/Response DTOs
 ├── bootstrap/              # App initialization
 │   ├── container.ts       # tsyringe DI registration
 │   ├── registerRoutes.ts
