@@ -8,12 +8,13 @@ import { ValidationError, AuthenticationError, NotFoundError, ConflictError } fr
 import { verifyPassword, generateSecureToken } from "@core/utils/index.js";
 import { LIMITS } from "@core/constants/index.js";
 import { pgClient } from "@data/orm/pgClient.js";
+import { RequestInput } from "@core/utils/request.js";
 
 interface ChangeEmailInput {
   userId: string;
   currentPassword: string;
   newEmail: string;
-  request: { ip: string; headers: { "user-agent": string } };
+  request: RequestInput;
 }
 
 interface ChangeEmailOutput {

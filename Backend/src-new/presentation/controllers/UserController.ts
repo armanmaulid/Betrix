@@ -4,11 +4,11 @@ import { GetUsageUseCase } from "@application/use-cases/user/GetUsageUseCase.js"
 import { GetMessagesUseCase } from "@application/use-cases/user/GetMessagesUseCase.js";
 import { SendMessageUseCase } from "@application/use-cases/user/SendMessageUseCase.js";
 import { UpdateNotificationPrefsUseCase } from "@application/use-cases/user/UpdateNotificationPrefsUseCase.js";
-import { Session } from "@domain/entities/Session.js";
+import { User } from "@domain/entities/User.js";
 
 export class UserController {
-  private getUser(req: Request): Session {
-    return req.user as Session;
+  private getUser(req: Request): User {
+    return req.user as User;
   }
 
   async getUsage(req: Request, res: Response, next: NextFunction) {
@@ -42,7 +42,7 @@ export class UserController {
 
   async sendMessage(req: Request, res: Response, next: NextFunction) {
     try {
-      const useCase = container.resolve("SendUserMessageUseCase");
+      const useCase = container.resolve<SendMessageUseCase>("SendUserMessageUseCase");
       const result = await useCase.execute({
         fromUserId: this.getUser(req).userId,
         toEmail: req.body.toEmail,

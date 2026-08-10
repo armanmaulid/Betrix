@@ -6,15 +6,15 @@ import { requireCredits } from "@presentation/middleware/credits.middleware.js";
 import { validate } from "@presentation/middleware/validate.middleware.js";
 import { sendMessageDto, getHistoryDto, deleteSessionDto, exportHistoryDto } from "@application/dtos/chat.dto.js";
 import { CreditAction } from "@domain/entities/CreditTransaction.js";
-import { TASK_TIER_MAP, TIER_CREDIT_COST } from "@config/models.js";
+import { TASK_TIER_MAP, TIER_CREDIT_COST, TaskType, ModelTier } from "@config/models.js";
 
 const router = Router();
 const controller = container.resolve(ChatController);
 
 function checkChatCredits(req: any, res: any, next: any) {
-  const taskType = req.body.taskType || "general";
+  const taskType = (req.body.taskType || "general") as TaskType;
   const tier = req.body.tier || TASK_TIER_MAP[taskType] || "balanced";
-  const cost = TIER_CREDIT_COST[tier];
+  const cost = TIER_CREDIT_COST[tier as ModelTier];
   return requireCredits(cost, `chat_${tier}` as CreditAction)(req, res, next);
 }
 

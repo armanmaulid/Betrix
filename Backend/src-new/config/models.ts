@@ -18,7 +18,10 @@ export const MODELS = {
   },
 };
 
-export const TASK_TIER_MAP = {
+export type TaskType = "general" | "classify_signal" | "quick_summary" | "market_insight" | "trade_reasoning" | "risk_narrative";
+export type ModelTier = "cheap" | "balanced" | "deep";
+
+export const TASK_TIER_MAP: Record<TaskType, ModelTier> = {
   general: "cheap",
   classify_signal: "cheap",
   quick_summary: "balanced",
@@ -27,14 +30,14 @@ export const TASK_TIER_MAP = {
   risk_narrative: "deep",
 };
 
-export const TIER_CREDIT_COST: Record<string, number> = { cheap: 1, balanced: 3, deep: 5 };
+export const TIER_CREDIT_COST: Record<ModelTier, number> = { cheap: 1, balanced: 3, deep: 5 };
 
-export function resolveTier(taskType: string, tierOverride?: string): string {
-  if (tierOverride && MODELS[tierOverride as keyof typeof MODELS]) return tierOverride;
-  return TASK_TIER_MAP[taskType as keyof typeof TASK_TIER_MAP] || "balanced";
+export function resolveTier(taskType: string, tierOverride?: string): ModelTier {
+  if (tierOverride && MODELS[tierOverride as keyof typeof MODELS]) return tierOverride as ModelTier;
+  return TASK_TIER_MAP[taskType as TaskType] || "balanced";
 }
 
 export function resolveModel(taskType: string, tierOverride?: string) {
   const tier = resolveTier(taskType, tierOverride);
-  return MODELS[tier as keyof typeof MODELS];
+  return MODELS[tier];
 }

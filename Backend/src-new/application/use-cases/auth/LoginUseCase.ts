@@ -14,11 +14,12 @@ import { isDeviceEnforcementEnabled } from "@config/deviceEnforcement.js";
 import { AuthDomainService } from "@domain/services/AuthDomainServiceImpl.js";
 import { logUserActivity } from "@domain/services/ActivityLogger.js";
 import { LIMITS } from "@core/constants/index.js";
+import { RequestInput } from "@core/utils/request.js";
 
 interface LoginInput {
   email: string;
   password: string;
-  request: { ip: string; headers: { "user-agent": string } };
+  request: RequestInput;
 }
 
 interface LoginOutput {
@@ -74,7 +75,12 @@ export class LoginUseCase {
       throw new AuthenticationError("Email not verified. Check your inbox.");
     }
 
-    const result = await this.authDomainService.establishAuthenticatedSession(user, input.request);
+    const requestForAuth = {
+      ip: input.request.ip,
+      headers: { "user-agent": input.request.headers["user-agent"] as string },
+    };
+
+    const result = await this.authDomainService.establishAuthenticatedSession(user, requestForAuth);
     if (!result.ok) {
       throw new AuthenticationError(result.error, { 
         ...(result.hasActiveSession ? { hasActiveSession: true } : {}) 
@@ -86,7 +92,7 @@ export class LoginUseCase {
       action: "login",
       details: { email: user.email },
       ip: clientIP,
-      userAgent: input.request.headers["user-agent"] ?? null,
+      userAgent: input.request.headers["user-agent"] as string ?? undefined,
     });
 
     return { user: result.user!, sessionToken: result.sessionToken! };

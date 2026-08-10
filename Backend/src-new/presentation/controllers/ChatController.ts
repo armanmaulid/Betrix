@@ -5,11 +5,11 @@ import { StreamMessageUseCase } from "@application/use-cases/chat/StreamMessageU
 import { GetChatHistoryUseCase } from "@application/use-cases/chat/GetChatHistoryUseCase.js";
 import { DeleteChatSessionUseCase } from "@application/use-cases/chat/DeleteChatSessionUseCase.js";
 import { ExportChatHistoryUseCase } from "@application/use-cases/chat/ExportChatHistoryUseCase.js";
-import { Session } from "@domain/entities/Session.js";
+import { User } from "@domain/entities/User.js";
 
 export class ChatController {
-  private getUser(req: Request): Session {
-    return req.user as Session;
+  private getUser(req: Request): User {
+    return req.user as User;
   }
 
   async sendMessage(req: Request, res: Response, next: NextFunction) {

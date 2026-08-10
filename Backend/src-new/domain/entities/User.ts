@@ -25,6 +25,10 @@ export class User {
     public readonly verifiedAt: Date | null
   ) {}
 
+  get userId(): string {
+    return this.id;
+  }
+
   static create(data: {
     id: string;
     email: string;

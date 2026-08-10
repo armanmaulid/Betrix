@@ -11,18 +11,19 @@ import { GetSystemInfoUseCase } from "@application/use-cases/admin/GetSystemInfo
 import { GetAuditLogsUseCase } from "@application/use-cases/admin/GetAuditLogsUseCase.js";
 import { ExportAuditLogsUseCase } from "@application/use-cases/admin/ExportAuditLogsUseCase.js";
 import { BroadcastMessageUseCase } from "@application/use-cases/admin/BroadcastMessageUseCase.js";
-import { Session } from "@domain/entities/Session.js";
+import { User } from "@domain/entities/User.js";
 import { RequestInput } from "@core/utils/request.js";
 
 export class AdminController {
-  private getUser(req: Request): Session {
-    return req.user as Session;
+  private getUser(req: Request): User {
+    return req.user as User;
   }
 
   private getRequestInput(req: Request): RequestInput {
     return {
       ip: req.ip!,
       userAgent: req.headers["user-agent"] ?? "",
+      headers: req.headers,
     };
   }
 

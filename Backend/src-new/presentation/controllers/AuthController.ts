@@ -18,6 +18,7 @@ export class AuthController {
     return {
       ip: req.ip!,
       userAgent: req.headers["user-agent"] ?? "",
+      headers: req.headers,
     };
   }
 
@@ -96,7 +97,7 @@ export class AuthController {
     try {
       const useCase = container.resolve(ChangePasswordUseCase);
       await useCase.execute({
-        userId: req.user!.userId,
+        userId: (req.user as any).userId,
         sessionToken: req.headers.authorization?.replace("Bearer ", "")!,
         currentPassword: req.body.currentPassword,
         newPassword: req.body.newPassword,
@@ -112,7 +113,7 @@ export class AuthController {
     try {
       const useCase = container.resolve(ChangeEmailUseCase);
       const result = await useCase.execute({
-        userId: req.user!.userId,
+        userId: (req.user as any).userId,
         currentPassword: req.body.currentPassword,
         newEmail: req.body.newEmail,
         request: this.getRequestInput(req),
@@ -178,6 +179,7 @@ export class AuthController {
   private serializeUser(user: any) {
     return {
       id: user.id,
+      userId: user.id,
       email: user.email,
       name: user.name,
       isAdmin: user.isAdmin,
