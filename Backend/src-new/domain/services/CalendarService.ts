@@ -24,7 +24,7 @@ export class CalendarService {
     const maxEventTime = await this.calendarRepo.getMaxEventTime();
     const fromDate = maxEventTime || new Date();
 
-    const events = await this.mt5Client.fetchCalendar();
+    const events = await this.mt5Client.fetchCalendar("today");
 
     if (events.length > 0) {
       await this.calendarRepo.saveMany(events);

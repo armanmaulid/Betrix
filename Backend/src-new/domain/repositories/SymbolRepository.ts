@@ -7,4 +7,6 @@ export interface SymbolRepository {
   findActive(): Promise<BrokerSymbol[]>;
   findByCategory(category: string): Promise<BrokerSymbol[]>;
   findById(symbol: string): Promise<BrokerSymbol | null>;
+  getStoredCount(): Promise<number>;
+  setStoredCount(count: number): Promise<void>;
 }
