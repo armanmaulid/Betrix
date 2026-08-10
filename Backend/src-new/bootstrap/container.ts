@@ -93,7 +93,7 @@ export function registerDependencies() {
   container.register("AiPort", { useClass: AiGatewayClient });
   container.register("EmailPort", { useClass: EmailService });
   container.register("FinnhubClient", { useClass: FinnhubClient });
-  container.register("Mt5Client", { useClass: Mt5Client });
+  container.register("Mt5Client", { useClass: Mt5Client }, { lifecycle: Lifecycle.Singleton });
   container.register("CachePort", { useClass: GeneralCacheStore }, { lifecycle: Lifecycle.Singleton });
 
   // Use cases
