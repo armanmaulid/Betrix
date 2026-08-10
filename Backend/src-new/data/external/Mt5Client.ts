@@ -1,11 +1,17 @@
 import { injectable, singleton } from "tsyringe";
 import { env } from "@config/env";
 import { logger } from "@core/logging/logger.js";
-import { BrokerSymbol } from "@domain/entities/BrokerSymbol.js";
-import { CalendarEvent } from "@domain/entities/CalendarEvent.js";
+import { BrokerSymbol, TradeMode } from "@domain/entities/BrokerSymbol.js";
 import { SymbolRepository } from "@domain/repositories/SymbolRepository.js";
 import { CalendarRepository } from "@domain/repositories/CalendarRepository.js";
 import { redisClient } from "../orm/redisClient.js";
+
+interface Mt5Symbol {
+  name: string;
+  trade_mode: number;
+  description: string;
+  path: string;
+}
 
 interface PriceTick {
   symbol: string;
@@ -39,6 +45,31 @@ interface CalendarUpdate {
   actual: string | null;
   forecast: string | null;
   previous: string | null;
+}
+
+function transformMt5Symbol(s: Mt5Symbol): BrokerSymbol {
+  // Extract category from path (e.g., "Forex\Majors\EURUSD" → "Forex\Majors")
+  const pathParts = s.path.split("\\");
+  const category = pathParts.length >= 2 ? pathParts.slice(0, -1).join("\\") : s.path;
+  
+  // Map trade_mode to TradeMode enum
+  // 0=DISABLED, 1=LONG_ONLY, 2=SHORT_ONLY, 3=LONG_SHORT, 4=LONG_SHORT (full access)
+  const tradeModeMap: Record<number, TradeMode> = {
+    0: TradeMode.DISABLED,
+    1: TradeMode.LONG_ONLY,
+    2: TradeMode.SHORT_ONLY,
+    3: TradeMode.LONG_SHORT,
+    4: TradeMode.LONG_SHORT,
+  };
+  
+  return BrokerSymbol.create({
+    symbol: s.name,
+    description: s.description,
+    path: s.path,
+    category,
+    tradeMode: tradeModeMap[s.trade_mode] ?? TradeMode.LONG_SHORT,
+    isActive: s.trade_mode > 0, // disabled if trade_mode === 0
+  });
 }
 
 @injectable()
@@ -319,7 +350,7 @@ export class Mt5Client {
     return data.count;
   }
 
-  async fetchSymbols(): Promise<any[]> {
+  async fetchSymbols(): Promise<BrokerSymbol[]> {
     // Retry with backoff for slow EA symbol list generation
     const maxRetries = 3;
     const baseDelay = 2000;
@@ -332,10 +363,11 @@ export class Mt5Client {
           throw new Error(`HTTP ${response.status}: ${response.statusText}`);
         }
         
-        const data = await response.json() as any[];
+        const data = await response.json() as { symbols?: Mt5Symbol[] };
+        const rawSymbols = data.symbols || [];
         
-        if (data.length > 0) {
-          return data;
+        if (rawSymbols.length > 0) {
+          return rawSymbols.map(transformMt5Symbol);
         }
         
         logger.warn(`fetchSymbols returned empty array (attempt ${attempt}/${maxRetries})`, { context: "MT5" });
