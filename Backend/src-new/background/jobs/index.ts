@@ -111,12 +111,14 @@ export async function runStartupJobs() {
 }
 
 export async function runHourlyCleanup() {
+  const cachePort = container.resolve("CachePort") as { cleanup: () => number };
   const results = await Promise.allSettled([
     cleanupExpiredSessions(),
     cleanupOldFailedAttempts(),
     cleanupExpiredTokens(),
     cleanupOldUsageRecords(),
     cleanupOldNews(7),
+    cachePort.cleanup(),
   ]);
   
   const total = results.reduce((sum, r) => sum + (r.status === "fulfilled" ? r.value : 0), 0);
