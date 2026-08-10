@@ -30,10 +30,11 @@ export class AuthDomainService {
     sessionToken?: string;
   }> {
     if (isDeviceEnforcementEnabled()) {
-      // Atomic check-and-set to prevent TOCTOU race condition
+      // Atomic check-and-set using SET NX to prevent TOCTOU race condition
       const fingerprint = DeviceFingerprint.create(request);
-      const result = await this.deviceSessionRepo.setSessionForDeviceAtomic(user.id, fingerprint.value, ""); // placeholder token
-
+      const sessionToken = generateSecureToken(LIMITS.SESSION_TOKEN_BYTES);
+      
+      const result = await this.deviceSessionRepo.setSessionForDeviceAtomic(user.id, fingerprint.value, sessionToken);
       if (!result.success) {
         return { ok: false, status: 403, error: "Device already has active session", hasActiveSession: true };
       }

@@ -54,7 +54,7 @@ export class SendMessageUseCase {
     const cleanHistory = sanitizeHistory(input.history);
     const messages = [...cleanHistory, { role: "user" as const, content: input.message.substring(0, LIMITS.MESSAGE_MAX_LENGTH) }];
 
-    const cacheKey = input.message;
+    const cacheKey = `${input.userId}:${input.message}`;
     const isCacheable = ["general", "quick_summary", "classify_signal"].includes(input.taskType) && messages.length === 1;
 
     // Check cache BEFORE deducting credits
