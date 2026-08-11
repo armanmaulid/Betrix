@@ -20,18 +20,19 @@ src-new/
 ├── domain/                 # Pure business logic (zero framework deps)
 │   ├── entities/          # User, Session, ChatMessage, CreditTransaction, Device, AdminAction, Message, NewsArticle, BrokerSymbol, CalendarEvent
 │   ├── repositories/      # Repository interfaces (ports)
-│   ├── services/          # Domain services (AuthDomainService, DeviceDomainService, ChatDomainService, etc.)
-│   ├── events/            # Domain events (UserRegistered, CreditsDeducted, etc.)
+│   ├── services/          # Domain services (AuthDomainService, DeviceDomainService, CalendarService, AiPromptRegistry, etc.)
+│   ├── events/            # Domain events (UserRegistered, CreditsDeducted, EventDispatcher, etc.)
 │   └── value-objects/     # Email, DeviceFingerprint, SessionToken
 ├── data/                   # Infrastructure implementations (adapters)
-│   ├── repositories/      # PostgreSQL & Redis implementations
+│   ├── repositories/      # PostgreSQL (PgCalendarRepository, PgUsageRepository) & Redis implementations
 │   ├── orm/               # pgClient, redisClient
-│   ├── external/          # AiGatewayClient, EmailService, FinnhubClient, Mt5Client
+│   ├── external/          # AiGatewayClient, EmailService, Mt5HttpClient, Mt5WebsocketClient, Mt5BrokerAdapter, FinnhubNewsAdapter
 │   └── cache/             # GeneralCacheStore (in-memory)
 ├── application/            # Use cases (orchestration layer)
 │   ├── dtos/              # Zod schemas for request validation
-│   ├── use-cases/         # 30+ use cases organized by feature
-│   └── ports/             # Output ports (EmailPort, AiPort, CachePort)
+│   ├── use-cases/         # Use cases grouped by feature (admin, auth, chat, market, news)
+│   ├── ports/             # Output ports (IBrokerProvider, INewsProvider, etc.)
+│   └── event-handlers/    # Domain event subscribers (ChatLoggingHandler)
 ├── presentation/           # HTTP layer
 │   ├── routes/v1/         # API routes (auth, chat, admin, user, market, health)
 │   ├── middleware/        # auth, admin, credits, validate
@@ -58,11 +59,13 @@ src-new/
 | **Market Data** | MT5 symbols, economic calendar, Finnhub news |
 | **Security** | Helmet, CORS, rate limiting (IP + per-user), input sanitization |
 
-### Recent Fixes
-- **Chat credit double-deduction fixed**: Removed redundant middleware; use case now owns full deduct→call→refund lifecycle
-- **Session token hashing**: Tokens hashed with SHA-256 before Redis storage (SHA-256)
-- **Dead code removed**: Unused `CreditDomainService` interface deleted
-- **MT5 Bridge integration**: Real-time market data with WebSocket streaming, Redis caching, and REST endpoints
+### Recent Fixes & Optimizations
+- **PostgreSQL Bulk Inserts**: Resolved connection drops during massive calendar/symbol syncs by implementing deduplicated, chunked bulk inserts.
+- **Data Retention Policies**: Cleanup jobs will *never* delete critical data (Usages, Chat History, Logins, Calendar). Only expired verification tokens, 7-day old news, and RAM cache are purged.
+- **Non-Blocking Startup**: Heavy background syncs (Symbols, Calendar, Cache) now run asynchronously, allowing the Express server to instantly bind and accept traffic without hanging.
+- **Chat credit double-deduction fixed**: Removed redundant middleware; use case now owns full deduct→call→refund lifecycle.
+- **Session token hashing**: Tokens hashed with SHA-256 before Redis storage (SHA-256).
+- **MT5 Bridge integration**: Real-time market data with WebSocket streaming, Redis caching, and REST endpoints.
 
 ## Quick Start
 
@@ -181,15 +184,7 @@ When `DEVICE_ENFORCEMENT=true`:
 | News Polling | 10s | Finnhub news (if API key set) |
 | D1 Cache Warmup | Broker midnight | Pre-fetch daily candles |
 
-## Background Jobs
 
-| Job | Schedule | Description |
-|-----|----------|-------------|
-| Cleanup | Hourly | Expired sessions, failed logins, tokens, usage, old news |
-| Symbol Sync | Daily 02:00 | Fetch symbols from MT5 |
-| Calendar Sync | Daily 03:00 | Fetch economic calendar |
-| News Polling | 10s | Finnhub news (if API key set) |
-| D1 Cache Warmup | Broker midnight | Pre-fetch daily candles |
 
 ## MT5 Bridge Integration
 
@@ -270,6 +265,11 @@ const symbols = await marketData.getSymbols(true);
 // Get all cached prices
 const allPrices = await marketData.getAllPrices();
 ```
+
+## Known Quirks & Limitations
+
+- **node-postgres (pg) Concurrency**: The `pg` library does not support executing concurrent `Promise.all` queries on a single checked-out `Client` instance inside a transaction. Bulk operations must use raw `INSERT ... VALUES` bulk SQL strings.
+- **PostgreSQL ON CONFLICT limits**: An `INSERT ... ON CONFLICT DO UPDATE` query will throw an error if the payload array contains duplicate unique keys. Deduping the dataset in TypeScript before hitting the database is strictly required.
 
 ## Testing
 
