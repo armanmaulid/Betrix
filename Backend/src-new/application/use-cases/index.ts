@@ -31,4 +31,3 @@ export { SendMessageUseCase as SendUserMessageUseCase } from "./user/SendMessage
 export * from "./user/UpdateNotificationPrefsUseCase.js";
 export * from "./market/GetSymbolsUseCase.js";
 export * from "./market/GetCalendarUseCase.js";
-export * from "./market/WarmupMarketCacheUseCase.js";

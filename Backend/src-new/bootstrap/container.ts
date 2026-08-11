@@ -69,7 +69,6 @@ import { UpdateNotificationPrefsUseCase } from "@application/use-cases/user/Upda
 
 import { GetSymbolsUseCase } from "@application/use-cases/market/GetSymbolsUseCase.js";
 import { GetCalendarUseCase } from "@application/use-cases/market/GetCalendarUseCase.js";
-import { WarmupMarketCacheUseCase } from "@application/use-cases/market/WarmupMarketCacheUseCase.js";
 
 import { FetchNewsUseCase } from "@application/use-cases/news/FetchNewsUseCase.js";
 import { StoreNewsUseCase } from "@application/use-cases/news/StoreNewsUseCase.js";
@@ -83,6 +82,7 @@ import { UserController } from "@presentation/controllers/UserController.js";
 import { MarketController } from "@presentation/controllers/MarketController.js";
 import { NewsController } from "@presentation/controllers/NewsController.js";
 import { MarketDataService } from "@domain/services/MarketDataService.js";
+import { AuthDomainService } from "@domain/services/AuthDomainServiceImpl.js";
 import { NewsService } from "@domain/services/NewsService.js";
 
 // Events & Handlers
@@ -157,7 +157,6 @@ export function registerDependencies() {
 
   container.register("GetSymbolsUseCase", { useClass: GetSymbolsUseCase });
   container.register("GetCalendarUseCase", { useClass: GetCalendarUseCase });
-  container.register("WarmupMarketCacheUseCase", { useClass: WarmupMarketCacheUseCase });
 
   container.register("FetchNewsUseCase", { useClass: FetchNewsUseCase });
   container.register("StoreNewsUseCase", { useClass: StoreNewsUseCase });
@@ -165,6 +164,7 @@ export function registerDependencies() {
 
   // Services
   container.register("MarketDataService", { useClass: MarketDataService });
+  container.register("AuthDomainService", { useClass: AuthDomainService });
   container.register("NewsService", { useClass: NewsService });
   container.register("AiPromptRegistry", { useClass: AiPromptRegistry });
 

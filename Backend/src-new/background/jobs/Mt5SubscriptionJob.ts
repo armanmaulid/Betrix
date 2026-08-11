@@ -13,7 +13,7 @@ export class Mt5SubscriptionJob {
     // Set up broker callbacks to route real-time data to MarketDataService
     brokerClient.setCallbacks({
       onPriceTick: async (tick) => {
-        logger.debug(`Price update: ${tick.symbol} bid=${tick.bid} ask=${tick.ask}`, { context: "Broker" });
+        // logger.debug(`Price update: ${tick.symbol} bid=${tick.bid} ask=${tick.ask}`, { context: "Broker" });
         await marketDataService.handlePriceTick(tick);
       },
       onOHLCUpdate: async (update) => {
@@ -25,7 +25,7 @@ export class Mt5SubscriptionJob {
         await marketDataService.handleMarketBookUpdate(update);
       },
       onCalendarUpdate: async (update) => {
-        logger.debug(`Calendar update: event ${update.event_id}`, { context: "Broker" });
+        logger.debug(`Calendar Live Update [Event ${update.event_id}] - Actual: ${update.actual} | Forecast: ${update.forecast} | Prev: ${update.previous}`, { context: "Broker" });
         const calendarService = container.resolve(CalendarService);
         await calendarService.handleLiveUpdate(update);
       }

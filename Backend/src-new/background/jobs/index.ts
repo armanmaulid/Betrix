@@ -1,6 +1,5 @@
 import { container } from "tsyringe";
 import { logger } from "@core/logging/logger.js";
-import { WarmupMarketCacheUseCase } from "@application/use-cases/market/WarmupMarketCacheUseCase.js";
 import { SymbolService } from "@domain/services/SymbolService.js";
 import { CalendarService } from "@domain/services/CalendarService.js";
 import { SystemCleanupUseCase } from "@application/use-cases/admin/SystemCleanupUseCase.js";
@@ -9,7 +8,6 @@ import { FinnhubClient } from "@data/external/FinnhubClient.js";
 
 // Jobs
 import { Mt5SubscriptionJob } from "./Mt5SubscriptionJob.js";
-import { D1CacheRefreshJob } from "./D1CacheRefreshJob.js";
 import { DailySyncJob } from "./DailySyncJob.js";
 import { HourlyCleanupJob } from "./HourlyCleanupJob.js";
 import { NewsPollingJob } from "./NewsPollingJob.js";
@@ -20,9 +18,6 @@ export async function runStartupJobs() {
   // 1. Initialize Finnhub (Object instantiation only)
   container.resolve(FinnhubClient);
   logger.info("Finnhub Client initialized", { context: "Finnhub" });
-
-  // 2. Schedule recursive D1 cache refresh (Only sets a setTimeout)
-  D1CacheRefreshJob.start();
 
   // --- STAGE 2: LIGHT - MEDIUM (WebSocket Connection & Subscriptions) ---
   
@@ -57,12 +52,7 @@ export async function runStartupJobs() {
       logger.error("Sync broker symbols failed", { context: "Startup", error: err.message })
     );
     
-    // 8. Warmup market cache (Fetches D1 OHLC, MarketBook, and Prices for each tracked symbol, then caches in Redis)
-    const warmupUseCase = container.resolve(WarmupMarketCacheUseCase);
-    await warmupUseCase.execute().catch(err => 
-      logger.error("Warmup market cache failed", { context: "Startup", error: err.message })
-    );
-    
+
     logger.info("Heavy background syncs completed successfully.", { context: "Startup" });
   })();
 }
