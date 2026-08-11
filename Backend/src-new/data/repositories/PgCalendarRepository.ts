@@ -193,6 +193,14 @@ export class PgCalendarRepository implements CalendarRepository {
     return rows.map(this.mapRow);
   }
 
+  async findByEventId(eventId: number): Promise<CalendarEvent | null> {
+    const { rows } = await pgClient.query(
+      `SELECT * FROM calendar_events WHERE event_id = $1 LIMIT 1`,
+      [eventId]
+    );
+    return rows.length > 0 ? this.mapRow(rows[0]) : null;
+  }
+
   private mapRow(row: any): CalendarEvent {
     return new CalendarEvent(
       row.value_id, row.event_id, row.event_time, row.country,

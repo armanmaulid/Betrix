@@ -1,12 +1,8 @@
 import { inject, injectable } from "tsyringe";
 import { UserRepository } from "@domain/repositories/UserRepository.js";
 import { SessionRepository } from "@domain/repositories/SessionRepository.js";
-import { User, UserStatus } from "@domain/entities/User.js";
 import { NotFoundError, ValidationError } from "@core/errors/index.js";
 import { pgClient } from "@data/orm/pgClient.js";
-import { broadcastToUser } from "@domain/services/sseManager.js";
-import { sendEmail } from "@domain/services/emailService.js";
-import { hashPassword, generateSecureToken } from "@core/utils/index.js";
 import { logAdminAction } from "@domain/services/ActivityLogger.js";
 
 interface DeleteUserInput {
@@ -36,6 +32,9 @@ export class DeleteUserUseCase {
     if (rows.length === 0) {
       throw new NotFoundError("User");
     }
+
+    // Revoke all active sessions for the deleted user immediately
+    await this.sessionRepo.deleteByUserId(input.targetUserId);
 
     await logAdminAction({
       adminId: input.adminId,

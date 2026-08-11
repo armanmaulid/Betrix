@@ -92,34 +92,23 @@ export class CalendarService {
   }
 
   async handleLiveUpdate(update: CalendarUpdate): Promise<void> {
-    // 1. Fetch the existing event from the DB using its event_id
-    const existingEvents = await this.calendarRepo.findByQuery({ limit: 1 });
-    // Since we need to find by event_id exactly, let's just query all and find it, or optimally
-    // we would have a findByEventId method. Since CalendarEvent has valueId mapped to event_id,
-    // let's fetch it if possible.
-    // Wait, let's look at the Repository to see if there is a findByEventId.
-    // For now, if we can't find it, we skip.
-    // Actually, CalendarQuery doesn't have an ID filter. Let's just do a manual check or add findById.
-    // Wait, let's do this safely:
     try {
-        const events = await this.calendarRepo.findByQuery({});
-        const existingEvent = events.find(e => e.eventId === update.event_id);
-        
-        if (existingEvent) {
-          const updatedEvent = existingEvent.withUpdatedValues(
-            update.actual !== undefined ? update.actual : existingEvent.actual,
-            update.forecast !== undefined ? update.forecast : existingEvent.forecast,
-            update.previous !== undefined ? update.previous : existingEvent.previous
-          );
-          
-          await this.calendarRepo.save(updatedEvent);
+      const existingEvent = await this.calendarRepo.findByEventId(update.event_id);
+      if (!existingEvent) return;
 
-          if (env.MT5_TRACK_CALENDAR) {
-            broadcastGlobal("calendar_update", updatedEvent);
-          }
-        }
+      const updatedEvent = existingEvent.withUpdatedValues(
+        update.actual !== undefined ? update.actual : existingEvent.actual,
+        update.forecast !== undefined ? update.forecast : existingEvent.forecast,
+        update.previous !== undefined ? update.previous : existingEvent.previous
+      );
+
+      await this.calendarRepo.save(updatedEvent);
+
+      if (env.MT5_TRACK_CALENDAR) {
+        broadcastGlobal("calendar_update", updatedEvent);
+      }
     } catch (err) {
-        logger.error(`Failed to handle live calendar update: ${(err as Error).message}`, { context: "Calendar" });
+      logger.error(`Failed to handle live calendar update: ${(err as Error).message}`, { context: "Calendar" });
     }
   }
 }

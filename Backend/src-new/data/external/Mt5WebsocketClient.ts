@@ -113,8 +113,8 @@ export class Mt5WebsocketClient {
   private handleOHLCUpdate(msg: any): void {
     if (!msg.bars || !Array.isArray(msg.bars) || msg.bars.length === 0) return;
     
-    const latestBar = msg.bars[0];
-    const previousBar = msg.bars.length > 1 ? msg.bars[1] : null;
+    const latestBar = msg.bars[msg.bars.length - 1];
+    const previousBar = msg.bars.length > 1 ? msg.bars[msg.bars.length - 2] : null;
     
     const update = {
       symbol: msg.symbol,

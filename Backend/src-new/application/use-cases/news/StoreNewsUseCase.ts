@@ -13,13 +13,13 @@ export class StoreNewsUseCase {
   async execute(articles: NewsArticle[], sourceName: string = "Provider"): Promise<number> {
     if (articles.length === 0) return 0;
     
-    const savedCount = await this.newsRepo.saveMany(articles);
+    const savedArticles = await this.newsRepo.saveMany(articles);
     
-    if (savedCount > 0) {
-      broadcastGlobal("news_update", articles);
-      logger.info(`Saved ${savedCount} new articles from ${sourceName}`, { context: "News" });
+    if (savedArticles.length > 0) {
+      broadcastGlobal("news_update", savedArticles);
+      logger.info(`Saved ${savedArticles.length} new articles from ${sourceName}`, { context: "News" });
     }
     
-    return savedCount;
+    return savedArticles.length;
   }
 }

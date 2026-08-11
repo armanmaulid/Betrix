@@ -66,12 +66,30 @@ export class RedisSessionRepository implements SessionRepository {
   }
 
   async findByUserId(userId: string): Promise<Session[]> {
-    const tokens = await redisClient.smembers(`user_sessions:${userId}`);
+    const hashedTokens = await redisClient.smembers(`user_sessions:${userId}`); // already hashed
     const sessions: Session[] = [];
-    for (const token of tokens) {
-      const session = await this.findByToken(token);
-      if (session) sessions.push(session);
+
+    for (const hashedToken of hashedTokens) {
+      const cached = sessionMemoryCache.get(hashedToken);
+      if (cached && Date.now() - cached.timestamp < SESSION_MEMORY_CACHE_TTL_MS) {
+        sessions.push(cached.session);
+        continue;
+      }
+
+      const uid = await redisClient.get(`session:${hashedToken}`);
+      if (!uid) continue;
+
+      const ttl = await redisClient.ttl(`session:${hashedToken}`);
+      const expiresAt = ttl > 0 ? new Date(Date.now() + ttl * 1000) : new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+      // Note: raw token is not recoverable from the hash — this session object's
+      // `token` field will be the hashed value, not the original. Callers that
+      // need the raw token (e.g. to display or re-auth) cannot get it from here;
+      // that's a pre-existing one-way-hash constraint, not something this fix changes.
+      const session = new Session(hashedToken, uid as string, hashedToken, new Date(), expiresAt, null, null, null);
+      sessions.push(session);
     }
+
     return sessions;
   }
 
@@ -96,10 +114,11 @@ export class RedisSessionRepository implements SessionRepository {
   }
 
   async deleteByUserId(userId: string, exceptToken?: string): Promise<number> {
-    const tokens = await redisClient.smembers(`user_sessions:${userId}`);
-    const hashedTokens = tokens.map(hashSessionToken);
+    const hashedTokens = await redisClient.smembers(`user_sessions:${userId}`); // already hashed
     const hashedExceptToken = exceptToken ? hashSessionToken(exceptToken) : undefined;
-    const tokensToDelete = hashedExceptToken ? hashedTokens.filter(t => t !== hashedExceptToken) : hashedTokens;
+    const tokensToDelete = hashedExceptToken
+      ? hashedTokens.filter(t => t !== hashedExceptToken)
+      : hashedTokens;
 
     if (tokensToDelete.length > 0) {
       const keysToDelete = tokensToDelete.map(token => `session:${token}`);

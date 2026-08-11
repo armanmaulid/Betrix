@@ -20,4 +20,5 @@ export interface CalendarRepository {
   cleanupOlderThan(days: number): Promise<number>;
   getMaxEventTime(): Promise<Date | null>;
   findByQuery(query: CalendarQuery): Promise<CalendarEvent[]>;
+  findByEventId(eventId: number): Promise<CalendarEvent | null>;
 }

@@ -29,36 +29,26 @@ export class AuthDomainService {
     user?: User;
     sessionToken?: string;
   }> {
+    const sessionToken = generateSecureToken(LIMITS.SESSION_TOKEN_BYTES);
+    let fingerprint: DeviceFingerprint | undefined;
+
     if (isDeviceEnforcementEnabled()) {
-      // Atomic check-and-set using SET NX to prevent TOCTOU race condition
-      const fingerprint = DeviceFingerprint.create(request);
-      const sessionToken = generateSecureToken(LIMITS.SESSION_TOKEN_BYTES);
-      
+      fingerprint = DeviceFingerprint.create(request);
       const result = await this.deviceSessionRepo.setSessionForDeviceAtomic(user.id, fingerprint.value, sessionToken);
       if (!result.success) {
         return { ok: false, status: 403, error: "Device already has active session", hasActiveSession: true };
       }
     }
 
-    const sessionToken = generateSecureToken(LIMITS.SESSION_TOKEN_BYTES);
     await this.sessionRepo.save(Session.create({
       userId: user.id,
       token: sessionToken,
-      deviceFingerprint: isDeviceEnforcementEnabled() ? DeviceFingerprint.create(request).value : null,
+      deviceFingerprint: fingerprint ? fingerprint.value : null,
       ip: request.ip,
       userAgent: request.headers["user-agent"],
     }));
 
-    if (isDeviceEnforcementEnabled()) {
-      const fingerprint = DeviceFingerprint.create(request);
-      // Atomic replace - returns old token if existed
-      const oldToken = await this.deviceSessionRepo.replaceSessionForDevice(user.id, fingerprint.value, sessionToken);
-      
-      // If there was an old session, revoke it
-      if (oldToken) {
-        await this.sessionRepo.delete(oldToken);
-      }
-      
+    if (fingerprint) {
       await this.deviceRepo.bind(Device.create({ userId: user.id, fingerprint: fingerprint.value }));
     }
 

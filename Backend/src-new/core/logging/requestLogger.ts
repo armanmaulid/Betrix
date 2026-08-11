@@ -31,7 +31,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
   logger.debug("incoming request", {
     method: req.method,
     path: loggedPath,
-    userId: (req as any).user?.id,
+    userId: (req as any).user?.userId,
     ip: (req as any).normalizedIP || req.ip,
     requestId: req.id,
   });
@@ -43,7 +43,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
       logger.error("request completed", {
         method: req.method,
         path: loggedPath,
-        userId: (req as any).user?.id,
+        userId: (req as any).user?.userId,
         statusCode: res.statusCode,
         duration,
         requestId: req.id,
@@ -52,7 +52,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
       logger.warn("request completed", {
         method: req.method,
         path: loggedPath,
-        userId: (req as any).user?.id,
+        userId: (req as any).user?.userId,
         statusCode: res.statusCode,
         duration,
         requestId: req.id,
@@ -61,7 +61,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
       logger.debug("request completed", {
         method: req.method,
         path: loggedPath,
-        userId: (req as any).user?.id,
+        userId: (req as any).user?.userId,
         statusCode: res.statusCode,
         duration,
         requestId: req.id,

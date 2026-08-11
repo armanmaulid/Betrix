@@ -45,7 +45,7 @@ export const perUserLimiter = createRateLimiter({
   max: env.RATE_LIMIT_PER_USER_PER_MINUTE,
   message: "Terlalu banyak request untuk akun ini, coba lagi sebentar lagi",
   keyGenerator: (req) => {
-    const userId = (req as any).user?.id;
+    const userId = (req as any).user?.userId;
     return userId ? `user:${userId}` : ipKeyGenerator(req.ip || "unknown");
   },
 });

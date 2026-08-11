@@ -1,6 +1,8 @@
 import { redisClient } from "@data/orm/redisClient.js";
 import { MarketDataRepository } from "@domain/repositories/MarketDataRepository.js";
 import { PriceTick, OHLCUpdate, MarketBookUpdate } from "@application/ports/IBrokerProvider.js";
+import { env } from "@config/env.js";
+import { secondsUntilBrokerMidnight } from "@core/utils/date.js";
 
 export class RedisMarketDataRepository implements MarketDataRepository {
   async cachePrice(tick: PriceTick): Promise<void> {
@@ -10,7 +12,14 @@ export class RedisMarketDataRepository implements MarketDataRepository {
 
   async cacheOHLC(update: OHLCUpdate): Promise<void> {
     const cacheKey = `mt5:ohlc:${update.symbol}:${update.timeframe}`;
-    await redisClient.setex(cacheKey, 300, JSON.stringify(update)); // 5min TTL
+    
+    // For D1 timeframe, TTL should expire precisely at broker midnight
+    // For other timeframes, we can just use 24h as a fallback
+    const ttl = update.timeframe === "D1" 
+      ? secondsUntilBrokerMidnight(env.MT5_BROKER_UTC_OFFSET)
+      : 86400;
+      
+    await redisClient.setex(cacheKey, Math.max(ttl, 60), JSON.stringify(update));
   }
 
   async cacheMarketBook(update: MarketBookUpdate): Promise<void> {

@@ -21,27 +21,37 @@ export class PgNewsRepository implements NewsRepository {
     return this.mapRow(rows[0]);
   }
 
-  async saveMany(articles: NewsArticle[]): Promise<number> {
-    if (articles.length === 0) return 0;
-    
+  async saveMany(articles: NewsArticle[]): Promise<NewsArticle[]> {
+    if (articles.length === 0) return [];
+
     const client = await pgClient.connect();
     try {
       await client.query("BEGIN");
-      let count = 0;
+
+      const placeholders: string[] = [];
+      const params: any[] = [];
+      let paramIndex = 1;
+
       for (const article of articles) {
-        const { rowCount } = await client.query(
-          `INSERT INTO news_articles (id, source, title, url, summary, asset_tags, published_at, created_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-           ON CONFLICT (url) DO NOTHING`,
-          [
-            article.id, article.source, article.title, article.url,
-            article.summary, article.assetTags, article.publishedAt, article.createdAt
-          ]
+        placeholders.push(
+          `($${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++})`
         );
-        count += rowCount || 0;
+        params.push(
+          article.id, article.source, article.title, article.url,
+          article.summary, article.assetTags, article.publishedAt, article.createdAt
+        );
       }
+
+      const { rows } = await client.query(
+        `INSERT INTO news_articles (id, source, title, url, summary, asset_tags, published_at, created_at)
+         VALUES ${placeholders.join(",")}
+         ON CONFLICT (url) DO NOTHING
+         RETURNING *`,
+        params
+      );
+
       await client.query("COMMIT");
-      return count;
+      return rows.map(this.mapRow);
     } catch (err) {
       await client.query("ROLLBACK");
       throw err;

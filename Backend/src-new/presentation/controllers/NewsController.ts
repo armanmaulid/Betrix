@@ -1,10 +1,10 @@
 import type { Request, Response, NextFunction } from "express";
 import { container } from "tsyringe";
 import { GetNewsUseCase } from "@application/use-cases/news/GetNewsUseCase.js";
-import { addClient, removeClient } from "@domain/services/sseManager.js";
+import { addClient } from "@domain/services/sseManager.js";
 import type { AuthenticatedRequest } from "@presentation/middleware/auth.middleware.js";
 
-const VALID_ASSETS = ["usd", "metal", "oil", "btc", "eco", "global", "crypto"];
+const VALID_ASSETS = ["usd", "eur", "gbp", "jpy", "metal", "oil", "btc", "eco", "global", "crypto"];
 
 export class NewsController {
   private getGetNewsUseCase() {
@@ -17,11 +17,7 @@ export class NewsController {
       const { userId, token } = userReq.user;
 
       addClient(userId, token, res);
-
-      // Keep connection alive, handled by addClient which writes headers and heartbeat.
-      req.on("close", () => {
-        removeClient(userId, token);
-      });
+      // Keep connection alive, handled by addClient which writes headers and manages cleanup.
     } catch (err) {
       next(err);
     }
