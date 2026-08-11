@@ -26,4 +26,12 @@ export class PgLoginAttemptRepository implements LoginAttemptRepository {
       [email]
     );
   }
+
+  async cleanupOlderThan(days: number): Promise<number> {
+    const { rowCount } = await pgClient.query(
+      `DELETE FROM failed_login_attempts WHERE attempted_at < NOW() - INTERVAL '1 day' * $1`,
+      [days]
+    );
+    return rowCount || 0;
+  }
 }

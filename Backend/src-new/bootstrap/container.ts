@@ -17,13 +17,18 @@ import { PgCalendarRepository } from "@data/repositories/PgCalendarRepository.js
 import { PgLoginAttemptRepository } from "@data/repositories/PgLoginAttemptRepository.js";
 import { RedisDeviceSessionRepository } from "@data/repositories/RedisDeviceSessionRepository.js";
 import { PgVerificationRepository } from "@data/repositories/PgVerificationRepository.js";
+import { PgUsageRepository } from "@data/repositories/PgUsageRepository.js";
+import { RedisMarketDataRepository } from "@data/repositories/RedisMarketDataRepository.js";
 
 // External services
 import { AiGatewayClient } from "@data/external/AiGatewayClient.js";
 import { EmailService } from "@data/external/EmailService.js";
 import { FinnhubClient } from "@data/external/FinnhubClient.js";
-import { Mt5Client } from "@data/external/Mt5Client.js";
+import { Mt5BrokerAdapter } from "@data/external/Mt5BrokerAdapter.js";
+import { Mt5HttpClient } from "@data/external/Mt5HttpClient.js";
+import { Mt5WebsocketClient } from "@data/external/Mt5WebsocketClient.js";
 import { GeneralCacheStore } from "@data/cache/GeneralCacheStore.js";
+import { FinnhubNewsAdapter } from "@data/external/FinnhubNewsAdapter.js";
 
 // Use cases
 import { RegisterUseCase } from "@application/use-cases/auth/RegisterUseCase.js";
@@ -55,6 +60,7 @@ import { GetSystemInfoUseCase } from "@application/use-cases/admin/GetSystemInfo
 import { GetAuditLogsUseCase } from "@application/use-cases/admin/GetAuditLogsUseCase.js";
 import { ExportAuditLogsUseCase } from "@application/use-cases/admin/ExportAuditLogsUseCase.js";
 import { BroadcastMessageUseCase } from "@application/use-cases/admin/BroadcastMessageUseCase.js";
+import { SystemCleanupUseCase } from "@application/use-cases/admin/SystemCleanupUseCase.js";
 
 import { GetUsageUseCase } from "@application/use-cases/user/GetUsageUseCase.js";
 import { GetMessagesUseCase } from "@application/use-cases/user/GetMessagesUseCase.js";
@@ -65,13 +71,24 @@ import { GetSymbolsUseCase } from "@application/use-cases/market/GetSymbolsUseCa
 import { GetCalendarUseCase } from "@application/use-cases/market/GetCalendarUseCase.js";
 import { WarmupMarketCacheUseCase } from "@application/use-cases/market/WarmupMarketCacheUseCase.js";
 
+import { FetchNewsUseCase } from "@application/use-cases/news/FetchNewsUseCase.js";
+import { StoreNewsUseCase } from "@application/use-cases/news/StoreNewsUseCase.js";
+import { GetNewsUseCase } from "@application/use-cases/news/GetNewsUseCase.js";
+
 // Controllers
 import { AuthController } from "@presentation/controllers/AuthController.js";
 import { ChatController } from "@presentation/controllers/ChatController.js";
 import { AdminController } from "@presentation/controllers/AdminController.js";
 import { UserController } from "@presentation/controllers/UserController.js";
 import { MarketController } from "@presentation/controllers/MarketController.js";
+import { NewsController } from "@presentation/controllers/NewsController.js";
 import { MarketDataService } from "@domain/services/MarketDataService.js";
+import { NewsService } from "@domain/services/NewsService.js";
+
+// Events & Handlers
+import { EventDispatcher } from "@domain/events/index.js";
+import { ChatLoggingHandler } from "@application/event-handlers/ChatLoggingHandler.js";
+import { AiPromptRegistry } from "@domain/services/AiPromptRegistry.js";
 
 export function registerDependencies() {
   // Repositories
@@ -88,12 +105,17 @@ export function registerDependencies() {
   container.register("LoginAttemptRepository", { useClass: PgLoginAttemptRepository });
   container.register("DeviceSessionRepository", { useClass: RedisDeviceSessionRepository });
   container.register("VerificationRepository", { useClass: PgVerificationRepository });
+  container.register("UsageRepository", { useClass: PgUsageRepository });
+  container.register("MarketDataRepository", { useClass: RedisMarketDataRepository });
 
   // External services
   container.register("AiPort", { useClass: AiGatewayClient });
   container.register("EmailPort", { useClass: EmailService });
   container.register("FinnhubClient", { useClass: FinnhubClient });
-  container.register("Mt5Client", { useClass: Mt5Client }, { lifecycle: Lifecycle.Singleton });
+  container.register("INewsProvider", { useClass: FinnhubNewsAdapter });
+  container.register("Mt5HttpClient", { useClass: Mt5HttpClient }, { lifecycle: Lifecycle.Singleton });
+  container.register("Mt5WebsocketClient", { useClass: Mt5WebsocketClient }, { lifecycle: Lifecycle.Singleton });
+  container.register("IBrokerProvider", { useClass: Mt5BrokerAdapter }, { lifecycle: Lifecycle.Singleton });
   container.register("CachePort", { useClass: GeneralCacheStore }, { lifecycle: Lifecycle.Singleton });
 
   // Use cases
@@ -126,6 +148,7 @@ export function registerDependencies() {
   container.register("GetAuditLogsUseCase", { useClass: GetAuditLogsUseCase });
   container.register("ExportAuditLogsUseCase", { useClass: ExportAuditLogsUseCase });
   container.register("BroadcastMessageUseCase", { useClass: BroadcastMessageUseCase });
+  container.register("SystemCleanupUseCase", { useClass: SystemCleanupUseCase });
 
   container.register("GetUsageUseCase", { useClass: GetUsageUseCase });
   container.register("GetMessagesUseCase", { useClass: GetMessagesUseCase });
@@ -136,8 +159,18 @@ export function registerDependencies() {
   container.register("GetCalendarUseCase", { useClass: GetCalendarUseCase });
   container.register("WarmupMarketCacheUseCase", { useClass: WarmupMarketCacheUseCase });
 
+  container.register("FetchNewsUseCase", { useClass: FetchNewsUseCase });
+  container.register("StoreNewsUseCase", { useClass: StoreNewsUseCase });
+  container.register("GetNewsUseCase", { useClass: GetNewsUseCase });
+
   // Services
   container.register("MarketDataService", { useClass: MarketDataService });
+  container.register("NewsService", { useClass: NewsService });
+  container.register("AiPromptRegistry", { useClass: AiPromptRegistry });
+
+  // Events & Handlers
+  container.register("EventDispatcher", { useClass: EventDispatcher }, { lifecycle: Lifecycle.Singleton });
+  container.register("ChatLoggingHandler", { useClass: ChatLoggingHandler });
 
   // Controllers
   container.register("AuthController", { useClass: AuthController });
@@ -145,4 +178,5 @@ export function registerDependencies() {
   container.register("AdminController", { useClass: AdminController });
   container.register("UserController", { useClass: UserController });
   container.register("MarketController", { useClass: MarketController });
+  container.register("NewsController", { useClass: NewsController });
 }

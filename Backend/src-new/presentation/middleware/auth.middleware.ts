@@ -15,7 +15,9 @@ export interface AuthenticatedRequest extends Request {
 
 export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization || "";
-  const sessionToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
+  const sessionToken = authHeader.startsWith("Bearer ") 
+    ? authHeader.slice(7) 
+    : (req.query.token as string || null);
 
   if (!sessionToken) {
     return res.status(401).json({ error: "Session token required", code: "UNAUTHENTICATED" });

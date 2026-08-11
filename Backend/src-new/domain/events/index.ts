@@ -3,6 +3,8 @@ import type { Session } from "../entities/Session.js";
 import type { ChatTaskType } from "../entities/ChatMessage.js";
 import type { CreditAction } from "../entities/CreditTransaction.js";
 
+export * from "./EventDispatcher.js";
+
 export interface DomainEvent {
   readonly type: string;
   readonly timestamp: Date;
@@ -45,8 +47,19 @@ export class CreditsRefunded implements DomainEvent {
   constructor(public readonly payload: { userId: string; amount: number; action: CreditAction; newBalance: number }) {}
 }
 
-export class ChatMessageSent implements DomainEvent {
-  readonly type = "chat.message_sent";
+export class ChatCompleted implements DomainEvent {
+  readonly type = "chat.completed";
   readonly timestamp = new Date();
-  constructor(public readonly payload: { userId: string; taskType: ChatTaskType; modelUsed: string; tokens: number }) {}
+  constructor(
+    public readonly payload: {
+      userId: string;
+      sessionId?: string;
+      taskType: ChatTaskType;
+      modelUsed: string;
+      message: string;
+      reply: string;
+      latencyMs: number;
+      usage?: { inputTokens: number; outputTokens: number };
+    }
+  ) {}
 }

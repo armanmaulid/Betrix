@@ -30,9 +30,13 @@ export class PgVerificationRepository implements VerificationRepository {
   }
 
   async invalidateUserTokens(userId: string): Promise<void> {
-    await pgClient.query(
-      `UPDATE email_verifications SET used_at = CURRENT_TIMESTAMP WHERE user_id = $1 AND used_at IS NULL`,
-      [userId]
+    await pgClient.query(`UPDATE email_verifications SET used_at = NOW() WHERE user_id = $1 AND used_at IS NULL`, [userId]);
+  }
+
+  async cleanupExpired(): Promise<number> {
+    const { rowCount } = await pgClient.query(
+      `DELETE FROM email_verifications WHERE expires_at < NOW() OR used_at IS NOT NULL`
     );
+    return rowCount || 0;
   }
 }

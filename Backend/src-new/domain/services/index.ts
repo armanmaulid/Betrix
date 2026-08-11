@@ -1,10 +1,10 @@
 export { AuthDomainService } from "./AuthDomainServiceImpl.js";
+export * from "./AiPromptRegistry.js";
 export * from "./DeviceDomainService.js";
 export * from "./ChatDomainService.js";
 export * from "./ActivityLogger.js";
 export * from "./emailService.js";
 export * from "./sseManager.js";
-export * from "./CleanupService.js";
 export * from "./SymbolService.js";
 export * from "./CalendarService.js";
 export * from "./NewsService.js";

@@ -50,19 +50,19 @@ export class PgNewsRepository implements NewsRepository {
     }
   }
 
-  async findLatest(limit: number): Promise<NewsArticle[]> {
+  async findLatest(limit: number, offset: number = 0): Promise<NewsArticle[]> {
     const { rows } = await pgClient.query(
-      `SELECT * FROM news_articles ORDER BY published_at DESC NULLS LAST LIMIT $1`,
-      [limit]
+      `SELECT * FROM news_articles ORDER BY published_at DESC NULLS LAST LIMIT $1 OFFSET $2`,
+      [limit, offset]
     );
     return rows.map(this.mapRow);
   }
 
-  async findByAssetTags(tags: string[], limit: number): Promise<NewsArticle[]> {
+  async findByAssetTags(tags: string[], limit: number, offset: number = 0): Promise<NewsArticle[]> {
     if (tags.length === 0) return [];
     const { rows } = await pgClient.query(
-      `SELECT * FROM news_articles WHERE asset_tags && $1 ORDER BY published_at DESC NULLS LAST LIMIT $2`,
-      [tags, limit]
+      `SELECT * FROM news_articles WHERE asset_tags && $1 ORDER BY published_at DESC NULLS LAST LIMIT $2 OFFSET $3`,
+      [tags, limit, offset]
     );
     return rows.map(this.mapRow);
   }

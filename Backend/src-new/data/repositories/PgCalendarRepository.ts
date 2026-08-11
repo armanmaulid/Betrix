@@ -28,34 +28,62 @@ export class PgCalendarRepository implements CalendarRepository {
   async saveMany(events: CalendarEvent[]): Promise<number> {
     if (events.length === 0) return 0;
     
+    // Deduplicate events by valueId to prevent Postgres "ON CONFLICT cannot affect row a second time" error
+    // If there are duplicates in the payload, the last one wins.
+    const uniqueEventsMap = new Map<number, CalendarEvent>();
+    for (const event of events) {
+      uniqueEventsMap.set(event.valueId, event);
+    }
+    const uniqueEvents = Array.from(uniqueEventsMap.values());
+    
     const client = await pgClient.connect();
+    const onError = (err: Error) => console.error("Client error in saveMany:", err.message);
+    client.on("error", onError);
+
     try {
       await client.query("BEGIN");
       let count = 0;
-      for (const event of events) {
-        const { rowCount } = await client.query(
-          `INSERT INTO calendar_events (value_id, event_id, event_time, country, currency, event_name, importance, actual, forecast, previous, created_at, updated_at)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-           ON CONFLICT (value_id) DO UPDATE SET
-             actual = EXCLUDED.actual,
-             forecast = EXCLUDED.forecast,
-             previous = EXCLUDED.previous,
-             updated_at = EXCLUDED.updated_at`,
-          [
+      
+      // Batch into chunks of 100 to speed up insertion with a single bulk query per chunk
+      const chunkSize = 100;
+      for (let i = 0; i < uniqueEvents.length; i += chunkSize) {
+        const chunk = uniqueEvents.slice(i, i + chunkSize);
+        
+        const placeholders: string[] = [];
+        const params: any[] = [];
+        let paramIndex = 1;
+        
+        for (const event of chunk) {
+          placeholders.push(`($${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++},$${paramIndex++})`);
+          params.push(
             event.valueId, event.eventId, event.eventTime, event.country,
             event.currency, event.eventName, event.importance,
             event.actual, event.forecast, event.previous,
             event.createdAt, event.updatedAt
-          ]
-        );
-        count += rowCount || 0;
+          );
+        }
+        
+        const queryStr = `
+          INSERT INTO calendar_events (value_id, event_id, event_time, country, currency, event_name, importance, actual, forecast, previous, created_at, updated_at)
+          VALUES ${placeholders.join(",")}
+          ON CONFLICT (value_id) DO UPDATE SET
+            actual = EXCLUDED.actual,
+            forecast = EXCLUDED.forecast,
+            previous = EXCLUDED.previous,
+            updated_at = EXCLUDED.updated_at
+        `;
+        
+        const result = await client.query(queryStr, params);
+        count += result.rowCount || 0;
       }
+      
       await client.query("COMMIT");
       return count;
     } catch (err) {
       await client.query("ROLLBACK");
       throw err;
     } finally {
+      client.removeListener("error", onError);
       client.release();
     }
   }

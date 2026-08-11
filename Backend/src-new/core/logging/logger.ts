@@ -90,7 +90,8 @@ const fileFormat = combine(
 );
 
 export const logger = winston.createLogger({
-  level: env.LOG_LEVEL || "info",
+  level: env.LOG_LEVEL === "silent" ? "error" : (env.LOG_LEVEL || "info"),
+  silent: env.LOG_LEVEL === "silent",
   format: combine(
     timestamp({ format: "YYYY-MM-DD HH:mm:ss.SSS" }),
     errors({ stack: true }),

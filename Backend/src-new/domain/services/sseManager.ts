@@ -75,3 +75,16 @@ export function sendHeartbeat(): void {
     }
   }
 }
+
+export function broadcastGlobal(event: string, data: unknown): void {
+  const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const [userId, userClients] of clients) {
+    for (const client of userClients) {
+      try {
+        client.response.write(message);
+      } catch {
+        removeClient(userId, client.sessionToken);
+      }
+    }
+  }
+}

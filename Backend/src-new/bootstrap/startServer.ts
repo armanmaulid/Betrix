@@ -4,6 +4,7 @@ import cors from "cors";
 import helmet from "helmet";
 import passport from "passport";
 import { registerDependencies } from "./container.js";
+import { registerEventHandlers } from "./events.js";
 import { registerRoutes } from "./registerRoutes.js";
 import { registerMiddleware } from "./registerMiddleware.js";
 import { errorHandler } from "@core/middleware/errorHandler.js";
@@ -19,6 +20,7 @@ import "../config/passport.js";
 
 export async function createApp() {
   registerDependencies();
+  registerEventHandlers();
   
   const app = express();
   

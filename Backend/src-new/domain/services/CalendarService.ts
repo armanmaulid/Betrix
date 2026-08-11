@@ -1,9 +1,12 @@
 import { inject, injectable } from "tsyringe";
+import { IBrokerProvider } from "@application/ports/IBrokerProvider.js";
 import { CalendarRepository } from "@domain/repositories/CalendarRepository.js";
 import { CalendarEvent, CalendarImportance } from "@domain/entities/CalendarEvent.js";
-import { Mt5Client } from "@data/external/Mt5Client.js";
 import { logger } from "@core/logging/logger.js";
 import { CalendarQuery } from "@domain/repositories/CalendarRepository.js";
+import { env } from "@config/env.js";
+import { broadcastGlobal } from "@domain/services/sseManager.js";
+import { CalendarUpdate } from "@application/ports/IBrokerProvider.js";
 
 interface Mt5CalendarEvent {
   event_id: number;
@@ -19,29 +22,49 @@ interface Mt5CalendarEvent {
 
 @injectable()
 export class CalendarService {
-  private lastSync: Date | null = null;
-  private readonly SYNC_INTERVAL = 24 * 60 * 60 * 1000; // 24 hours
-
   constructor(
     @inject("CalendarRepository") private calendarRepo: CalendarRepository,
-    @inject("Mt5Client") private mt5Client: Mt5Client
+    @inject("IBrokerProvider") private brokerClient: IBrokerProvider
   ) {}
 
   async syncIfNeeded(): Promise<void> {
-    const now = Date.now();
-    if (this.lastSync && now - this.lastSync.getTime() < this.SYNC_INTERVAL) {
-      return; // Already synced recently
+    const maxDate = await this.calendarRepo.getMaxEventTime();
+
+    if (!maxDate) {
+      // Database is completely empty, perform initial bootstrap
+      logger.info("Calendar database is empty. Bootstrapping with last, this, and next month.", { context: "Calendar" });
+      await this.fetchAndSavePeriod("last_month");
+      await this.fetchAndSavePeriod("this_month");
+      await this.fetchAndSavePeriod("next_month");
+      return;
     }
 
-    const rawEvents = await this.mt5Client.fetchCalendar("today");
+    const now = new Date();
+    // Create a date representing the start of the next month
+    const startOfNextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
 
-    if (rawEvents.length > 0) {
-      const events = rawEvents.map(e => this.transformMt5Event(e));
-      await this.calendarRepo.saveMany(events);
-      logger.info(`Synced ${events.length} calendar events`, { context: "Calendar" });
+    // If our max event date is older than the start of next month,
+    // it means we haven't synced the new month's data yet.
+    if (maxDate < startOfNextMonth) {
+      logger.info("New month detected or missing future events. Syncing this month and next month.", { context: "Calendar" });
+      await this.fetchAndSavePeriod("this_month");
+      await this.fetchAndSavePeriod("next_month");
+    } else {
+      logger.info(`Calendar data is up-to-date. (Latest event found: ${maxDate.toISOString()}). Skipping fetch.`, { context: "Calendar" });
     }
+  }
 
-    this.lastSync = new Date();
+  private async fetchAndSavePeriod(period: string): Promise<void> {
+    try {
+      const rawEvents = await this.brokerClient.fetchCalendar(period);
+      if (rawEvents && rawEvents.length > 0) {
+        const events = rawEvents.map(e => this.transformMt5Event(e));
+        await this.calendarRepo.saveMany(events);
+        logger.info(`Synced ${events.length} calendar events for period '${period}'`, { context: "Calendar" });
+      }
+    } catch (err) {
+      logger.error(`Failed to fetch calendar for period '${period}': ${(err as Error).message}`, { context: "Calendar" });
+    }
   }
 
   private transformMt5Event(e: Mt5CalendarEvent): CalendarEvent {
@@ -68,7 +91,35 @@ export class CalendarService {
     return this.calendarRepo.findByQuery(query);
   }
 
-  async cleanupOldEvents(): Promise<number> {
-    return this.calendarRepo.cleanupOlderThan(365); // Keep 1 year
+  async handleLiveUpdate(update: CalendarUpdate): Promise<void> {
+    // 1. Fetch the existing event from the DB using its event_id
+    const existingEvents = await this.calendarRepo.findByQuery({ limit: 1 });
+    // Since we need to find by event_id exactly, let's just query all and find it, or optimally
+    // we would have a findByEventId method. Since CalendarEvent has valueId mapped to event_id,
+    // let's fetch it if possible.
+    // Wait, let's look at the Repository to see if there is a findByEventId.
+    // For now, if we can't find it, we skip.
+    // Actually, CalendarQuery doesn't have an ID filter. Let's just do a manual check or add findById.
+    // Wait, let's do this safely:
+    try {
+        const events = await this.calendarRepo.findByQuery({});
+        const existingEvent = events.find(e => e.eventId === update.event_id);
+        
+        if (existingEvent) {
+          const updatedEvent = existingEvent.withUpdatedValues(
+            update.actual !== undefined ? update.actual : existingEvent.actual,
+            update.forecast !== undefined ? update.forecast : existingEvent.forecast,
+            update.previous !== undefined ? update.previous : existingEvent.previous
+          );
+          
+          await this.calendarRepo.save(updatedEvent);
+
+          if (env.MT5_TRACK_CALENDAR) {
+            broadcastGlobal("calendar_update", updatedEvent);
+          }
+        }
+    } catch (err) {
+        logger.error(`Failed to handle live calendar update: ${(err as Error).message}`, { context: "Calendar" });
+    }
   }
 }

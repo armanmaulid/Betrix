@@ -184,7 +184,6 @@ const migrations = [
     description TEXT,
     path TEXT,
     category VARCHAR(100),
-    trade_mode INTEGER DEFAULT 3,
     is_active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP

@@ -5,6 +5,7 @@ import adminRoutes from "./admin.routes.js";
 import userRoutes from "./user.routes.js";
 import marketRoutes from "./market.routes.js";
 import healthRoutes from "./health.routes.js";
+import newsRoutes from "./news.routes.js";
 
 const router = Router();
 
@@ -13,6 +14,7 @@ router.use("/chat", chatRoutes);
 router.use("/admin", adminRoutes);
 router.use("/me", userRoutes);
 router.use("/market", marketRoutes);
+router.use("/news", newsRoutes);
 router.use("/", healthRoutes);
 
 export default router;

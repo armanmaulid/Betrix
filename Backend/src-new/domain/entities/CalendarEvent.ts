@@ -49,4 +49,25 @@ export class CalendarEvent {
       now
     );
   }
+
+  withUpdatedValues(
+    actual: string | null,
+    forecast: string | null,
+    previous: string | null
+  ): CalendarEvent {
+    return new CalendarEvent(
+      this.valueId,
+      this.eventId,
+      this.eventTime,
+      this.country,
+      this.currency,
+      this.eventName,
+      this.importance,
+      actual,
+      forecast,
+      previous,
+      this.createdAt,
+      new Date()
+    );
+  }
 }

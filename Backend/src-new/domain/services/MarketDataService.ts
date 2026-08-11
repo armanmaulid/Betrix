@@ -1,8 +1,10 @@
 import { inject, injectable } from "tsyringe";
-import { redisClient } from "@data/orm/redisClient.js";
+import { MarketDataRepository } from "@domain/repositories/MarketDataRepository.js";
 import { SymbolRepository } from "@domain/repositories/SymbolRepository.js";
 import { BrokerSymbol } from "@domain/entities/BrokerSymbol.js";
 import { logger } from "@core/logging/logger.js";
+import { env } from "@config/env.js";
+import { broadcastGlobal } from "@domain/services/sseManager.js";
 
 interface PriceData {
   symbol: string;
@@ -36,21 +38,19 @@ interface SymbolInfo {
   description: string | null;
   path: string | null;
   category: string | null;
-  tradeMode: number;
   isActive: boolean;
 }
 
 @injectable()
 export class MarketDataService {
   constructor(
+    @inject("MarketDataRepository") private marketDataRepo: MarketDataRepository,
     @inject("SymbolRepository") private symbolRepo: SymbolRepository
   ) {}
 
   async getPrice(symbol: string): Promise<PriceData | null> {
-    const cacheKey = `mt5:price:${symbol}`;
-    const data = await redisClient.get<string | null>(cacheKey);
-    if (data) return JSON.parse(data);
-    return null;
+    const data = await this.marketDataRepo.getPrice(symbol);
+    return data || null;
   }
 
   async getPrices(symbols: string[]): Promise<Map<string, PriceData>> {
@@ -63,17 +63,13 @@ export class MarketDataService {
   }
 
   async getOHLC(symbol: string, timeframe: string): Promise<OHLCData | null> {
-    const cacheKey = `mt5:ohlc:${symbol}:${timeframe}`;
-    const data = await redisClient.get<string | null>(cacheKey);
-    if (data) return JSON.parse(data);
-    return null;
+    const data = await this.marketDataRepo.getOHLC(symbol, timeframe);
+    return data || null;
   }
 
   async getMarketBook(symbol: string): Promise<MarketBookData | null> {
-    const cacheKey = `mt5:mbook:${symbol}`;
-    const data = await redisClient.get<string | null>(cacheKey);
-    if (data) return JSON.parse(data);
-    return null;
+    const data = await this.marketDataRepo.getMarketBook(symbol);
+    return data || null;
   }
 
   async getSymbols(activeOnly = true): Promise<SymbolInfo[]> {
@@ -86,7 +82,6 @@ export class MarketDataService {
       description: s.description,
       path: s.path,
       category: s.category,
-      tradeMode: s.tradeMode,
       isActive: s.isActive
     }));
   }
@@ -99,7 +94,6 @@ export class MarketDataService {
       description: symbolEntity.description,
       path: symbolEntity.path,
       category: symbolEntity.category,
-      tradeMode: symbolEntity.tradeMode,
       isActive: symbolEntity.isActive
     };
   }
@@ -111,63 +105,47 @@ export class MarketDataService {
       description: s.description,
       path: s.path,
       category: s.category,
-      tradeMode: s.tradeMode,
       isActive: s.isActive
     }));
   }
 
   async getAllPrices(): Promise<PriceData[]> {
-    const keys = await redisClient.keys("mt5:price:*");
-    const prices: PriceData[] = [];
-    
-    for (const key of keys) {
-      const data = await redisClient.get<string | null>(key);
-      if (data) {
-        prices.push(JSON.parse(data));
-      }
-    }
-    return prices;
+    return this.marketDataRepo.getAllPrices();
   }
 
   async getAllOHLC(timeframe: string): Promise<any[]> {
-    const pattern = `mt5:ohlc:*:${timeframe}`;
-    const keys = await redisClient.keys(pattern);
-    const ohlc: any[] = [];
-    
-    for (const key of keys) {
-      const data = await redisClient.get<string | null>(key);
-      if (data) {
-        ohlc.push(JSON.parse(data));
-      }
-    }
-    return ohlc;
+    return this.marketDataRepo.getAllOHLC(timeframe);
   }
 
   async getAllMarketBooks(): Promise<any[]> {
-    const keys = await redisClient.keys("mt5:mbook:*");
-    const books: any[] = [];
-    
-    for (const key of keys) {
-      const data = await redisClient.get<string | null>(key);
-      if (data) {
-        books.push(JSON.parse(data));
-      }
-    }
-    return books;
+    return this.marketDataRepo.getAllMarketBooks();
   }
 
   async handlePriceTick(tick: { symbol: string; bid: number; ask: number; spread: number; digits: number; volume: number; timestamp: number }): Promise<void> {
-    const cacheKey = `mt5:price:${tick.symbol}`;
-    await redisClient.setex(cacheKey, 60, JSON.stringify(tick));
+    await this.marketDataRepo.cachePrice(tick);
+    
+    if (env.MT5_TRACK_PRICES && env.MT5_TRACKING_SYMBOLS.includes(tick.symbol)) {
+      broadcastGlobal("price_update", tick);
+    }
   }
 
-  async handleOHLCUpdate(update: { symbol: string; timeframe: string; time: number; open: number; high: number; low: number; close: number; volume: number }): Promise<void> {
-    const cacheKey = `mt5:ohlc:${update.symbol}:${update.timeframe}`;
-    await redisClient.setex(cacheKey, 300, JSON.stringify(update));
+  async handleOHLCUpdate(update: { symbol: string; timeframe: string; time: number; open: number; high: number; low: number; close: number; volume: number; prev_close?: number }): Promise<void> {
+    const ohlcUpdate = {
+      ...update,
+      prev_close: update.prev_close ?? update.open
+    };
+    await this.marketDataRepo.cacheOHLC(ohlcUpdate);
+    
+    if (env.MT5_TRACK_OHLC && env.MT5_TRACKING_SYMBOLS.includes(update.symbol)) {
+      broadcastGlobal("ohlc_update", ohlcUpdate);
+    }
   }
 
   async handleMarketBookUpdate(update: { symbol: string; bids: Array<{ price: number; volume: number }>; asks: Array<{ price: number; volume: number }> }): Promise<void> {
-    const cacheKey = `mt5:mbook:${update.symbol}`;
-    await redisClient.setex(cacheKey, 60, JSON.stringify(update));
+    await this.marketDataRepo.cacheMarketBook(update);
+    
+    if (env.MT5_TRACK_MBOOK && env.MT5_TRACKING_SYMBOLS.includes(update.symbol)) {
+      broadcastGlobal("mbook_update", update);
+    }
   }
 }
