@@ -1,14 +1,12 @@
-'use client';
-
 import React, { useEffect, useRef, useState } from "react";
-import { useAuthStore } from "../../store/authStore";
+import { useAuth } from "../../context/AuthContext";
 import { Activity, Server, Clock, Database, User } from "lucide-react";
 import { useVisibilityPoll } from "../../hooks/useVisibilityPoll";
 
 const POLL_MS = 10_000; // Tiap 10 detik hitung ping (skip saat tab background)
 
 export const StatusBar = React.memo(function StatusBar() {
-  const { user, isConnected } = useAuthStore();
+  const { user, isConnected } = useAuth();
   const [ping, setPing] = useState<number | null>(null);
   const cancelledRef = useRef(false);
 
@@ -25,8 +23,8 @@ export const StatusBar = React.memo(function StatusBar() {
 
     const start = performance.now();
     try {
-      const BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1").replace(/\/api\/v1\/?$/, '');
-      await fetch(`${BASE_URL}/health`);
+      const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+      await fetch(`${BACKEND_URL}/health`);
       const end = performance.now();
       if (!cancelledRef.current) setPing(Math.round(end - start));
     } catch (err) {
@@ -78,7 +76,7 @@ export const StatusBar = React.memo(function StatusBar() {
       <div className="flex items-center">
         {/* BUILD INFO */}
         <div className="flex items-center border-l border-[var(--border)] px-3 text-[var(--text-muted)]">
-          BUILD: V1.0.0-BETA (NEXT)
+          BUILD: V1.0.0-BETA
         </div>
 
         {/* ACCOUNT INFO */}

@@ -1,23 +1,12 @@
-'use client';
-
 import type { ReactNode } from "react";
-import { useEffect } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import {  useAuthStore  } from "../../store/authStore";
+import { Navigate, useLocation } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
 export function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { user, isLoading } = useAuthStore();
-  const pathname = usePathname();
+  const { user, isLoading } = useAuth();
+  const location = useLocation();
 
-  const router = useRouter();
-
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.replace("/login?from=" + encodeURIComponent(pathname || ""));
-    }
-  }, [isLoading, user, pathname, router]);
-
-  if (isLoading || !user) {
+  if (isLoading) {
     return (
       <div className="dark flex h-screen items-center justify-center bg-[var(--bg)] font-mono text-[12px] text-[var(--text-muted)]">
         Memuat sesi...
@@ -25,6 +14,11 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
     );
   }
 
+  if (!user) {
+    // Remember where they were headed so LoginPage can send them back after
+    // a successful login instead of always dropping them on "/".
+    return <Navigate to="/login" replace state={{ from: location.pathname }} />;
+  }
+
   return <>{children}</>;
 }
-

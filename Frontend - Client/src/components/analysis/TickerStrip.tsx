@@ -1,4 +1,3 @@
-"use client";
 import React, { useEffect, useRef, useState } from "react";
 import { useTickerPrices, MARKET_SYMBOLS, type TickerSymbol } from "../../hooks/useTickerPrices";
 
@@ -97,4 +96,3 @@ export const TickerStrip = React.memo(function TickerStrip({ symbols = MARKET_SY
     </div>
   );
 });
-

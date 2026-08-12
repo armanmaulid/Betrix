@@ -1,4 +1,3 @@
-"use client";
 import React, { useState } from "react";
 import { Globe, Copy, FileText, ChevronRight, Check } from "lucide-react";
 import ReactMarkdown from "react-markdown";
@@ -95,4 +94,3 @@ export const ChatMessageItem = React.memo(({ msg }: { msg: any }) => {
     </div>
   );
 });
-

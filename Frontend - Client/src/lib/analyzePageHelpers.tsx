@@ -1,5 +1,5 @@
-import type { Candle } from "./api/marketClient";
-import type { NewsItem } from "./api/newsClient";
+import type { Candle } from "../api/marketClient";
+import type { NewsItem } from "../api/newsClient";
 
 // Styling elemen Markdown supaya senada dengan tema terminal gelap Betrix
 // (aksen orange #ff9900, border #222/#333) alih-alih default browser polos.

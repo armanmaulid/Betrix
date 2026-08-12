@@ -1,4 +1,3 @@
-"use client";
 // @ts-nocheck
 import type { ReactNode } from "react";
 
@@ -199,4 +198,3 @@ function Particles() {
     </div>
   );
 }
-

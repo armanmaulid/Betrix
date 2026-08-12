@@ -1,47 +1,28 @@
-'use client';
-
-import { useEffect, type ReactNode } from "react";
-import { useRouter, usePathname } from "next/navigation";
-import { useAuthStore } from "../../store/authStore";
-import { useShellStore } from "../../store/shellStore";
+import { useState, useMemo, type ReactNode } from "react";
+import { Outlet, useOutletContext } from "react-router-dom";
 import { TerminalShell } from "./TerminalShell";
 
-export function TerminalShellLayout({ children }: { children: ReactNode }) {
-  const { user, isLoading, restoreSession } = useAuthStore();
-  const router = useRouter();
-  const pathname = usePathname();
-  
-  const rightPanel = useShellStore((state) => state.rightPanel);
-  const onSearch = useShellStore((state) => state.onSearch);
+export interface ShellContextType {
+  setRightPanel: (panel: ReactNode | null) => void;
+  setOnSearch: (handler: (s: string) => void) => void;
+}
 
-  useEffect(() => {
-    restoreSession();
-  }, [restoreSession]);
+export function TerminalShellLayout() {
+  const [rightPanel, setRightPanel] = useState<ReactNode | null>(null);
+  const [onSearch, setOnSearch] = useState<((s: string) => void)>(() => () => {});
 
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.replace(`/login?from=${encodeURIComponent(pathname || "")}`);
-    }
-  }, [isLoading, user, router, pathname]);
-
-  if (isLoading) {
-    return (
-      <div className="dark flex h-screen items-center justify-center bg-[var(--bg)] font-mono text-[12px] text-[var(--text-muted)]">
-        Memuat sesi...
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
+  const context = useMemo<ShellContextType>(() => ({
+    setRightPanel,
+    setOnSearch: (fn: (s: string) => void) => setOnSearch(() => fn)
+  }), []);
 
   return (
-    <div className="dark">
-      <TerminalShell onSearchSymbol={onSearch} rightPanel={rightPanel}>
-        {children}
-      </TerminalShell>
-    </div>
+    <TerminalShell onSearchSymbol={onSearch} rightPanel={rightPanel}>
+      <Outlet context={context} />
+    </TerminalShell>
   );
 }
 
+export function useShellContext() {
+  return useOutletContext<ShellContextType>();
+}

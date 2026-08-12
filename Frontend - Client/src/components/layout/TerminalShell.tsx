@@ -1,4 +1,3 @@
-"use client";
 import type { ReactNode } from "react";
 import { TopBar } from "./TopBar";
 import { SideNavRail } from "./SideNavRail";
@@ -40,4 +39,3 @@ export function TerminalShell({ onSearchSymbol, rightPanel, children }: Terminal
     </div>
   );
 }
-

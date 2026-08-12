@@ -1,8 +1,7 @@
-"use client";
 import { useEffect, useRef, useState } from "react";
 import { createChart, IChartApi, ISeriesApi, Time, ColorType, CandlestickSeries } from "lightweight-charts";
 import { AlertTriangle, Loader2 } from "lucide-react";
-import { fetchCandles } from "../../lib/api/marketClient";
+import { fetchCandles } from "../../api/marketClient";
 import { useTickerPrices } from "../../hooks/useTickerPrices";
 
 interface LightweightChartWidgetProps {
@@ -68,17 +67,17 @@ export function LightweightChartWidget({ symbol, timeframe }: LightweightChartWi
         if (cancelled) return;
         
         const data = candles
-          .map((c: any) => ({
+          .map((c) => ({
             time: c.time as Time,
             open: c.open,
             high: c.high,
             low: c.low,
             close: c.close,
           }))
-          .sort((a: any, b: any) => (a.time as number) - (b.time as number));
+          .sort((a, b) => (a.time as number) - (b.time as number));
 
         // Lightweight-charts akan crash jika ada duplicate time
-        const uniqueData = data.filter((v: any, i: number, a: any[]) => i === 0 || v.time !== a[i - 1].time);
+        const uniqueData = data.filter((v, i, a) => i === 0 || v.time !== a[i - 1].time);
         
         seriesRef.current.setData(uniqueData);
         if (uniqueData.length > 0) {
@@ -170,4 +169,3 @@ function getTimeframeSeconds(tf: string): number {
     </div>
   );
 }
-

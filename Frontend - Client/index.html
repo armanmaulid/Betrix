@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="id" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- TradingViewWidget mount script eksternal dari domain ini setiap kali
+         simbol/timeframe berganti — preconnect biar TLS handshake-nya sudah
+         siap sebelum widget benar-benar di-mount. -->
+    <link rel="preconnect" href="https://s3.tradingview.com" crossorigin />
+    <link rel="dns-prefetch" href="https://s3.tradingview.com" />
+    <title>Betrix — Client</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

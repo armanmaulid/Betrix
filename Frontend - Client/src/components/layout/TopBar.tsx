@@ -1,8 +1,6 @@
-'use client';
-
 import React, { useEffect, useState, type FormEvent } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import { useAuthStore } from "../../store/authStore";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 import { Maximize2, Search, Zap } from "lucide-react";
 
 const FUNCTION_TABS = [
@@ -15,15 +13,21 @@ interface TopBarProps {
   onSearchSymbol: (symbol: string) => void;
 }
 
+// Dua tab function-key ini navigasi HALAMAN BENERAN sekarang (bukan
+// scroll-anchor satu halaman lagi) — DashboardPage (chart TradingView
+// publik) dan AnalyzePage (KLineChart + StrategyPanel + hasil sinyal AI).
+// Search box juga beneran: submit → set symbol di halaman aktif.
+//
+// NOTE: indikator "LIVE" cuma ada DI SINI (sejajar jam), TIDAK ada lagi di
+// TickerStrip — sebelumnya sempat ada di dua tempat sekaligus (dobel).
 export const TopBar = React.memo(function TopBar({ onSearchSymbol }: TopBarProps) {
-  const [now, setNow] = useState<Date | null>(null);
+  const [now, setNow] = useState(new Date());
   const [query, setQuery] = useState("");
-  const { user, isConnected } = useAuthStore();
-  const router = useRouter();
-  const pathname = usePathname();
+  const { user, isConnected } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   useEffect(() => {
-    setNow(new Date());
     const t = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(t);
   }, []);
@@ -47,11 +51,11 @@ export const TopBar = React.memo(function TopBar({ onSearchSymbol }: TopBarProps
     <div className="flex items-stretch border-b border-[var(--border)] bg-[var(--surface)] text-[11px]">
       <div className="flex flex-shrink-0 items-stretch overflow-x-auto">
         {FUNCTION_TABS.map((t) => {
-          const isActive = pathname === t.to;
+          const isActive = location.pathname === t.to;
           return (
             <button
               key={t.key}
-              onClick={() => router.push(t.to)}
+              onClick={() => navigate(t.to)}
               className={`btn-sweep bx-nav-tab ${isActive ? "bx-nav-tab-active" : ""}`}
             >
               <span className="bx-nav-tab-key">{t.key}</span>
@@ -89,7 +93,7 @@ export const TopBar = React.memo(function TopBar({ onSearchSymbol }: TopBarProps
       </div>
 
       <div className="flex flex-shrink-0 items-center gap-1.5 border-l border-[var(--border)] px-3 text-[10px]">
-        <span className="text-[#b5a679]">API: <span className={`font-bold ${process.env.NODE_ENV === "development" ? "text-yellow-500" : "text-[var(--success)]"}`}>{process.env.NODE_ENV === "development" ? "DEVELOPMENT" : "OPERATIONAL"}</span> <span className="text-[var(--text-muted)]">v0.1</span></span>
+        <span className="text-[#b5a679]">API: <span className={`font-bold ${import.meta.env.DEV ? "text-yellow-500" : "text-[var(--success)]"}`}>{import.meta.env.DEV ? "DEVELOPMENT" : "OPERATIONAL"}</span> <span className="text-[var(--text-muted)]">v0.1</span></span>
       </div>
 
       <div className="flex flex-shrink-0 items-center gap-1.5 border-l border-[var(--border)] px-3 text-[10px]">
@@ -113,22 +117,16 @@ export const TopBar = React.memo(function TopBar({ onSearchSymbol }: TopBarProps
         <Maximize2 size={13} />
       </button>
 
-      <div className="flex w-24 flex-shrink-0 items-center border-l border-[var(--border)] px-3 text-[11px] font-bold text-orange-500">
+      <div className="flex flex-shrink-0 items-center border-l border-[var(--border)] px-3 text-[11px] font-bold text-orange-500">
         <span className="tabular">
-          {now ? (
-            <>
-              {now.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}{" "}
-              {(() => {
-                const offsetMin = -now.getTimezoneOffset();
-                const hrs = Math.floor(Math.abs(offsetMin) / 60);
-                const mins = Math.abs(offsetMin) % 60;
-                const sign = offsetMin >= 0 ? "+" : "-";
-                return `GMT${sign}${hrs}${mins > 0 ? `:${mins}` : ""}`;
-              })()}
-            </>
-          ) : (
-            "--:--:-- GMT+-"
-          )}
+          {now.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}{" "}
+          {(() => {
+            const offsetMin = -now.getTimezoneOffset();
+            const hrs = Math.floor(Math.abs(offsetMin) / 60);
+            const mins = Math.abs(offsetMin) % 60;
+            const sign = offsetMin >= 0 ? "+" : "-";
+            return `GMT${sign}${hrs}${mins > 0 ? `:${mins}` : ""}`;
+          })()}
         </span>
       </div>
     </div>

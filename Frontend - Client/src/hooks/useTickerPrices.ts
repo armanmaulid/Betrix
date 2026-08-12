@@ -1,6 +1,5 @@
-"use client";
 import { useEffect, useState } from "react";
-import { fetchCandles } from "../lib/api/marketClient";
+import { fetchCandles } from "../api/marketClient";
 import { onLogout } from "../lib/authEvents";
 
 export interface TickerSymbol {
@@ -61,9 +60,9 @@ function updateGlobalStream() {
   const symbolKey = getActiveSymbolKey();
   if (!symbolKey) return; // Nobody is listening
 
-  const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+  const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
   const token = localStorage.getItem("eaconsole.sessionToken") || "";
-  const url = `${BACKEND_URL}/api/v1/market/stream?symbol=${symbolKey}&token=${token}`;
+  const url = `${BACKEND_URL}/api/market/stream?symbol=${symbolKey}&token=${token}`;
   
   globalEventSource = new EventSource(url);
   globalEventSource.addEventListener("price_update", (e) => {
@@ -113,7 +112,7 @@ export function useTickerPrices(symbols: TickerSymbol[]): Record<string, TickerP
 
     // Registrasi symbol & jadwalkan koneksi stream SEGERA saat mount —
     // supaya subscribe ke MT5 bridge (lewat updateGlobalStream ->
-    // /api/v1/market/stream) mulai berjalan PARALEL dengan fetch harga awal
+    // /api/market/stream) mulai berjalan PARALEL dengan fetch harga awal
     // di bawah, bukan menunggunya selesai dulu. Sebelumnya urutannya
     // sekuensial (fetch dulu, baru connect stream +100ms debounce di
     // belakangnya), jadi realtime tick terasa "antre" di awal load.
@@ -235,6 +234,3 @@ export const MARKET_SYMBOLS: TickerSymbol[] = [
   { symbol: "BTCUSD", label: "BTC/USD", decimals: 2 },
   { symbol: "ETHUSD", label: "ETH/USD", decimals: 2 },
 ];
-
-
-

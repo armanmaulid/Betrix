@@ -1,7 +1,6 @@
-"use client";
 import React, { useEffect, useRef, useState } from "react";
 import { CalendarClock, RefreshCw, Info, Filter, X } from "lucide-react";
-import { fetchEconomicCalendar, type CalendarEvent } from "../../lib/api/marketClient";
+import { fetchEconomicCalendar, type CalendarEvent } from "../../api/marketClient";
 import { onLogout } from "../../lib/authEvents";
 
 const IMPACT_DOT: Record<CalendarEvent["importance"], string> = {
@@ -183,7 +182,7 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
   // dari mt5-bridge tiap ada actual value baru rilis / revisi forecast).
   // Debounce ringan karena beberapa event bisa datang beruntun sekaligus.
   useEffect(() => {
-    const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+    const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
     const token = localStorage.getItem("eaconsole.sessionToken") || "";
     if (!token) return;
 
@@ -596,5 +595,3 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
     </div>
   );
 });
-
-

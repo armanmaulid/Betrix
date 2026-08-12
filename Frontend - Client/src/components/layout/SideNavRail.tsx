@@ -1,10 +1,12 @@
-'use client';
-
 import React from "react";
 import { LayoutGrid, CandlestickChart, Sparkles, Newspaper, CalendarClock, Settings, LogOut } from "lucide-react";
-import { usePathname, useRouter } from "next/navigation";
-import { useAuthStore } from "../../store/authStore";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../../context/AuthContext";
 
+// anchorId cuma ada di DashboardPage ("/") — kalau lagi di halaman itu,
+// klik langsung scroll ke section-nya. Kalau lagi di halaman lain (mis.
+// AnalyzePage), klik akan pindah dulu ke "/" (tanpa auto-scroll — halaman
+// tujuan pendek, jadi cukup terlihat begitu landing).
 const NAV_ITEMS = [
   { icon: LayoutGrid, label: "Dashboard", path: "/", anchorId: "panel-dashboard" },
   { icon: CandlestickChart, label: "Chart", path: "/", anchorId: "panel-chart" },
@@ -14,17 +16,17 @@ const NAV_ITEMS = [
 ];
 
 export const SideNavRail = React.memo(function SideNavRail() {
-  const { logout } = useAuthStore();
-  const router = useRouter();
-  const pathname = usePathname();
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   function handleClick(path: string, anchorId?: string) {
-    if (pathname === path) {
+    if (location.pathname === path) {
       if (anchorId) {
         document.getElementById(anchorId)?.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     } else {
-      router.push(path);
+      navigate(path);
     }
   }
 
@@ -39,7 +41,7 @@ export const SideNavRail = React.memo(function SideNavRail() {
             title={label}
             className={
               "flex h-9 w-9 items-center justify-center hover:bg-[var(--surface-alt)] hover:text-[var(--accent)] " +
-              (pathname === path ? "text-[var(--accent)]" : "text-[var(--text-muted)]")
+              (location.pathname === path ? "text-[var(--accent)]" : "text-[var(--text-muted)]")
             }
           >
             <Icon size={17} />
@@ -54,7 +56,7 @@ export const SideNavRail = React.memo(function SideNavRail() {
           title="Pengaturan"
           className={
             "flex h-9 w-9 items-center justify-center hover:bg-[var(--surface-alt)] hover:text-[var(--accent)] " +
-            (pathname === "/settings" ? "text-[var(--accent)] bg-[rgba(255,170,0,0.05)]" : "text-[var(--text-muted)]")
+            (location.pathname === "/settings" ? "text-[var(--accent)] bg-[rgba(255,170,0,0.05)]" : "text-[var(--text-muted)]")
           }
         >
           <Settings size={17} />
