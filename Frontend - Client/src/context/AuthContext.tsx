@@ -122,12 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
-    // Tutup semua stream (me/stream, news/stream (for ticker, calendar, // Tutup semua stream (me/stream, news/stream (for ticker, calendar, me/stream, market/stream ticker & calendar,c.),c.), news/stream) SEKARANG JUGA — jangan nunggu network round-trip ke backend atau nunggu ProtectedRoute unmount komponen yang makai stream.
-    // news/stream) SEKARANG JUGA — jangan nunggu network round-trip ke
-    // backend atau nunggu ProtectedRoute unmount komponen yang makai stream.
-    emitLogout();
-
-    if (sessionToken) {
+    // Tutup semua stream (me/stream, news/stream (for ticker, calendar, &c.), news/stream) SEKARANG JUGA — jangan nunggu network round-trip ke backend atau nunggu ProtectedRoute unmount komponen yang makai stream.
       // Best-effort — even if this network call fails, forget the token
       // locally so the user isn't stuck "logged in" on this device.
       await authApi.logout(sessionToken).catch(() => {});
