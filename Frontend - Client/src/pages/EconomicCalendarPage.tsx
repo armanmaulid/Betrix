@@ -212,7 +212,7 @@ export function EconomicCalendarPage() {
     const token = localStorage.getItem("eaconsole.sessionToken") || "";
     if (!token) return;
 
-    const es = new EventSource(`${BACKEND_URL}/api/market/stream?calendar=1&token=${token}`);
+    const es = new EventSource(`${BACKEND_URL}/api/news/stream?token=${token}`);
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     let hasConnectedBefore = false;
     es.onopen = () => {

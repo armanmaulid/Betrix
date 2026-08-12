@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!sessionToken || !user) return;
 
     const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-    const es = new EventSource(`${BACKEND_URL}/api/auth/me/stream?token=${sessionToken}`);
+    const es = new EventSource(`${BACKEND_URL}/api/news/stream?token=${sessionToken}`);
 
     es.onopen = () => setIsConnected(true);
     es.onerror = () => setIsConnected(false);
@@ -122,7 +122,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
-    // Tutup semua stream (me/stream, market/stream ticker & calendar,
+    // Tutup semua stream (me/stream, news/stream (for ticker, calendar, // Tutup semua stream (me/stream, news/stream (for ticker, calendar, me/stream, market/stream ticker & calendar,c.),c.), news/stream) SEKARANG JUGA — jangan nunggu network round-trip ke backend atau nunggu ProtectedRoute unmount komponen yang makai stream.
     // news/stream) SEKARANG JUGA — jangan nunggu network round-trip ke
     // backend atau nunggu ProtectedRoute unmount komponen yang makai stream.
     emitLogout();

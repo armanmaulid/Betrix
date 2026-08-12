@@ -186,7 +186,7 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
     const token = localStorage.getItem("eaconsole.sessionToken") || "";
     if (!token) return;
 
-    const es = new EventSource(`${BACKEND_URL}/api/market/stream?calendar=1&token=${token}`);
+    const es = new EventSource(`${BACKEND_URL}/api/news/stream?token=${token}`);
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
     // FIX: /stream cuma push delta LIVE, gak pernah kirim snapshot pas

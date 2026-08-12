@@ -62,7 +62,7 @@ function updateGlobalStream() {
 
   const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
   const token = localStorage.getItem("eaconsole.sessionToken") || "";
-  const url = `${BACKEND_URL}/api/market/stream?symbol=${symbolKey}&token=${token}`;
+  const url = `${BACKEND_URL}/api/news/stream?token=${token}`;
   
   globalEventSource = new EventSource(url);
   globalEventSource.addEventListener("price_update", (e) => {
@@ -112,7 +112,7 @@ export function useTickerPrices(symbols: TickerSymbol[]): Record<string, TickerP
 
     // Registrasi symbol & jadwalkan koneksi stream SEGERA saat mount —
     // supaya subscribe ke MT5 bridge (lewat updateGlobalStream ->
-    // /api/market/stream) mulai berjalan PARALEL dengan fetch harga awal
+    // /api/news/stream) mulai berjalan PARALEL dengan fetch harga awal
     // di bawah, bukan menunggunya selesai dulu. Sebelumnya urutannya
     // sekuensial (fetch dulu, baru connect stream +100ms debounce di
     // belakangnya), jadi realtime tick terasa "antre" di awal load.
