@@ -22,7 +22,7 @@ router.get("/messages/:id", controller.getMessageDetail.bind(controller));
 router.post("/messages/:id/read", controller.markMessageRead.bind(controller));
 router.delete("/messages/:id", controller.deleteMessage.bind(controller));
 router.post("/messages", validate(sendMessageDto), controller.sendMessage.bind(controller));
-router.get("/messages/preferences", controller.updateNotificationPrefs.bind(controller)); // GET
+router.get("/messages/preferences", controller.getNotificationPrefs.bind(controller));
 router.post("/messages/preferences", validate(updateNotificationPrefsDto), controller.updateNotificationPrefs.bind(controller));
 
 export default router;

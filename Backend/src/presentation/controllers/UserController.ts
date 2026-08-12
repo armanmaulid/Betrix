@@ -9,6 +9,7 @@ import { GetMessageThreadUseCase } from "@application/use-cases/user/GetMessageT
 import { MarkMessageReadUseCase } from "@application/use-cases/user/MarkMessageReadUseCase.js";
 import type { DeleteMessageUseCase } from "@application/use-cases/user/DeleteMessageUseCase.js";
 import { UpdateNotificationPrefsUseCase } from "@application/use-cases/user/UpdateNotificationPrefsUseCase.js";
+import { GetNotificationPrefsUseCase } from "@application/use-cases/user/GetNotificationPrefsUseCase.js";
 import { GetUserActivityUseCase } from "@application/use-cases/user/GetUserActivityUseCase.js";
 import type { User } from "@domain/entities/User.js";
 
@@ -155,6 +156,16 @@ export class UserController {
         emailEnabled: req.body.emailEnabled,
       });
       res.json({ message: "Preferences updated" });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async getNotificationPrefs(req: Request, res: Response, next: NextFunction) {
+    try {
+      const useCase = container.resolve(GetNotificationPrefsUseCase);
+      const result = await useCase.execute({ userId: this.getUser(req).userId });
+      res.json(result);
     } catch (err) {
       next(err);
     }

@@ -72,6 +72,7 @@ import { GetUsageUseCase } from "@application/use-cases/user/GetUsageUseCase.js"
 import { GetMessagesUseCase } from "@application/use-cases/user/GetMessagesUseCase.js";
 import { SendMessageUseCase as SendUserMessageUseCase } from "@application/use-cases/user/SendMessageUseCase.js";
 import { UpdateNotificationPrefsUseCase } from "@application/use-cases/user/UpdateNotificationPrefsUseCase.js";
+import { GetNotificationPrefsUseCase } from "@application/use-cases/user/GetNotificationPrefsUseCase.js";
 import { GetUserActivityUseCase } from "@application/use-cases/user/GetUserActivityUseCase.js";
 import { GetSentMessagesUseCase } from "@application/use-cases/user/GetSentMessagesUseCase.js";
 import { GetMessageDetailUseCase } from "@application/use-cases/user/GetMessageDetailUseCase.js";
@@ -173,6 +174,7 @@ export function registerDependencies() {
   container.register("GetMessagesUseCase", { useClass: GetMessagesUseCase });
   container.register("SendUserMessageUseCase", { useClass: SendUserMessageUseCase });
   container.register("UpdateNotificationPrefsUseCase", { useClass: UpdateNotificationPrefsUseCase });
+  container.register("GetNotificationPrefsUseCase", { useClass: GetNotificationPrefsUseCase });
   container.register("GetUserActivityUseCase", { useClass: GetUserActivityUseCase });
   container.register("GetSentMessagesUseCase", { useClass: GetSentMessagesUseCase });
   container.register("GetMessageDetailUseCase", { useClass: GetMessageDetailUseCase });
