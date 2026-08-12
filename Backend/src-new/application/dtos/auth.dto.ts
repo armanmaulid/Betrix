@@ -23,11 +23,11 @@ export const changeEmailDto = z.object({
 
 export const updateProfileDto = z.object({
   name: z.string().optional(),
-  phone: z.string().optional(),
-  address: z.string().optional(),
-  birthdate: z.string().date().optional(),
-  gender: z.enum(["male", "female", "other"]).optional(),
-  bio: z.string().optional(),
+  phone: z.string().nullable().optional(),
+  address: z.string().nullable().optional(),
+  birthdate: z.string().date().nullable().optional(),
+  gender: z.enum(["male", "female", "other"]).nullable().optional(),
+  bio: z.string().nullable().optional(),
 });
 
 export const verifyEmailDto = z.object({

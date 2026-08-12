@@ -28,7 +28,8 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
 
   const loggedPath = redactSensitiveQuery(req.originalUrl || req.path);
 
-  logger.debug("incoming request", {
+  logger.info("Incoming request", {
+    context: "HTTP",
     method: req.method,
     path: loggedPath,
     userId: (req as any).user?.userId,
@@ -40,7 +41,8 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
     const duration = Date.now() - start;
 
     if (res.statusCode >= 500) {
-      logger.error("request completed", {
+      logger.error("Request failed", {
+        context: "HTTP",
         method: req.method,
         path: loggedPath,
         userId: (req as any).user?.userId,
@@ -49,7 +51,8 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
         requestId: req.id,
       });
     } else if (res.statusCode >= 400) {
-      logger.warn("request completed", {
+      logger.warn("Request completed", {
+        context: "HTTP",
         method: req.method,
         path: loggedPath,
         userId: (req as any).user?.userId,
@@ -58,7 +61,8 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
         requestId: req.id,
       });
     } else {
-      logger.debug("request completed", {
+      logger.info("Request completed", {
+        context: "HTTP",
         method: req.method,
         path: loggedPath,
         userId: (req as any).user?.userId,

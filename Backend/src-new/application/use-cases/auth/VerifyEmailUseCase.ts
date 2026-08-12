@@ -21,7 +21,8 @@ interface VerifyEmailOutput {
 export class VerifyEmailUseCase {
   constructor(
     @inject("UserRepository") private userRepo: UserRepository,
-    @inject("VerificationRepository") private verificationRepo: VerificationRepository
+    @inject("VerificationRepository") private verificationRepo: VerificationRepository,
+    @inject("EmailPort") private emailPort: EmailPort
   ) {}
 
   async execute(input: VerifyEmailInput): Promise<VerifyEmailOutput> {
@@ -35,8 +36,15 @@ export class VerifyEmailUseCase {
       throw new NotFoundError("User");
     }
 
-    const verifiedUser = user.withEmailVerified();
+    const verifiedUser = result.newEmail 
+      ? user.withEmail(result.newEmail)
+      : user.withEmailVerified();
+    
     await this.userRepo.save(verifiedUser);
+
+    if (result.newEmail) {
+      await this.emailPort.sendEmailChangeNotification(user.email, result.newEmail);
+    }
 
     return { user: verifiedUser };
   }

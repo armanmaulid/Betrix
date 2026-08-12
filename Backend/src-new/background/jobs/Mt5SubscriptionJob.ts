@@ -28,7 +28,49 @@ export class Mt5SubscriptionJob {
         logger.debug(`Calendar Live Update [Event ${update.event_id}] - Actual: ${update.actual} | Forecast: ${update.forecast} | Prev: ${update.previous}`, { context: "Broker" });
         const calendarService = container.resolve(CalendarService);
         await calendarService.handleLiveUpdate(update);
-      }
+      },
+
+      // Layer 1 (reactive): every time the WS (re)connects - network blip OR
+      // EA restart - re-apply tracking config from .env. Idempotent when the
+      // EA is still alive with the same config; this is what actually fixes
+      // the case where the EA restarted and lost its tracking state.
+      onReconnect: () => {
+        logger.info("MT5 WS (re)connected - re-applying tracking subscriptions", { context: "Broker" });
+        Mt5SubscriptionJob.setupSubscriptions().catch(err =>
+          logger.error("Resubscribe on reconnect failed", { context: "Broker", error: (err as Error).message })
+        );
+      },
+
+      // Layer 2 (proactive): compare what the EA says is active right now
+      // against what .env says should be active. Mismatch means the EA's
+      // tracking config diverged from what we expect - resubscribe.
+      onTrackingStatus: (status) => {
+        const trackingSymbols = env.MT5_TRACKING_SYMBOLS;
+        const expected = {
+          price: env.MT5_TRACK_PRICES && trackingSymbols.length > 0,
+          ohlc: env.MT5_TRACK_OHLC && trackingSymbols.length > 0,
+          mbook: env.MT5_TRACK_MBOOK && trackingSymbols.length > 0,
+          calendar: env.MT5_TRACK_CALENDAR,
+        };
+
+        const mismatch =
+          status.price !== expected.price ||
+          status.ohlc !== expected.ohlc ||
+          status.mbook !== expected.mbook ||
+          status.calendar !== expected.calendar;
+
+        if (mismatch) {
+          logger.warn("MT5 tracking status mismatch vs .env - resubscribing", {
+            context: "Broker",
+            expected,
+            actual: { price: status.price, ohlc: status.ohlc, mbook: status.mbook, calendar: status.calendar },
+            uptimeSec: status.uptimeSec,
+          });
+          Mt5SubscriptionJob.setupSubscriptions().catch(err =>
+            logger.error("Resubscribe after status mismatch failed", { context: "Broker", error: (err as Error).message })
+          );
+        }
+      },
     });
 
     // Connect to Broker WebSocket (non-blocking - HTTP works for all operations)
@@ -38,7 +80,21 @@ export class Mt5SubscriptionJob {
     logger.info("Broker Client initialized (HTTP mode)", { context: "Broker" });
   }
 
+  // Guard against concurrent/rapid-fire calls. onReconnect and the first
+  // onTrackingStatus mismatch can fire within milliseconds of each other,
+  // causing duplicate POST /v1/track/* requests to the EA. This timestamp
+  // lets us coalesce those into a single effective call.
+  private static lastSubscriptionAt = 0;
+  private static readonly SUBSCRIPTION_DEBOUNCE_MS = 5000;
+
   static async setupSubscriptions(): Promise<void> {
+    const now = Date.now();
+    if (now - Mt5SubscriptionJob.lastSubscriptionAt < Mt5SubscriptionJob.SUBSCRIPTION_DEBOUNCE_MS) {
+      logger.debug("setupSubscriptions debounced (called too soon after last run)", { context: "Broker" });
+      return;
+    }
+    Mt5SubscriptionJob.lastSubscriptionAt = now;
+
     const brokerClient = container.resolve<IBrokerProvider>("IBrokerProvider");
     
     try {

@@ -10,7 +10,7 @@ import { Device } from "@domain/entities/Device.js";
 import { Email } from "@domain/value-objects";
 import { DeviceFingerprint } from "@domain/value-objects";
 import { ValidationError, ConflictError, InternalError } from "@core/errors/index.js";
-import { hashPassword, generateSecureToken, getDeviceFingerprint } from "@core/utils/index.js";
+import { hashPassword, generateOTP, getDeviceFingerprint, generateSecureToken } from "@core/utils/index.js";
 import { isDeviceEnforcementEnabled } from "@config/deviceEnforcement.js";
 import { LIMITS } from "@core/constants/index.js";
 import { RequestInput } from "@core/utils/request.js";
@@ -73,7 +73,7 @@ export class RegisterUseCase {
       await this.deviceRepo.bind(Device.create({ userId: user.id, fingerprint: fingerprint.value }));
     }
 
-    const token = generateSecureToken(LIMITS.VERIFICATION_TOKEN_BYTES);
+    const token = generateOTP();
     await this.verificationRepo.create(user.id, token, 24 * 60 * 60);
     await this.emailPort.sendVerificationEmail(email.value, token);
 

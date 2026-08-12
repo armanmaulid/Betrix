@@ -22,10 +22,11 @@ export async function runStartupJobs() {
   // --- STAGE 2: LIGHT - MEDIUM (WebSocket Connection & Subscriptions) ---
   
   // 3. Setup MT5 connections, callbacks, and WebSocket
+  // Note: setupSubscriptions() is NOT called here explicitly because the
+  // onReconnect callback (set in setupAndConnect) already calls it as soon
+  // as the WebSocket connects. Calling it here too would cause duplicate
+  // subscriptions due to a race condition.
   await Mt5SubscriptionJob.setupAndConnect();
-
-  // 4. Register MT5 subscriptions based on environment flags (Sends messages via WS)
-  await Mt5SubscriptionJob.setupSubscriptions();
 
   // --- STAGE 3 & 4: HEAVY OPERATIONS (Run Asynchronously in Background) ---
   

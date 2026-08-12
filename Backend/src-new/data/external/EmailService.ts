@@ -31,8 +31,8 @@ export class EmailService {
     return this.sendEmail({
       to: email,
       subject: "Verify your Betrix account",
-      text: `Please verify your email by clicking: ${url}`,
-      html: `<p>Please verify your email by clicking: <a href="${url}">${url}</a></p>`,
+      text: `Your OTP code is: ${token}\n\nAlternatively, please verify your email by clicking: ${url}`,
+      html: `<p>Your OTP code is: <strong>${token}</strong></p><p>Alternatively, please verify your email by clicking: <a href="${url}">${url}</a></p>`,
     });
   }
 
@@ -41,8 +41,8 @@ export class EmailService {
     return this.sendEmail({
       to: email,
       subject: "Confirm your new email address",
-      text: `Please confirm your new email by clicking: ${url}`,
-      html: `<p>Please confirm your new email by clicking: <a href="${url}">${url}</a></p>`,
+      text: `Your OTP code is: ${token}\n\nAlternatively, confirm your new email by clicking: ${url}`,
+      html: `<p>Your OTP code is: <strong>${token}</strong></p><p>Alternatively, confirm your new email by clicking: <a href="${url}">${url}</a></p>`,
     });
   }
 

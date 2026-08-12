@@ -40,3 +40,27 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
     next(err);
   }
 }
+
+export async function guestMiddleware(req: Request, res: Response, next: NextFunction) {
+  const authHeader = req.headers.authorization || "";
+  const sessionToken = authHeader.startsWith("Bearer ") 
+    ? authHeader.slice(7) 
+    : (req.query.token as string || null);
+
+  if (!sessionToken) {
+    return next();
+  }
+
+  try {
+    const sessionRepo = container.resolve("SessionRepository") as SessionRepository;
+    const session = await sessionRepo.findByToken(sessionToken);
+
+    if (session) {
+      return res.status(400).json({ error: "Already logged in", code: "ALREADY_AUTHENTICATED" });
+    }
+
+    next();
+  } catch (err) {
+    next(); // if there is an error checking the session, let them proceed
+  }
+}

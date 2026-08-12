@@ -1,0 +1,1492 @@
+diff --git a/Backend/ARCHITECTURE.md b/Backend/ARCHITECTURE.md
+deleted file mode 100644
+index b6d1575..0000000
+--- a/Backend/ARCHITECTURE.md
++++ /dev/null
+@@ -1,391 +0,0 @@
+-# Architecture Overview & Full Codebase Index
+-
+-## High-Level Stats
+-- **Total Nodes:** 1646
+-- **Total Edges:** 4418
+-- **Languages:**
+-  - TypeScript: 152 files
+-  - JavaScript: 54 files
+-
+-## Node & Edge Types
+-- **Nodes:**
+-  - Method: 332
+-  - Function: 260
+-  - Variable: 235
+-  - File: 210
+-  - Module: 210
+-  - Interface: 105
+-  - Class: 94
+-  - Route: 91
+-  - Folder: 43
+-  - Type: 31
+-  - Section: 24
+-  - Enum: 7
+-  - Decorator: 2
+-  - Branch: 1
+-  - Project: 1
+-- **Edges:**
+-  - DEFINES: 1298
+-  - IMPORTS: 869
+-  - USAGE: 644
+-  - CALLS: 616
+-  - DEFINES_METHOD: 332
+-  - CONTAINS_FILE: 210
+-  - SEMANTICALLY_RELATED: 198
+-  - SIMILAR_TO: 55
+-  - DECORATES: 54
+-  - CONTAINS_FOLDER: 38
+-  - HANDLES: 36
+-  - INHERITS: 31
+-  - RAISES: 30
+-  - WRITES: 6
+-  - HAS_BRANCH: 1
+-
+-## Packages
+-- **data**: 152 nodes
+-- **domain**: 134 nodes
+-- **services**: 112 nodes
+-- **application**: 98 nodes
+-- **presentation**: 58 nodes
+-- **core**: 57 nodes
+-- **routes**: 21 nodes
+-- **middleware**: 11 nodes
+-- **db**: 10 nodes
+-- **background**: 10 nodes
+-- **bootstrap**: 7 nodes
+-- **utils**: 7 nodes
+-- **config**: 5 nodes
+-- **server**: 4 nodes
+-
+-## Routes
+-- `[ANY] /api/auth/register` -> 
+-- `[ANY] /api/auth` -> 
+-- `[ANY] /api` -> 
+-- `[GET] /health` -> 
+-- `[ANY] /api/usage` -> 
+-- `[ANY] /api/admin` -> 
+-- `[ANY] /api/messages` -> 
+-- `[ANY] /api/news` -> 
+-- `[ANY] /api/market` -> 
+-- `[ANY] /api/me` -> 
+-- `[POST] /register` -> 
+-- `[POST] /login` -> 
+-- `[POST] /logout` -> 
+-- `[POST] /logout-by-credentials` -> 
+-- `[POST] /logout-all` -> 
+-- `[GET] /verify-email` -> 
+-- `[POST] /resend-verification` -> 
+-- `[GET] /me` -> 
+-- `[PUT] /profile` -> 
+-- `[PUT] /password` -> 
+-
+-## Entry Points
+-- `runStartupJobs` (src-new/background/jobs/index.ts) -> `D-Betrix-Backend.src-new.background.jobs.runStartupJobs`
+-- `runHourlyCleanup` (src-new/background/jobs/index.ts) -> `D-Betrix-Backend.src-new.background.jobs.runHourlyCleanup`
+-- `runDailyJobs` (src-new/background/jobs/index.ts) -> `D-Betrix-Backend.src-new.background.jobs.runDailyJobs`
+-- `runNewsPolling` (src-new/background/jobs/index.ts) -> `D-Betrix-Backend.src-new.background.jobs.runNewsPolling`
+-- `startBackgroundJobs` (src-new/background/jobs/index.ts) -> `D-Betrix-Backend.src-new.background.jobs.startBackgroundJobs`
+-- `registerDependencies` (src-new/bootstrap/container.ts) -> `D-Betrix-Backend.src-new.bootstrap.container.registerDependencies`
+-- `registerMiddleware` (src-new/bootstrap/registerMiddleware.ts) -> `D-Betrix-Backend.src-new.bootstrap.registerMiddleware.registerMiddleware`
+-- `registerRoutes` (src-new/bootstrap/registerRoutes.ts) -> `D-Betrix-Backend.src-new.bootstrap.registerRoutes.registerRoutes`
+-- `createApp` (src-new/bootstrap/startServer.ts) -> `D-Betrix-Backend.src-new.bootstrap.startServer.createApp`
+-- `startServer` (src-new/bootstrap/startServer.ts) -> `D-Betrix-Backend.src-new.bootstrap.startServer.startServer`
+-- `isDeviceEnforcementEnabled` (src-new/config/deviceEnforcement.ts) -> `D-Betrix-Backend.src-new.config.deviceEnforcement.isDeviceEnforcementEnabled`
+-- `resolveTier` (src-new/config/models.ts) -> `D-Betrix-Backend.src-new.config.models.resolveTier`
+-- `resolveModel` (src-new/config/models.ts) -> `D-Betrix-Backend.src-new.config.models.resolveModel`
+-- `isAppError` (src-new/core/errors/index.ts) -> `D-Betrix-Backend.src-new.core.errors.isAppError`
+-- `logMetrics` (src-new/core/logging/logger.ts) -> `D-Betrix-Backend.src-new.core.logging.logger.logMetrics`
+-- `logRequest` (src-new/core/logging/logger.ts) -> `D-Betrix-Backend.src-new.core.logging.logger.logRequest`
+-- `logResponse` (src-new/core/logging/logger.ts) -> `D-Betrix-Backend.src-new.core.logging.logger.logResponse`
+-- `logError` (src-new/core/logging/logger.ts) -> `D-Betrix-Backend.src-new.core.logging.logger.logError`
+-- `requestLogger` (src-new/core/logging/requestLogger.ts) -> `D-Betrix-Backend.src-new.core.logging.requestLogger.requestLogger`
+-- `errorHandler` (src-new/core/middleware/errorHandler.ts) -> `D-Betrix-Backend.src-new.core.middleware.errorHandler.errorHandler`
+-
+-## Hotspots
+-- **getMarketDataService** (Fan-in: 10) -> `D-Betrix-Backend.src-new.presentation.controllers.MarketController.MarketController.getMarketDataService`
+-- **sendEmail** (Fan-in: 9) -> `D-Betrix-Backend.src-new.domain.services.emailService.sendEmail`
+-- **getHttpBase** (Fan-in: 7) -> `D-Betrix-Backend.src-new.data.external.Mt5Client.Mt5Client.getHttpBase`
+-- **mapRow** (Fan-in: 6) -> `D-Betrix-Backend.src-new.data.repositories.PgUserRepository.PgUserRepository.mapRow`
+-- **sendEmail** (Fan-in: 6) -> `D-Betrix-Backend.src-new.data.external.EmailService.EmailService.sendEmail`
+-- **logUserActivity** (Fan-in: 6) -> `D-Betrix-Backend.src-new.domain.services.ActivityLogger.logUserActivity`
+-- **getRequestInput** (Fan-in: 6) -> `D-Betrix-Backend.src-new.presentation.controllers.AuthController.AuthController.getRequestInput`
+-- **validateSession** (Fan-in: 5) -> `D-Betrix-Backend.src.services.sessionStore.validateSession`
+-- **validate** (Fan-in: 5) -> `D-Betrix-Backend.src-new.presentation.middleware.validate.middleware.validate`
+-- **getUser** (Fan-in: 5) -> `D-Betrix-Backend.src-new.presentation.controllers.ChatController.ChatController.getUser`
+-
+-## Boundaries
+-- application -> core (46 calls)
+-- application -> domain (29 calls)
+-- data -> domain (16 calls)
+-- background -> domain (11 calls)
+-- data -> background (4 calls)
+-- routes -> services (3 calls)
+-- application -> config (3 calls)
+-- middleware -> services (2 calls)
+-- bootstrap -> background (2 calls)
+-- bootstrap -> data (2 calls)
+-
+-## Layers
+-- **root** (Type: api) - has HTTP route definitions
+-- **application** (Type: entry) - only outbound calls
+-- **background** (Type: internal) - fan-in=6, fan-out=11
+-- **bootstrap** (Type: entry) - has entry points, only outbound calls
+-- **config** (Type: leaf) - only inbound calls, no outbound
+-- **core** (Type: core) - high fan-in (46 in, 0 out)
+-- **data** (Type: internal) - fan-in=2, fan-out=20
+-- **domain** (Type: core) - high fan-in (56 in, 0 out)
+-- **middleware** (Type: entry) - only outbound calls
+-- **routes** (Type: entry) - only outbound calls
+-- **services** (Type: core) - high fan-in (5 in, 0 out)
+-
+-## Clusters
+-- **Cluster 19** (Cohesion: 0.84) - 34 members
+-  - Packages: src-new
+-  - Top Nodes: execute, ValidationError, NotFoundError, execute, AuthenticationError
+-- **Cluster 32** (Cohesion: 0.93) - 24 members
+-  - Packages: src-new
+-  - Top Nodes: runStartupJobs, runHourlyCleanup, startBackgroundJobs, removeClient, createApp
+-- **Cluster 44** (Cohesion: 0.86) - 18 members
+-  - Packages: src-new
+-  - Top Nodes: logUserActivity, execute, execute, fireAndForgetLogging, fireAndForgetLogging
+-- **Cluster 70** (Cohesion: 1.00) - 17 members
+-  - Packages: src
+-  - Top Nodes: establishAuthenticatedSession, validateSession, normalizeIP, requireAuth, getDeviceFingerprint
+-- **Cluster 112** (Cohesion: 1.00) - 15 members
+-  - Packages: src
+-  - Top Nodes: streamModel, routeAndCall, callModel, resolveModel, routeAndStream
+-- **Cluster 12** (Cohesion: 0.93) - 15 members
+-  - Packages: src-new
+-  - Top Nodes: User, mapRow, create, withUpdatedProfile, withEmailVerified
+-- **Cluster 123** (Cohesion: 0.93) - 14 members
+-  - Packages: src
+-  - Top Nodes: connect, sendTrackRequest, connect, upsertEvents, updatePrice
+-- **Cluster 184** (Cohesion: 1.00) - 12 members
+-  - Packages: src-new
+-  - Top Nodes: handleMessage, connect, scheduleReconnect, handlePriceTick, handleOHLCUpdate
+-- **Cluster 10** (Cohesion: 1.00) - 11 members
+-  - Packages: src-new
+-  - Top Nodes: getMarketDataService, getPrice, getPrices, getOHLC, getMarketBook
+-- **Cluster 5** (Cohesion: 1.00) - 10 members
+-  - Packages: src-new
+-  - Top Nodes: getRequestInput, serializeUser, register, login, logout
+-- **Cluster 122** (Cohesion: 1.00) - 9 members
+-  - Packages: src
+-  - Top Nodes: migrate, pad, parseMigration, getMigrationState, deriveStatus
+-- **Cluster 335** (Cohesion: 1.00) - 8 members
+-  - Packages: src-new
+-  - Top Nodes: getHttpBase, trackPrices, trackOHLC, trackMarketBook, trackCalendar
+-
+-## Full File Tree
+-- 📄 `.env.example` (0 children)
+-- 📄 `Dockerfile` (0 children)
+-- 📄 `README.md` (0 children)
+-- 📄 `eslint.config.js` (0 children)
+-- 📁 `src` (7 children)
+-- 📁 `src-new` (9 children)
+-- 📁 `src-new/application` (3 children)
+-- 📁 `src-new/application/dtos` (6 children)
+-- 📄 `src-new/application/dtos/admin.dto.ts` (0 children)
+-- 📄 `src-new/application/dtos/auth.dto.ts` (0 children)
+-- 📄 `src-new/application/dtos/chat.dto.ts` (0 children)
+-- 📄 `src-new/application/dtos/index.ts` (0 children)
+-- 📄 `src-new/application/dtos/market.dto.ts` (0 children)
+-- 📄 `src-new/application/dtos/user.dto.ts` (0 children)
+-- 📁 `src-new/application/ports` (1 children)
+-- 📄 `src-new/application/ports/index.ts` (0 children)
+-- 📁 `src-new/application/use-cases` (6 children)
+-- 📁 `src-new/application/use-cases/admin` (0 children)
+-- 📁 `src-new/application/use-cases/auth` (0 children)
+-- 📁 `src-new/application/use-cases/chat` (0 children)
+-- 📄 `src-new/application/use-cases/index.ts` (0 children)
+-- 📁 `src-new/application/use-cases/market` (0 children)
+-- 📁 `src-new/application/use-cases/user` (0 children)
+-- 📁 `src-new/background` (1 children)
+-- 📁 `src-new/background/jobs` (1 children)
+-- 📄 `src-new/background/jobs/index.ts` (0 children)
+-- 📁 `src-new/bootstrap` (4 children)
+-- 📄 `src-new/bootstrap/container.ts` (0 children)
+-- 📄 `src-new/bootstrap/registerMiddleware.ts` (0 children)
+-- 📄 `src-new/bootstrap/registerRoutes.ts` (0 children)
+-- 📄 `src-new/bootstrap/startServer.ts` (0 children)
+-- 📁 `src-new/config` (5 children)
+-- 📄 `src-new/config/deviceEnforcement.ts` (0 children)
+-- 📄 `src-new/config/env.ts` (0 children)
+-- 📄 `src-new/config/index.ts` (0 children)
+-- 📄 `src-new/config/models.ts` (0 children)
+-- 📄 `src-new/config/passport.ts` (0 children)
+-- 📁 `src-new/core` (6 children)
+-- 📁 `src-new/core/constants` (1 children)
+-- 📄 `src-new/core/constants/index.ts` (0 children)
+-- 📁 `src-new/core/errors` (1 children)
+-- 📄 `src-new/core/errors/index.ts` (0 children)
+-- 📄 `src-new/core/index.ts` (0 children)
+-- 📁 `src-new/core/logging` (3 children)
+-- 📄 `src-new/core/logging/index.ts` (0 children)
+-- 📄 `src-new/core/logging/logger.ts` (0 children)
+-- 📄 `src-new/core/logging/requestLogger.ts` (0 children)
+-- 📁 `src-new/core/middleware` (5 children)
+-- 📄 `src-new/core/middleware/errorHandler.ts` (0 children)
+-- 📄 `src-new/core/middleware/index.ts` (0 children)
+-- 📄 `src-new/core/middleware/rateLimiter.ts` (0 children)
+-- 📄 `src-new/core/middleware/requestId.ts` (0 children)
+-- 📄 `src-new/core/middleware/sanitize.ts` (0 children)
+-- 📁 `src-new/core/utils` (7 children)
+-- 📄 `src-new/core/utils/chat.ts` (0 children)
+-- 📄 `src-new/core/utils/crypto.ts` (0 children)
+-- 📄 `src-new/core/utils/csv.ts` (0 children)
+-- 📄 `src-new/core/utils/date.ts` (0 children)
+-- 📄 `src-new/core/utils/deviceFingerprint.ts` (0 children)
+-- 📄 `src-new/core/utils/index.ts` (0 children)
+-- 📄 `src-new/core/utils/request.ts` (0 children)
+-- 📁 `src-new/data` (4 children)
+-- 📁 `src-new/data/cache` (1 children)
+-- 📄 `src-new/data/cache/GeneralCacheStore.ts` (0 children)
+-- 📁 `src-new/data/external` (4 children)
+-- 📄 `src-new/data/external/AiGatewayClient.ts` (0 children)
+-- 📄 `src-new/data/external/EmailService.ts` (0 children)
+-- 📄 `src-new/data/external/FinnhubClient.ts` (0 children)
+-- 📄 `src-new/data/external/Mt5Client.ts` (0 children)
+-- 📁 `src-new/data/orm` (3 children)
+-- 📄 `src-new/data/orm/migrate.ts` (0 children)
+-- 📄 `src-new/data/orm/pgClient.ts` (0 children)
+-- 📄 `src-new/data/orm/redisClient.ts` (0 children)
+-- 📁 `src-new/data/repositories` (14 children)
+-- 📄 `src-new/data/repositories/PgAdminActionRepository.ts` (0 children)
+-- 📄 `src-new/data/repositories/PgCalendarRepository.ts` (0 children)
+-- 📄 `src-new/data/repositories/PgChatRepository.ts` (0 children)
+-- 📄 `src-new/data/repositories/PgCreditRepository.ts` (0 children)
+-- 📄 `src-new/data/repositories/PgDeviceRepository.ts` (0 children)
+-- 📄 `src-new/data/repositories/PgLoginAttemptRepository.ts` (0 children)
+-- 📄 `src-new/data/repositories/PgMessageRepository.ts` (0 children)
+-- 📄 `src-new/data/repositories/PgNewsRepository.ts` (0 children)
+-- 📄 `src-new/data/repositories/PgSymbolRepository.ts` (0 children)
+-- 📄 `src-new/data/repositories/PgUserRepository.ts` (0 children)
+-- 📄 `src-new/data/repositories/PgVerificationRepository.ts` (0 children)
+-- 📄 `src-new/data/repositories/RedisDeviceSessionRepository.ts` (0 children)
+-- 📄 `src-new/data/repositories/RedisSessionRepository.ts` (0 children)
+-- 📄 `src-new/data/repositories/index.ts` (0 children)
+-- 📁 `src-new/domain` (6 children)
+-- 📁 `src-new/domain/entities` (11 children)
+-- 📄 `src-new/domain/entities/AdminAction.ts` (0 children)
+-- 📄 `src-new/domain/entities/BrokerSymbol.ts` (0 children)
+-- 📄 `src-new/domain/entities/CalendarEvent.ts` (0 children)
+-- 📄 `src-new/domain/entities/ChatMessage.ts` (0 children)
+-- 📄 `src-new/domain/entities/CreditTransaction.ts` (0 children)
+-- 📄 `src-new/domain/entities/Device.ts` (0 children)
+-- 📄 `src-new/domain/entities/Message.ts` (0 children)
+-- 📄 `src-new/domain/entities/NewsArticle.ts` (0 children)
+-- 📄 `src-new/domain/entities/Session.ts` (0 children)
+-- 📄 `src-new/domain/entities/User.ts` (0 children)
+-- 📄 `src-new/domain/entities/index.ts` (0 children)
+-- 📁 `src-new/domain/events` (1 children)
+-- 📄 `src-new/domain/events/index.ts` (0 children)
+-- 📄 `src-new/domain/index.ts` (0 children)
+-- 📁 `src-new/domain/repositories` (14 children)
+-- 📄 `src-new/domain/repositories/AdminActionRepository.ts` (0 children)
+-- 📄 `src-new/domain/repositories/CalendarRepository.ts` (0 children)
+-- 📄 `src-new/domain/repositories/ChatRepository.ts` (0 children)
+-- 📄 `src-new/domain/repositories/CreditRepository.ts` (0 children)
+-- 📄 `src-new/domain/repositories/DeviceRepository.ts` (0 children)
+-- 📄 `src-new/domain/repositories/DeviceSessionRepository.ts` (0 children)
+-- 📄 `src-new/domain/repositories/LoginAttemptRepository.ts` (0 children)
+-- 📄 `src-new/domain/repositories/MessageRepository.ts` (0 children)
+-- 📄 `src-new/domain/repositories/NewsRepository.ts` (0 children)
+-- 📄 `src-new/domain/repositories/SessionRepository.ts` (0 children)
+-- 📄 `src-new/domain/repositories/SymbolRepository.ts` (0 children)
+-- 📄 `src-new/domain/repositories/UserRepository.ts` (0 children)
+-- 📄 `src-new/domain/repositories/VerificationRepository.ts` (0 children)
+-- 📄 `src-new/domain/repositories/index.ts` (0 children)
+-- 📁 `src-new/domain/services` (14 children)
+-- 📄 `src-new/domain/services/ActivityLogger.ts` (0 children)
+-- 📄 `src-new/domain/services/AuthDomainService.ts` (0 children)
+-- 📄 `src-new/domain/services/AuthDomainServiceImpl.ts` (0 children)
+-- 📄 `src-new/domain/services/CalendarService.ts` (0 children)
+-- 📄 `src-new/domain/services/ChatDomainService.ts` (0 children)
+-- 📄 `src-new/domain/services/CleanupService.ts` (0 children)
+-- 📄 `src-new/domain/services/DeviceDomainService.ts` (0 children)
+-- 📄 `src-new/domain/services/MarketDataService.ts` (0 children)
+-- 📄 `src-new/domain/services/NewsService.ts` (0 children)
+-- 📄 `src-new/domain/services/SymbolService.ts` (0 children)
+-- 📄 `src-new/domain/services/emailService.ts` (0 children)
+-- 📄 `src-new/domain/services/index.ts` (0 children)
+-- 📄 `src-new/domain/services/sseManager.ts` (0 children)
+-- 📄 `src-new/domain/services/thinkingFilter.ts` (0 children)
+-- 📁 `src-new/domain/value-objects` (1 children)
+-- 📄 `src-new/domain/value-objects/index.ts` (0 children)
+-- 📄 `src-new/main.ts` (0 children)
+-- 📁 `src-new/presentation` (3 children)
+-- 📁 `src-new/presentation/controllers` (5 children)
+-- 📄 `src-new/presentation/controllers/AdminController.ts` (0 children)
+-- 📄 `src-new/presentation/controllers/AuthController.ts` (0 children)
+-- 📄 `src-new/presentation/controllers/ChatController.ts` (0 children)
+-- 📄 `src-new/presentation/controllers/MarketController.ts` (0 children)
+-- 📄 `src-new/presentation/controllers/UserController.ts` (0 children)
+-- 📁 `src-new/presentation/middleware` (4 children)
+-- 📄 `src-new/presentation/middleware/admin.middleware.ts` (0 children)
+-- 📄 `src-new/presentation/middleware/auth.middleware.ts` (0 children)
+-- 📄 `src-new/presentation/middleware/index.ts` (0 children)
+-- 📄 `src-new/presentation/middleware/validate.middleware.ts` (0 children)
+-- 📁 `src-new/presentation/routes` (1 children)
+-- 📁 `src-new/presentation/routes/v1` (0 children)
+-- 📁 `src/config` (2 children)
+-- 📄 `src/config/models.js` (0 children)
+-- 📄 `src/config/passport.js` (0 children)
+-- 📁 `src/db` (3 children)
+-- 📄 `src/db/migrate.js` (0 children)
+-- 📄 `src/db/pool.js` (0 children)
+-- 📄 `src/db/redis.js` (0 children)
+-- 📁 `src/middleware` (7 children)
+-- 📄 `src/middleware/adminAuth.js` (0 children)
+-- 📄 `src/middleware/auth.js` (0 children)
+-- 📄 `src/middleware/credits.js` (0 children)
+-- 📄 `src/middleware/normalizeIP.js` (0 children)
+-- 📄 `src/middleware/rateLimitPerUser.js` (0 children)
+-- 📄 `src/middleware/requestLogger.js` (0 children)
+-- 📄 `src/middleware/sanitize.js` (0 children)
+-- 📁 `src/routes` (9 children)
+-- 📄 `src/routes/activity.js` (0 children)
+-- 📄 `src/routes/admin.js` (0 children)
+-- 📄 `src/routes/auth.js` (0 children)
+-- 📄 `src/routes/chat.js` (0 children)
+-- 📄 `src/routes/health.js` (0 children)
+-- 📄 `src/routes/market.js` (0 children)
+-- 📄 `src/routes/messages.js` (0 children)
+-- 📄 `src/routes/news.js` (0 children)
+-- 📄 `src/routes/usage.js` (0 children)
+-- 📄 `src/server.js` (0 children)
+-- 📁 `src/services` (25 children)
+-- 📄 `src/services/activityLogger.js` (0 children)
+-- 📄 `src/services/aiClient.js` (0 children)
+-- 📄 `src/services/authSession.js` (0 children)
+-- 📄 `src/services/calendarStore.js` (0 children)
+-- 📄 `src/services/chatLogStore.js` (0 children)
+-- 📄 `src/services/creditStore.js` (0 children)
+-- 📄 `src/services/d1CacheStore.js` (0 children)
+-- 📄 `src/services/deviceSessionStore.js` (0 children)
+-- 📄 `src/services/deviceStore.js` (0 children)
+-- 📄 `src/services/emailService.js` (0 children)
+-- 📄 `src/services/finnhubClient.js` (0 children)
+-- 📄 `src/services/generalCache.js` (0 children)
+-- 📄 `src/services/loginAttemptStore.js` (0 children)
+-- 📄 `src/services/modelRouter.js` (0 children)
+-- 📄 `src/services/mt5Client.js` (0 children)
+-- 📄 `src/services/newsFetcher.js` (0 children)
+-- 📄 `src/services/newsRealtimeStore.js` (0 children)
+-- 📄 `src/services/newsStore.js` (0 children)
+-- 📄 `src/services/sessionStore.js` (0 children)
+-- 📄 `src/services/sseManager.js` (0 children)
+-- 📄 `src/services/symbolStore.js` (0 children)
+-- 📄 `src/services/thinkingFilter.js` (0 children)
+-- 📄 `src/services/tokenUsageStore.js` (0 children)
+-- 📄 `src/services/userStore.js` (0 children)
+-- 📄 `src/services/verificationStore.js` (0 children)
+-- 📁 `src/utils` (6 children)
+-- 📄 `src/utils/csv.js` (0 children)
+-- 📄 `src/utils/deviceEnforcement.js` (0 children)
+-- 📄 `src/utils/deviceFingerprint.js` (0 children)
+-- 📄 `src/utils/logger.js` (0 children)
+-- 📄 `src/utils/routeMapper.js` (0 children)
+-- 📄 `src/utils/startupLogger.js` (0 children)
+-- 📄 `symbol_list.json` (0 children)
+-- 📄 `vitest.config.ts` (0 children)
+\ No newline at end of file
+diff --git a/Backend/betrix-src-new-bugfix-spec.md b/Backend/betrix-src-new-bugfix-spec.md
+deleted file mode 100644
+index 18c650e..0000000
+--- a/Backend/betrix-src-new-bugfix-spec.md
++++ /dev/null
+@@ -1,245 +0,0 @@
+-# Betrix `Backend/src-new` — Bug Fix Spec
+-
+-Confirmed bugs from a logic-lens style review, root-caused against the actual source. Each entry is self-contained: file, exact problem, exact fix. No design debate needed — just apply.
+-
+----
+-
+-## BUG 1 (Critical) — Session deletion is a silent no-op due to double-hashing
+-
+-**File:** `Backend/src-new/data/repositories/RedisSessionRepository.ts`
+-
+-**Root cause:**
+-- `save()` stores the session token **already hashed** in the Redis set: `sadd('user_sessions:{userId}', hashedToken)` where `hashedToken = hashSessionToken(session.token)`.
+-- `deleteByUserId()` reads that same set with `smembers()` — getting back **already-hashed** tokens — then hashes them **again**: `const hashedTokens = tokens.map(hashSessionToken)`.
+-- Result: it computes `session:{hash(hash(token))}` and deletes that key, but the real key in Redis is `session:{hash(token)}`. The delete/srem calls are no-ops on nonexistent keys, while the function still returns a nonzero "count" as if it succeeded.
+-- The identical pattern exists in `findByUserId()` — it also calls `this.findByToken(token)` for each already-hashed token pulled from `smembers()`, and `findByToken()` internally hashes its input again. So `findByUserId()` **always returns an empty array**, even when sessions exist.
+-
+-**Impact:**
+-- `ChangePasswordUseCase` claims to revoke all other sessions on password change — it does not. A stolen token stays valid after the victim changes their password.
+-- `ResetUserPasswordUseCase` (admin-triggered) has the same silent failure.
+-- `GetSessionsUseCase` ("view active sessions" feature) always shows zero sessions.
+-
+-**Fix:**
+-In `deleteByUserId()`, do **not** re-hash tokens obtained from `smembers()` — they are already hashed. Build the Redis keys directly from them:
+-
+-```ts
+-async deleteByUserId(userId: string, exceptToken?: string): Promise<number> {
+-  const hashedTokens = await redisClient.smembers(`user_sessions:${userId}`); // already hashed
+-  const hashedExceptToken = exceptToken ? hashSessionToken(exceptToken) : undefined;
+-  const tokensToDelete = hashedExceptToken
+-    ? hashedTokens.filter(t => t !== hashedExceptToken)
+-    : hashedTokens;
+-
+-  if (tokensToDelete.length > 0) {
+-    const keysToDelete = tokensToDelete.map(token => `session:${token}`);
+-    await redisClient.del(...keysToDelete);
+-    await redisClient.srem(`user_sessions:${userId}`, ...tokensToDelete);
+-    for (const token of tokensToDelete) {
+-      sessionMemoryCache.delete(token);
+-    }
+-  }
+-
+-  return tokensToDelete.length;
+-}
+-```
+-
+-In `findByUserId()`, don't route already-hashed tokens back through `findByToken()` (which hashes again). Look up the session data directly using the hashed token as the Redis key:
+-
+-```ts
+-async findByUserId(userId: string): Promise<Session[]> {
+-  const hashedTokens = await redisClient.smembers(`user_sessions:${userId}`); // already hashed
+-  const sessions: Session[] = [];
+-
+-  for (const hashedToken of hashedTokens) {
+-    const cached = sessionMemoryCache.get(hashedToken);
+-    if (cached && Date.now() - cached.timestamp < SESSION_MEMORY_CACHE_TTL_MS) {
+-      sessions.push(cached.session);
+-      continue;
+-    }
+-
+-    const uid = await redisClient.get(`session:${hashedToken}`);
+-    if (!uid) continue;
+-
+-    const ttl = await redisClient.ttl(`session:${hashedToken}`);
+-    const expiresAt = ttl > 0 ? new Date(Date.now() + ttl * 1000) : new Date(Date.now() + 24 * 60 * 60 * 1000);
+-
+-    // Note: raw token is not recoverable from the hash — this session object's
+-    // `token` field will be the hashed value, not the original. Callers that
+-    // need the raw token (e.g. to display or re-auth) cannot get it from here;
+-    // that's a pre-existing one-way-hash constraint, not something this fix changes.
+-    const session = new Session(hashedToken, uid as string, hashedToken, new Date(), expiresAt, null, null, null);
+-    sessions.push(session);
+-  }
+-
+-  return sessions;
+-}
+-```
+-
+-**Test:** Log in twice (two sessions for one user). Call change-password. Confirm both old Redis `session:*` keys are actually gone (`redis-cli exists session:<hash>` → `0`), and the previously-issued tokens now get `401` on protected routes.
+-
+----
+-
+-## BUG 2 (Critical) — `DeleteUserUseCase` never revokes the deleted user's session
+-
+-**File:** `Backend/src-new/application/use-cases/admin/DeleteUserUseCase.ts`
+-
+-**Root cause:** `SessionRepository` is injected in the constructor but never called anywhere in `execute()`. The user row is deleted from Postgres, but nothing touches Redis. `authMiddleware` only checks `sessionRepo.findByToken()` — it never re-validates that the user still exists in Postgres — so a deleted user's existing token keeps working until its 24h TTL naturally expires.
+-
+-**Fix:** Call session revocation as part of the delete flow, using the fixed `deleteByUserId` from Bug 1. Also remove the dead imports (`sendEmail`, `hashPassword`, `generateSecureToken`, `broadcastToUser` are all unused — leftover from copy/paste).
+-
+-```ts
+-import { inject, injectable } from "tsyringe";
+-import { UserRepository } from "@domain/repositories/UserRepository.js";
+-import { SessionRepository } from "@domain/repositories/SessionRepository.js";
+-import { NotFoundError, ValidationError } from "@core/errors/index.js";
+-import { pgClient } from "@data/orm/pgClient.js";
+-import { logAdminAction } from "@domain/services/ActivityLogger.js";
+-
+-interface DeleteUserInput {
+-  adminId: string;
+-  targetUserId: string;
+-  requestIp: string;
+-  requestUserAgent: string;
+-}
+-
+-@injectable()
+-export class DeleteUserUseCase {
+-  constructor(
+-    @inject("UserRepository") private userRepo: UserRepository,
+-    @inject("SessionRepository") private sessionRepo: SessionRepository
+-  ) {}
+-
+-  async execute(input: DeleteUserInput): Promise<void> {
+-    if (input.targetUserId === input.adminId) {
+-      throw new ValidationError("Cannot delete your own account");
+-    }
+-
+-    const { rows } = await pgClient.query(
+-      `DELETE FROM users WHERE id = $1 RETURNING email`,
+-      [input.targetUserId]
+-    );
+-
+-    if (rows.length === 0) {
+-      throw new NotFoundError("User");
+-    }
+-
+-    // Revoke all active sessions for the deleted user immediately
+-    await this.sessionRepo.deleteByUserId(input.targetUserId);
+-
+-    await logAdminAction({
+-      adminId: input.adminId,
+-      action: "delete_user",
+-      targetType: "user",
+-      targetId: input.targetUserId,
+-      details: { email: rows[0].email },
+-      ip: input.requestIp,
+-      userAgent: input.requestUserAgent,
+-    });
+-  }
+-}
+-```
+-
+-**Dependency:** Apply Bug 1's fix first — otherwise `deleteByUserId` here will still be a no-op.
+-
+-**Test:** Log in as a user, grab the session token, have an admin delete that user, then immediately call any authenticated endpoint with the old token — must return `401`.
+-
+----
+-
+-## BUG 3 (High) — `req.user.id` vs `req.user.userId` field mismatch breaks per-user rate limiting and request-log attribution
+-
+-**Files:** `Backend/src-new/core/middleware/rateLimiter.ts`, `Backend/src-new/core/logging/requestLogger.ts`
+-
+-**Root cause:** `presentation/middleware/auth.middleware.ts` sets `req.user = { userId, token }` — the field is `userId`, not `id`. But both files below read `.id`:
+-
+-- `rateLimiter.ts` line 48 (inside `perUserLimiter`'s `keyGenerator`): `(req as any).user?.id` → always `undefined` → silently falls back to `ipKeyGenerator(req.ip)`. `RATE_LIMIT_PER_USER_PER_MINUTE` never actually limits per-user; every authenticated request is throttled per-IP instead.
+-- `requestLogger.ts` lines 34, 46, 55, 64: same `.id` access → `userId` is always `undefined` in every request log, for every non-admin route. (Admin routes only get a correct value because `admin.middleware.ts` later overwrites `req.user` with a full `User` entity that does have `.id` — but that happens after this logger's initial "incoming request" log already fired.)
+-
+-**Fix:** Change `.id` to `.userId` in both files.
+-
+-`core/middleware/rateLimiter.ts`:
+-```ts
+-export const perUserLimiter = createRateLimiter({
+-  windowMs: 60 * 1000,
+-  max: env.RATE_LIMIT_PER_USER_PER_MINUTE,
+-  message: "Terlalu banyak request untuk akun ini, coba lagi sebentar lagi",
+-  keyGenerator: (req) => {
+-    const userId = (req as any).user?.userId;
+-    return userId ? `user:${userId}` : ipKeyGenerator(req.ip || "unknown");
+-  },
+-});
+-```
+-
+-`core/logging/requestLogger.ts` — replace all four occurrences of `(req as any).user?.id` with `(req as any).user?.userId`.
+-
+-**Test:** Log in, hammer an authenticated endpoint past `RATE_LIMIT_PER_USER_PER_MINUTE` from the same account — confirm the 429 triggers based on the account, not shared IP (e.g. two different accounts from behind the same NAT/IP no longer throttle each other). Check logs show a real `userId` value for a normal (non-admin) authenticated request.
+-
+----
+-
+-## BUG 4 (Medium) — Redundant double session-token generation in device-enforcement login path
+-
+-**File:** `Backend/src-new/domain/services/AuthDomainServiceImpl.ts`, method `establishAuthenticatedSession`
+-
+-**Root cause:** When device enforcement is on:
+-1. Line ~35: generates token A, reserves it atomically via `setSessionForDeviceAtomic` (SET NX) — this is the TOCTOU-safe concurrency guard.
+-2. Line ~43: generates a **second, unrelated** token B and saves *that* one to `sessionRepo` — token A is never persisted anywhere else.
+-3. Line ~55: `replaceSessionForDevice(...)` unconditionally overwrites the Redis device-session key from token A → token B, returning token A as "old token".
+-4. Line ~58-59: deletes token A from `sessionRepo` — a no-op, since token A was never saved there in the first place.
+-
+-Not exploitable (the final state is consistent — device key ends up correctly pointing at token B, which matches the session actually returned to the client), but it's dead work: an extra `generateSecureToken` call and extra Redis round-trips every single login/register with device enforcement on, for no behavioral benefit.
+-
+-**Fix:** Generate the token once and reuse it for both the atomic reservation and the saved session — drop the second generation and the pointless replace/delete step:
+-
+-```ts
+-async establishAuthenticatedSession(user: User, request: { ip: string; headers: { "user-agent": string } }): Promise<{
+-  ok: boolean;
+-  status?: number;
+-  error?: string;
+-  hasActiveSession?: boolean;
+-  user?: User;
+-  sessionToken?: string;
+-}> {
+-  const sessionToken = generateSecureToken(LIMITS.SESSION_TOKEN_BYTES);
+-  let fingerprint: DeviceFingerprint | undefined;
+-
+-  if (isDeviceEnforcementEnabled()) {
+-    fingerprint = DeviceFingerprint.create(request);
+-    const result = await this.deviceSessionRepo.setSessionForDeviceAtomic(user.id, fingerprint.value, sessionToken);
+-    if (!result.success) {
+-      return { ok: false, status: 403, error: "Device already has active session", hasActiveSession: true };
+-    }
+-  }
+-
+-  await this.sessionRepo.save(Session.create({
+-    userId: user.id,
+-    token: sessionToken,
+-    deviceFingerprint: fingerprint ? fingerprint.value : null,
+-    ip: request.ip,
+-    userAgent: request.headers["user-agent"],
+-  }));
+-
+-  if (fingerprint) {
+-    await this.deviceRepo.bind(Device.create({ userId: user.id, fingerprint: fingerprint.value }));
+-  }
+-
+-  return { ok: true, user, sessionToken };
+-}
+-```
+-
+-Note: `setSessionForDeviceAtomic` already fully reserves the device→token mapping in step 1 (it's the atomic NX set) — there is nothing left for `replaceSessionForDevice` to correct, so it can be dropped from this path entirely. `replaceSessionForDevice` is still used elsewhere (kept as-is); only this call site changes.
+-
+-**Test:** With `DEVICE_ENFORCEMENT=true`, log in once — confirm exactly one `SET ... NX` and no subsequent overwrite happens (check Redis command log or add a temporary log line), and that the returned `sessionToken` matches what's actually stored at `device_session:{userId}:{fingerprint}`.
+-
+----
+-
+-## Not a bug — explicitly confirmed by Arman
+-
+-- **`FinnhubClient` idle at startup** — intentional. Finnhub is scoped to news provider only in `src-new`, not live price ticks. No action needed.
+-
+-## Noted but not required to fix (cosmetic / low severity, optional)
+-
+-- `bootstrap/container.ts` registers use-cases under string tokens (`container.register("RegisterUseCase", ...)`) that are never resolved by string anywhere (controllers use `container.resolve(RegisterUseCase)` by class). Dead registrations, harmless. Safe to delete if doing cleanup, not required.
+-- `AiGatewayClient.streamModel()` labels every `AbortError` as `"AI provider timeout after Xms"`, even when the abort came from `params.signal` (client closed the connection) rather than the internal timeout controller. Not functionally broken, just makes gateway timeout logs/metrics unreliable. Fix only if you care about that log accuracy — distinguish by checking `timeoutController.signal.aborted` vs `params.signal?.aborted` before choosing the error message.
+-
+-## Apply order
+-
+-Bug 1 → Bug 2 (depends on Bug 1) → Bug 3 → Bug 4. Bug 3 and Bug 4 are independent of the others and each other.
+diff --git a/Backend/src-new/application/dtos/auth.dto.ts b/Backend/src-new/application/dtos/auth.dto.ts
+index 8a1ec17..3a783c4 100644
+--- a/Backend/src-new/application/dtos/auth.dto.ts
++++ b/Backend/src-new/application/dtos/auth.dto.ts
+@@ -23,11 +23,11 @@ export const changeEmailDto = z.object({
+ 
+ export const updateProfileDto = z.object({
+   name: z.string().optional(),
+-  phone: z.string().optional(),
+-  address: z.string().optional(),
+-  birthdate: z.string().date().optional(),
+-  gender: z.enum(["male", "female", "other"]).optional(),
+-  bio: z.string().optional(),
++  phone: z.string().nullable().optional(),
++  address: z.string().nullable().optional(),
++  birthdate: z.string().date().nullable().optional(),
++  gender: z.enum(["male", "female", "other"]).nullable().optional(),
++  bio: z.string().nullable().optional(),
+ });
+ 
+ export const verifyEmailDto = z.object({
+diff --git a/Backend/src-new/application/ports/IBrokerProvider.ts b/Backend/src-new/application/ports/IBrokerProvider.ts
+index 1c31dda..b901f94 100644
+--- a/Backend/src-new/application/ports/IBrokerProvider.ts
++++ b/Backend/src-new/application/ports/IBrokerProvider.ts
+@@ -35,11 +35,21 @@ export interface CalendarUpdate {
+   previous: string | null;
+ }
+ 
++export interface TrackingStatus {
++  price: boolean;
++  ohlc: boolean;
++  mbook: boolean;
++  calendar: boolean;
++  uptimeSec: number;
++}
++
+ export interface BrokerCallbacks {
+   onPriceTick?: (tick: PriceTick) => void;
+   onOHLCUpdate?: (update: OHLCUpdate) => void;
+   onMarketBookUpdate?: (update: MarketBookUpdate) => void;
+   onCalendarUpdate?: (update: CalendarUpdate) => void;
++  onReconnect?: () => void;
++  onTrackingStatus?: (status: TrackingStatus) => void;
+ }
+ 
+ export interface IBrokerProvider {
+diff --git a/Backend/src-new/application/use-cases/auth/ChangeEmailUseCase.ts b/Backend/src-new/application/use-cases/auth/ChangeEmailUseCase.ts
+index b92edc3..3ed5463 100644
+--- a/Backend/src-new/application/use-cases/auth/ChangeEmailUseCase.ts
++++ b/Backend/src-new/application/use-cases/auth/ChangeEmailUseCase.ts
+@@ -5,7 +5,7 @@ import { EmailPort } from "@application/ports";
+ import { User } from "@domain/entities/User.js";
+ import { Email } from "@domain/value-objects";
+ import { ValidationError, AuthenticationError, NotFoundError, ConflictError } from "@core/errors/index.js";
+-import { verifyPassword, generateSecureToken } from "@core/utils/index.js";
++import { verifyPassword, generateOTP } from "@core/utils/index.js";
+ import { LIMITS } from "@core/constants/index.js";
+ import { pgClient } from "@data/orm/pgClient.js";
+ import { RequestInput } from "@core/utils/request.js";
+@@ -56,7 +56,7 @@ export class ChangeEmailUseCase {
+     }
+ 
+     await this.verificationRepo.invalidateUserTokens(user.id);
+-    const token = generateSecureToken(LIMITS.VERIFICATION_TOKEN_BYTES);
++    const token = generateOTP();
+     await pgClient.query(
+       `INSERT INTO email_verifications (user_id, token, expires_at, new_email)
+        VALUES ($1, $2, NOW() + INTERVAL '24 hours', $3)`,
+diff --git a/Backend/src-new/application/use-cases/auth/RegisterUseCase.ts b/Backend/src-new/application/use-cases/auth/RegisterUseCase.ts
+index b17d289..d90a9dc 100644
+--- a/Backend/src-new/application/use-cases/auth/RegisterUseCase.ts
++++ b/Backend/src-new/application/use-cases/auth/RegisterUseCase.ts
+@@ -10,7 +10,7 @@ import { Device } from "@domain/entities/Device.js";
+ import { Email } from "@domain/value-objects";
+ import { DeviceFingerprint } from "@domain/value-objects";
+ import { ValidationError, ConflictError, InternalError } from "@core/errors/index.js";
+-import { hashPassword, generateSecureToken, getDeviceFingerprint } from "@core/utils/index.js";
++import { hashPassword, generateOTP, getDeviceFingerprint, generateSecureToken } from "@core/utils/index.js";
+ import { isDeviceEnforcementEnabled } from "@config/deviceEnforcement.js";
+ import { LIMITS } from "@core/constants/index.js";
+ import { RequestInput } from "@core/utils/request.js";
+@@ -73,7 +73,7 @@ export class RegisterUseCase {
+       await this.deviceRepo.bind(Device.create({ userId: user.id, fingerprint: fingerprint.value }));
+     }
+ 
+-    const token = generateSecureToken(LIMITS.VERIFICATION_TOKEN_BYTES);
++    const token = generateOTP();
+     await this.verificationRepo.create(user.id, token, 24 * 60 * 60);
+     await this.emailPort.sendVerificationEmail(email.value, token);
+ 
+diff --git a/Backend/src-new/application/use-cases/auth/ResendVerificationUseCase.ts b/Backend/src-new/application/use-cases/auth/ResendVerificationUseCase.ts
+index 9178154..736cb6d 100644
+--- a/Backend/src-new/application/use-cases/auth/ResendVerificationUseCase.ts
++++ b/Backend/src-new/application/use-cases/auth/ResendVerificationUseCase.ts
+@@ -5,7 +5,7 @@ import { EmailPort } from "@application/ports";
+ import { User } from "@domain/entities/User.js";
+ import { Email } from "@domain/value-objects";
+ import { ValidationError, NotFoundError } from "@core/errors/index.js";
+-import { generateSecureToken } from "@core/utils/index.js";
++import { generateOTP } from "@core/utils/index.js";
+ import { LIMITS } from "@core/constants/index.js";
+ 
+ interface ResendVerificationInput {
+@@ -33,7 +33,7 @@ export class ResendVerificationUseCase {
+     }
+ 
+     await this.verificationRepo.invalidateUserTokens(user.id);
+-    const token = generateSecureToken(LIMITS.VERIFICATION_TOKEN_BYTES);
++    const token = generateOTP();
+     await this.verificationRepo.create(user.id, token, 24 * 60 * 60);
+     await this.emailPort.sendVerificationEmail(email.value, token);
+   }
+diff --git a/Backend/src-new/application/use-cases/auth/VerifyEmailUseCase.ts b/Backend/src-new/application/use-cases/auth/VerifyEmailUseCase.ts
+index 195c116..686d989 100644
+--- a/Backend/src-new/application/use-cases/auth/VerifyEmailUseCase.ts
++++ b/Backend/src-new/application/use-cases/auth/VerifyEmailUseCase.ts
+@@ -21,7 +21,8 @@ interface VerifyEmailOutput {
+ export class VerifyEmailUseCase {
+   constructor(
+     @inject("UserRepository") private userRepo: UserRepository,
+-    @inject("VerificationRepository") private verificationRepo: VerificationRepository
++    @inject("VerificationRepository") private verificationRepo: VerificationRepository,
++    @inject("EmailPort") private emailPort: EmailPort
+   ) {}
+ 
+   async execute(input: VerifyEmailInput): Promise<VerifyEmailOutput> {
+@@ -35,9 +36,16 @@ export class VerifyEmailUseCase {
+       throw new NotFoundError("User");
+     }
+ 
+-    const verifiedUser = user.withEmailVerified();
++    const verifiedUser = result.newEmail 
++      ? user.withEmail(result.newEmail)
++      : user.withEmailVerified();
++    
+     await this.userRepo.save(verifiedUser);
+ 
++    if (result.newEmail) {
++      await this.emailPort.sendEmailChangeNotification(user.email, result.newEmail);
++    }
++
+     return { user: verifiedUser };
+   }
+ }
+\ No newline at end of file
+diff --git a/Backend/src-new/background/jobs/Mt5SubscriptionJob.ts b/Backend/src-new/background/jobs/Mt5SubscriptionJob.ts
+index 2d84a51..6488130 100644
+--- a/Backend/src-new/background/jobs/Mt5SubscriptionJob.ts
++++ b/Backend/src-new/background/jobs/Mt5SubscriptionJob.ts
+@@ -28,7 +28,49 @@ export class Mt5SubscriptionJob {
+         logger.debug(`Calendar Live Update [Event ${update.event_id}] - Actual: ${update.actual} | Forecast: ${update.forecast} | Prev: ${update.previous}`, { context: "Broker" });
+         const calendarService = container.resolve(CalendarService);
+         await calendarService.handleLiveUpdate(update);
+-      }
++      },
++
++      // Layer 1 (reactive): every time the WS (re)connects - network blip OR
++      // EA restart - re-apply tracking config from .env. Idempotent when the
++      // EA is still alive with the same config; this is what actually fixes
++      // the case where the EA restarted and lost its tracking state.
++      onReconnect: () => {
++        logger.info("MT5 WS (re)connected - re-applying tracking subscriptions", { context: "Broker" });
++        Mt5SubscriptionJob.setupSubscriptions().catch(err =>
++          logger.error("Resubscribe on reconnect failed", { context: "Broker", error: (err as Error).message })
++        );
++      },
++
++      // Layer 2 (proactive): compare what the EA says is active right now
++      // against what .env says should be active. Mismatch means the EA's
++      // tracking config diverged from what we expect - resubscribe.
++      onTrackingStatus: (status) => {
++        const trackingSymbols = env.MT5_TRACKING_SYMBOLS;
++        const expected = {
++          price: env.MT5_TRACK_PRICES && trackingSymbols.length > 0,
++          ohlc: env.MT5_TRACK_OHLC && trackingSymbols.length > 0,
++          mbook: env.MT5_TRACK_MBOOK && trackingSymbols.length > 0,
++          calendar: env.MT5_TRACK_CALENDAR,
++        };
++
++        const mismatch =
++          status.price !== expected.price ||
++          status.ohlc !== expected.ohlc ||
++          status.mbook !== expected.mbook ||
++          status.calendar !== expected.calendar;
++
++        if (mismatch) {
++          logger.warn("MT5 tracking status mismatch vs .env - resubscribing", {
++            context: "Broker",
++            expected,
++            actual: { price: status.price, ohlc: status.ohlc, mbook: status.mbook, calendar: status.calendar },
++            uptimeSec: status.uptimeSec,
++          });
++          Mt5SubscriptionJob.setupSubscriptions().catch(err =>
++            logger.error("Resubscribe after status mismatch failed", { context: "Broker", error: (err as Error).message })
++          );
++        }
++      },
+     });
+ 
+     // Connect to Broker WebSocket (non-blocking - HTTP works for all operations)
+@@ -38,7 +80,21 @@ export class Mt5SubscriptionJob {
+     logger.info("Broker Client initialized (HTTP mode)", { context: "Broker" });
+   }
+ 
++  // Guard against concurrent/rapid-fire calls. onReconnect and the first
++  // onTrackingStatus mismatch can fire within milliseconds of each other,
++  // causing duplicate POST /v1/track/* requests to the EA. This timestamp
++  // lets us coalesce those into a single effective call.
++  private static lastSubscriptionAt = 0;
++  private static readonly SUBSCRIPTION_DEBOUNCE_MS = 5000;
++
+   static async setupSubscriptions(): Promise<void> {
++    const now = Date.now();
++    if (now - Mt5SubscriptionJob.lastSubscriptionAt < Mt5SubscriptionJob.SUBSCRIPTION_DEBOUNCE_MS) {
++      logger.debug("setupSubscriptions debounced (called too soon after last run)", { context: "Broker" });
++      return;
++    }
++    Mt5SubscriptionJob.lastSubscriptionAt = now;
++
+     const brokerClient = container.resolve<IBrokerProvider>("IBrokerProvider");
+     
+     try {
+diff --git a/Backend/src-new/background/jobs/index.ts b/Backend/src-new/background/jobs/index.ts
+index 62477a1..540d8db 100644
+--- a/Backend/src-new/background/jobs/index.ts
++++ b/Backend/src-new/background/jobs/index.ts
+@@ -22,11 +22,12 @@ export async function runStartupJobs() {
+   // --- STAGE 2: LIGHT - MEDIUM (WebSocket Connection & Subscriptions) ---
+   
+   // 3. Setup MT5 connections, callbacks, and WebSocket
++  // Note: setupSubscriptions() is NOT called here explicitly because the
++  // onReconnect callback (set in setupAndConnect) already calls it as soon
++  // as the WebSocket connects. Calling it here too would cause duplicate
++  // subscriptions due to a race condition.
+   await Mt5SubscriptionJob.setupAndConnect();
+ 
+-  // 4. Register MT5 subscriptions based on environment flags (Sends messages via WS)
+-  await Mt5SubscriptionJob.setupSubscriptions();
+-
+   // --- STAGE 3 & 4: HEAVY OPERATIONS (Run Asynchronously in Background) ---
+   
+   // We wrap these in a fire-and-forget IIFE (Immediately Invoked Function Expression) 
+diff --git a/Backend/src-new/bootstrap/startServer.ts b/Backend/src-new/bootstrap/startServer.ts
+index 0d801f0..c62b058 100644
+--- a/Backend/src-new/bootstrap/startServer.ts
++++ b/Backend/src-new/bootstrap/startServer.ts
+@@ -10,6 +10,7 @@ import { registerMiddleware } from "./registerMiddleware.js";
+ import { errorHandler } from "@core/middleware/errorHandler.js";
+ import { requestLogger } from "@core/logging/requestLogger.js";
+ import { requestId } from "@core/middleware/requestId.js";
++import { ipNormalizer } from "@core/middleware/ipNormalizer.js";
+ import { sanitizeInput } from "@core/middleware/sanitize.js";
+ import { env } from "@config/env";
+ import { logger } from "@core/logging/logger.js";
+@@ -27,6 +28,7 @@ export async function createApp() {
+   app.set("trust proxy", env.TRUST_PROXY_HOPS);
+   
+   // Core middleware
++  app.use(ipNormalizer);
+   app.use(requestId);
+   app.use(requestLogger);
+   app.use(express.json({ limit: "15mb" }));
+diff --git a/Backend/src-new/core/logging/logger.ts b/Backend/src-new/core/logging/logger.ts
+index a178e95..707e163 100644
+--- a/Backend/src-new/core/logging/logger.ts
++++ b/Backend/src-new/core/logging/logger.ts
+@@ -66,13 +66,25 @@ const consoleFormatter = printf(({ level, message, timestamp, context, ...meta }
+       metaObj[key] = meta[key as keyof typeof meta];
+     }
+     
+-    const metaStr = "\n" + JSON.stringify(metaObj, (_, v) => {
++    let metaStr = "\n" + JSON.stringify(metaObj, (_, v) => {
+       if (typeof v === "string" && v.length > 1000) {
+         return truncate(v, 200);
+       }
+       return v;
+     }, 2);
+-    msg += chalk.gray(metaStr);
++    
++    // Apply gray base color and then highlight statusCode
++    metaStr = chalk.gray(metaStr).replace(/"statusCode":\s*(\d+)/g, (match, code) => {
++      const num = parseInt(code, 10);
++      let colorCode = chalk.white(code);
++      if (num >= 500) colorCode = chalk.red(code);
++      else if (num >= 400) colorCode = chalk.yellow(code);
++      else if (num >= 300) colorCode = chalk.cyan(code);
++      else if (num >= 200) colorCode = chalk.green(code);
++      return `"statusCode": ${colorCode}`;
++    });
++    
++    msg += metaStr;
+   }
+ 
+   if (meta.stack) {
+diff --git a/Backend/src-new/core/logging/requestLogger.ts b/Backend/src-new/core/logging/requestLogger.ts
+index 1a2b103..107681b 100644
+--- a/Backend/src-new/core/logging/requestLogger.ts
++++ b/Backend/src-new/core/logging/requestLogger.ts
+@@ -28,7 +28,8 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
+ 
+   const loggedPath = redactSensitiveQuery(req.originalUrl || req.path);
+ 
+-  logger.debug("incoming request", {
++  logger.info("Incoming request", {
++    context: "HTTP",
+     method: req.method,
+     path: loggedPath,
+     userId: (req as any).user?.userId,
+@@ -40,7 +41,8 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
+     const duration = Date.now() - start;
+ 
+     if (res.statusCode >= 500) {
+-      logger.error("request completed", {
++      logger.error("Request failed", {
++        context: "HTTP",
+         method: req.method,
+         path: loggedPath,
+         userId: (req as any).user?.userId,
+@@ -49,7 +51,8 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
+         requestId: req.id,
+       });
+     } else if (res.statusCode >= 400) {
+-      logger.warn("request completed", {
++      logger.warn("Request completed", {
++        context: "HTTP",
+         method: req.method,
+         path: loggedPath,
+         userId: (req as any).user?.userId,
+@@ -58,7 +61,8 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
+         requestId: req.id,
+       });
+     } else {
+-      logger.debug("request completed", {
++      logger.info("Request completed", {
++        context: "HTTP",
+         method: req.method,
+         path: loggedPath,
+         userId: (req as any).user?.userId,
+diff --git a/Backend/src-new/core/middleware/index.ts b/Backend/src-new/core/middleware/index.ts
+index 0e855f2..d548c0e 100644
+--- a/Backend/src-new/core/middleware/index.ts
++++ b/Backend/src-new/core/middleware/index.ts
+@@ -1,4 +1,5 @@
+ export * from "./errorHandler.js";
+ export * from "./requestId.js";
+ export * from "./rateLimiter.js";
+-export * from "./sanitize.js";
+\ No newline at end of file
++export * from "./sanitize.js";
++export * from "./ipNormalizer.js";
+\ No newline at end of file
+diff --git a/Backend/src-new/core/middleware/rateLimiter.ts b/Backend/src-new/core/middleware/rateLimiter.ts
+index 9d3d55a..7920ec3 100644
+--- a/Backend/src-new/core/middleware/rateLimiter.ts
++++ b/Backend/src-new/core/middleware/rateLimiter.ts
+@@ -1,6 +1,7 @@
+ import rateLimit, { ipKeyGenerator } from "express-rate-limit";
+ import { env } from "@config/env";
+-import type { Request } from "express";
++import type { Request, Response } from "express";
++import { logger } from "@core/logging/logger.js";
+ 
+ function createIpKeyGenerator() {
+   return (req: Request) => ipKeyGenerator(req.ip || "unknown");
+@@ -10,6 +11,7 @@ export function createRateLimiter(options: {
+   windowMs: number;
+   max: number;
+   message: string;
++  name?: string;
+   keyGenerator?: (req: Request) => string;
+ }) {
+   return rateLimit({
+@@ -19,28 +21,45 @@ export function createRateLimiter(options: {
+     standardHeaders: true,
+     legacyHeaders: false,
+     keyGenerator: options.keyGenerator || createIpKeyGenerator(),
++    handler: (req: Request, res: Response) => {
++      const ip = (req as any).normalizedIP || req.ip || "unknown";
++      logger.warn(`Rate limit exceeded`, {
++        context: "RateLimit",
++        limiter: options.name || "global",
++        ip,
++        method: req.method,
++        path: req.originalUrl || req.path,
++        maxRequests: options.max,
++        windowMs: options.windowMs,
++      });
++      res.status(429).json({ error: options.message });
++    },
+   });
+ }
+ 
+ export const globalLimiter = createRateLimiter({
++  name: "global",
+   windowMs: 60 * 1000,
+   max: env.RATE_LIMIT_PER_MINUTE,
+   message: "Terlalu banyak request, coba lagi sebentar lagi",
+ });
+ 
+ export const authLimiter = createRateLimiter({
++  name: "auth",
+   windowMs: 5 * 60 * 1000,
+   max: 10,
+   message: "Terlalu banyak percobaan login/register, coba lagi dalam 5 menit",
+ });
+ 
+ export const registerLimiter = createRateLimiter({
++  name: "register",
+   windowMs: 60 * 60 * 1000,
+   max: env.RATE_LIMIT_REGISTER_PER_HOUR,
+   message: "Terlalu banyak percobaan registrasi, coba lagi nanti",
+ });
+ 
+ export const perUserLimiter = createRateLimiter({
++  name: "per-user",
+   windowMs: 60 * 1000,
+   max: env.RATE_LIMIT_PER_USER_PER_MINUTE,
+   message: "Terlalu banyak request untuk akun ini, coba lagi sebentar lagi",
+diff --git a/Backend/src-new/core/utils/crypto.ts b/Backend/src-new/core/utils/crypto.ts
+index 64e9f71..bca3811 100644
+--- a/Backend/src-new/core/utils/crypto.ts
++++ b/Backend/src-new/core/utils/crypto.ts
+@@ -13,6 +13,15 @@ export function generateSecureToken(bytes = 32): string {
+   return crypto.randomBytes(bytes).toString("hex");
+ }
+ 
++export function generateOTP(length = 6): string {
++  const digits = "0123456789";
++  let otp = "";
++  for (let i = 0; i < length; i++) {
++    otp += digits[crypto.randomInt(0, digits.length)];
++  }
++  return otp;
++}
++
+ export function hashToken(token: string): string {
+   return crypto.createHash("sha256").update(token).digest("hex");
+ }
+diff --git a/Backend/src-new/data/external/EmailService.ts b/Backend/src-new/data/external/EmailService.ts
+index c48031d..520d81b 100644
+--- a/Backend/src-new/data/external/EmailService.ts
++++ b/Backend/src-new/data/external/EmailService.ts
+@@ -31,8 +31,8 @@ export class EmailService {
+     return this.sendEmail({
+       to: email,
+       subject: "Verify your Betrix account",
+-      text: `Please verify your email by clicking: ${url}`,
+-      html: `<p>Please verify your email by clicking: <a href="${url}">${url}</a></p>`,
++      text: `Your OTP code is: ${token}\n\nAlternatively, please verify your email by clicking: ${url}`,
++      html: `<p>Your OTP code is: <strong>${token}</strong></p><p>Alternatively, please verify your email by clicking: <a href="${url}">${url}</a></p>`,
+     });
+   }
+ 
+@@ -41,8 +41,8 @@ export class EmailService {
+     return this.sendEmail({
+       to: email,
+       subject: "Confirm your new email address",
+-      text: `Please confirm your new email by clicking: ${url}`,
+-      html: `<p>Please confirm your new email by clicking: <a href="${url}">${url}</a></p>`,
++      text: `Your OTP code is: ${token}\n\nAlternatively, confirm your new email by clicking: ${url}`,
++      html: `<p>Your OTP code is: <strong>${token}</strong></p><p>Alternatively, confirm your new email by clicking: <a href="${url}">${url}</a></p>`,
+     });
+   }
+ 
+diff --git a/Backend/src-new/data/external/Mt5WebsocketClient.ts b/Backend/src-new/data/external/Mt5WebsocketClient.ts
+index 657a754..1e2b99c 100644
+--- a/Backend/src-new/data/external/Mt5WebsocketClient.ts
++++ b/Backend/src-new/data/external/Mt5WebsocketClient.ts
+@@ -11,6 +11,16 @@ export class Mt5WebsocketClient {
+   private readonly MAX_RECONNECT_ATTEMPTS = 10;
+   private readonly RECONNECT_DELAY = 5000;
+ 
++  // Status heartbeat watchdog. EA broadcasts a "tracking_status" message
++  // every ~5s (see Data.mqh::SendTrackingStatus). If none arrives within
++  // STATUS_STALE_TIMEOUT_MS, the EA is assumed dead even though the TCP
++  // socket may still look open (covers non-graceful EA death: crash, kill,
++  // terminal shutdown, where onclose can be delayed or never fire).
++  private statusWatchdog: NodeJS.Timeout | null = null;
++  private lastTrackingStatusAt = 0;
++  private readonly STATUS_STALE_TIMEOUT_MS = 15000;
++  private readonly STATUS_CHECK_INTERVAL_MS = 5000;
++
+   private callbacks: BrokerCallbacks = {};
+ 
+   setCallbacks(callbacks: BrokerCallbacks): void {
+@@ -27,7 +37,8 @@ export class Mt5WebsocketClient {
+         this.ws.onopen = () => {
+           logger.info("MT5 WebSocket connected", { context: "MT5" });
+           this.reconnectAttempts = 0;
+-          this.subscribeToSymbols();
++          this.startStatusWatchdog();
++          this.callbacks.onReconnect?.();
+           resolve();
+         };
+ 
+@@ -35,6 +46,7 @@ export class Mt5WebsocketClient {
+         
+         this.ws.onclose = () => {
+           logger.warn("MT5 WebSocket disconnected", { context: "MT5" });
++          this.stopStatusWatchdog();
+           this.scheduleReconnect();
+         };
+ 
+@@ -67,9 +79,23 @@ export class Mt5WebsocketClient {
+     }, delay);
+   }
+ 
+-  private subscribeToSymbols(): void {
+-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+-    this.ws.send(JSON.stringify({ action: "subscribe", symbols: [] }));
++  private startStatusWatchdog(): void {
++    this.stopStatusWatchdog();
++    this.lastTrackingStatusAt = Date.now(); // grace period sampai status pertama datang
++    this.statusWatchdog = setInterval(() => {
++      const staleFor = Date.now() - this.lastTrackingStatusAt;
++      if (staleFor > this.STATUS_STALE_TIMEOUT_MS) {
++        logger.warn(`No tracking_status from MT5 EA in ${staleFor}ms - assuming EA dead, forcing reconnect`, { context: "MT5" });
++        this.ws?.close();
++      }
++    }, this.STATUS_CHECK_INTERVAL_MS);
++  }
++
++  private stopStatusWatchdog(): void {
++    if (this.statusWatchdog) {
++      clearInterval(this.statusWatchdog);
++      this.statusWatchdog = null;
++    }
+   }
+ 
+   private handleMessage(data: string): void {
+@@ -89,6 +115,9 @@ export class Mt5WebsocketClient {
+         case "calendar_update":
+           this.handleCalendarUpdate(msg);
+           break;
++        case "tracking_status":
++          this.handleTrackingStatus(msg);
++          break;
+       }
+     } catch (err) {
+       logger.error("Failed to parse MT5 message", { context: "MT5", error: (err as Error).message });
+@@ -158,6 +187,20 @@ export class Mt5WebsocketClient {
+     }
+   }
+ 
++  private handleTrackingStatus(msg: any): void {
++    this.lastTrackingStatusAt = Date.now();
++
++    if (this.callbacks.onTrackingStatus) {
++      this.callbacks.onTrackingStatus({
++        price: !!msg.price,
++        ohlc: !!msg.ohlc,
++        mbook: !!msg.mbook,
++        calendar: !!msg.calendar,
++        uptimeSec: typeof msg.uptime_sec === "number" ? msg.uptime_sec : 0,
++      });
++    }
++  }
++
+   private handleCalendarUpdate(msg: any): void {
+     if (!msg.events || !Array.isArray(msg.events)) return;
+ 
+@@ -176,6 +219,7 @@ export class Mt5WebsocketClient {
+   }
+ 
+   disconnect(): void {
++    this.stopStatusWatchdog();
+     if (this.ws) {
+       this.ws.close();
+       this.ws = null;
+diff --git a/Backend/src-new/data/orm/pgClient.ts b/Backend/src-new/data/orm/pgClient.ts
+index 2c334da..a220b87 100644
+--- a/Backend/src-new/data/orm/pgClient.ts
++++ b/Backend/src-new/data/orm/pgClient.ts
+@@ -1,25 +1,49 @@
+-import pg from "pg";
+-import { env } from "@config/env";
+-import { logger } from "@core/logging/logger.js";
+-
+-const { Pool } = pg;
+-
+-export const pgClient = new Pool({
+-  connectionString: env.DATABASE_URL,
+-  ssl: env.NODE_ENV === "development" && env.DATABASE_URL.includes("localhost")
+-    ? false
+-    : { rejectUnauthorized: true },
+-  max: env.DB_POOL_MAX,
+-  idleTimeoutMillis: 30000,
+-  connectionTimeoutMillis: 5000,
+-  statement_timeout: env.DB_STATEMENT_TIMEOUT_MS,
+-  query_timeout: env.DB_QUERY_TIMEOUT_MS,
+-});
+-
+-pgClient.on("error", (err) => {
+-  logger.error("Unexpected pg pool error", { context: "Database", error: err.message });
+-});
+-
+-export async function closePgClient(): Promise<void> {
+-  await pgClient.end();
+-}
+\ No newline at end of file
++import pg from "pg";
++import { env } from "@config/env";
++import { logger } from "@core/logging/logger.js";
++
++const { Pool } = pg;
++
++export const pgClient = new Pool({
++  connectionString: env.DATABASE_URL,
++  ssl: env.NODE_ENV === "development" && env.DATABASE_URL.includes("localhost")
++    ? false
++    : { rejectUnauthorized: true },
++  max: env.DB_POOL_MAX,
++  // Neon's pooler drops idle TCP connections after a few minutes.
++  // Close our side first (10s) so the pool never holds a stale socket
++  // that would emit an unhandled 'error' when Neon kills it.
++  idleTimeoutMillis: 10000,
++  connectionTimeoutMillis: 5000,
++  statement_timeout: env.DB_STATEMENT_TIMEOUT_MS,
++  query_timeout: env.DB_QUERY_TIMEOUT_MS,
++});
++
++pgClient.on("error", (err) => {
++  logger.error("Unexpected pg pool error", { context: "Database", error: err.message });
++});
++
++// Safety net: in rare race conditions, a pg Client that was just released
++// back to the pool can emit 'error' before the Pool re-attaches its own
++// listener. Without this, the unhandled 'error' event crashes Node.js.
++// We only suppress pg-related connection errors; everything else re-throws.
++process.on("uncaughtException", (err) => {
++  if (
++    err.message?.includes("Connection terminated unexpectedly") ||
++    err.message?.includes("Connection terminated due to connection timeout") ||
++    err.message?.includes("terminating connection due to administrator command")
++  ) {
++    logger.error("Caught pg connection error (process kept alive)", {
++      context: "Database",
++      error: err.message,
++    });
++    return; // swallow — pool will reconnect on next query
++  }
++  // Not a pg error — let it crash as normal
++  logger.error("Uncaught exception", { error: err.message, stack: err.stack });
++  process.exit(1);
++});
++
++export async function closePgClient(): Promise<void> {
++  await pgClient.end();
++}
+\ No newline at end of file
+diff --git a/Backend/src-new/data/repositories/PgVerificationRepository.ts b/Backend/src-new/data/repositories/PgVerificationRepository.ts
+index 8895178..a63b5ba 100644
+--- a/Backend/src-new/data/repositories/PgVerificationRepository.ts
++++ b/Backend/src-new/data/repositories/PgVerificationRepository.ts
+@@ -11,9 +11,9 @@ export class PgVerificationRepository implements VerificationRepository {
+     );
+   }
+ 
+-  async verify(token: string): Promise<{ success: boolean; userId?: string; error?: string }> {
++  async verify(token: string): Promise<{ success: boolean; userId?: string; newEmail?: string; error?: string }> {
+     const { rows } = await pgClient.query(
+-      `SELECT user_id, expires_at, used_at FROM email_verifications WHERE token = $1`,
++      `SELECT user_id, expires_at, used_at, new_email FROM email_verifications WHERE token = $1`,
+       [token]
+     );
+     const v = rows[0];
+@@ -26,7 +26,7 @@ export class PgVerificationRepository implements VerificationRepository {
+       [token]
+     );
+     
+-    return { success: true, userId: v.user_id };
++    return { success: true, userId: v.user_id, newEmail: v.new_email };
+   }
+ 
+   async invalidateUserTokens(userId: string): Promise<void> {
+diff --git a/Backend/src-new/domain/entities/User.ts b/Backend/src-new/domain/entities/User.ts
+index 1477d26..ca8db72 100644
+--- a/Backend/src-new/domain/entities/User.ts
++++ b/Backend/src-new/domain/entities/User.ts
+@@ -86,6 +86,16 @@ export class User {
+     );
+   }
+ 
++  withEmail(newEmail: string): User {
++    return new User(
++      this.id, newEmail.toLowerCase(), this.passwordHash, this.name,
++      this.isAdmin, this.status, true, this.credits,
++      this.createdAt, this.lastActive, this.googleId,
++      this.phone, this.address, this.birthdate, this.gender, this.bio,
++      new Date()
++    );
++  }
++
+   withStatus(status: UserStatus): User {
+     return new User(
+       this.id, this.email, this.passwordHash, this.name,
+diff --git a/Backend/src-new/domain/repositories/VerificationRepository.ts b/Backend/src-new/domain/repositories/VerificationRepository.ts
+index d0288c0..05642e8 100644
+--- a/Backend/src-new/domain/repositories/VerificationRepository.ts
++++ b/Backend/src-new/domain/repositories/VerificationRepository.ts
+@@ -1,6 +1,6 @@
+ export interface VerificationRepository {
+   create(userId: string, token: string, ttlSeconds: number): Promise<void>;
+-  verify(token: string): Promise<{ success: boolean; userId?: string; error?: string }>;
++  verify(token: string): Promise<{ success: boolean; userId?: string; newEmail?: string; error?: string }>;
+   invalidateUserTokens(userId: string): Promise<void>;
+   cleanupExpired(): Promise<number>;
+ }
+\ No newline at end of file
+diff --git a/Backend/src-new/domain/services/emailService.ts b/Backend/src-new/domain/services/emailService.ts
+index fcff88f..ba581f4 100644
+--- a/Backend/src-new/domain/services/emailService.ts
++++ b/Backend/src-new/domain/services/emailService.ts
+@@ -37,8 +37,8 @@ export async function sendVerificationEmail(email: string, token: string): Promi
+   return sendEmail({
+     to: email,
+     subject: "Verify your Betrix account",
+-    text: `Please verify your email by clicking: ${url}`,
+-    html: `<p>Please verify your email by clicking: <a href="${url}">${url}</a></p>`,
++    text: `Your OTP code is: ${token}\n\nAlternatively, please verify your email by clicking: ${url}`,
++    html: `<p>Your OTP code is: <strong>${token}</strong></p><p>Alternatively, please verify your email by clicking: <a href="${url}">${url}</a></p>`,
+   });
+ }
+ 
+@@ -49,8 +49,8 @@ export async function sendEmailChangeVerification(email: string, token: string):
+   return sendEmail({
+     to: email,
+     subject: "Confirm your new email address",
+-    text: `Please confirm your new email by clicking: ${url}`,
+-    html: `<p>Please confirm your new email by clicking: <a href="${url}">${url}</a></p>`,
++    text: `Your OTP code is: ${token}\n\nAlternatively, confirm your new email by clicking: ${url}`,
++    html: `<p>Your OTP code is: <strong>${token}</strong></p><p>Alternatively, confirm your new email by clicking: <a href="${url}">${url}</a></p>`,
+   });
+ }
+ 
+diff --git a/Backend/src-new/presentation/controllers/AuthController.ts b/Backend/src-new/presentation/controllers/AuthController.ts
+index 9c98d71..e229b2e 100644
+--- a/Backend/src-new/presentation/controllers/AuthController.ts
++++ b/Backend/src-new/presentation/controllers/AuthController.ts
+@@ -64,7 +64,7 @@ export class AuthController {
+     try {
+       const useCase = container.resolve(LogoutUseCase);
+       await useCase.execute({
+-        sessionToken: req.body.sessionToken,
++        sessionToken: (req as any).user.token,
+         request: this.getRequestInput(req),
+       });
+       res.json({ message: "Logout successful" });
+@@ -76,7 +76,8 @@ export class AuthController {
+   async verifyEmail(req: Request, res: Response, next: NextFunction) {
+     try {
+       const useCase = container.resolve(VerifyEmailUseCase);
+-      await useCase.execute({ token: req.query.token as string });
++      const token = (req.body.token || req.query.token) as string;
++      await useCase.execute({ token });
+       res.json({ message: "Email verified successfully" });
+     } catch (err) {
+       next(err);
+@@ -188,6 +189,13 @@ export class AuthController {
+       credits: user.credits,
+       createdAt: user.createdAt,
+       lastActive: user.lastActive,
++      phone: user.phone,
++      address: user.address,
++      birthdate: user.birthdate,
++      gender: user.gender,
++      bio: user.bio,
++      googleId: user.googleId,
++      verifiedAt: user.verifiedAt,
+     };
+   }
+ }
+\ No newline at end of file
+diff --git a/Backend/src-new/presentation/middleware/auth.middleware.ts b/Backend/src-new/presentation/middleware/auth.middleware.ts
+index 988ca28..6cfd5a4 100644
+--- a/Backend/src-new/presentation/middleware/auth.middleware.ts
++++ b/Backend/src-new/presentation/middleware/auth.middleware.ts
+@@ -39,4 +39,28 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
+   } catch (err) {
+     next(err);
+   }
++}
++
++export async function guestMiddleware(req: Request, res: Response, next: NextFunction) {
++  const authHeader = req.headers.authorization || "";
++  const sessionToken = authHeader.startsWith("Bearer ") 
++    ? authHeader.slice(7) 
++    : (req.query.token as string || null);
++
++  if (!sessionToken) {
++    return next();
++  }
++
++  try {
++    const sessionRepo = container.resolve("SessionRepository") as SessionRepository;
++    const session = await sessionRepo.findByToken(sessionToken);
++
++    if (session) {
++      return res.status(400).json({ error: "Already logged in", code: "ALREADY_AUTHENTICATED" });
++    }
++
++    next();
++  } catch (err) {
++    next(); // if there is an error checking the session, let them proceed
++  }
+ }
+\ No newline at end of file
+diff --git a/Backend/src-new/presentation/routes/v1/auth.routes.ts b/Backend/src-new/presentation/routes/v1/auth.routes.ts
+index 5f4c066..32f0f23 100644
+--- a/Backend/src-new/presentation/routes/v1/auth.routes.ts
++++ b/Backend/src-new/presentation/routes/v1/auth.routes.ts
+@@ -1,17 +1,18 @@
+ import { Router } from "express";
+ import { container } from "tsyringe";
+ import { AuthController } from "@presentation/controllers/AuthController.js";
+-import { authMiddleware } from "@presentation/middleware/auth.middleware.js";
++import { authMiddleware, guestMiddleware } from "@presentation/middleware/auth.middleware.js";
+ import { validate } from "@presentation/middleware/validate.middleware.js";
+ import { registerDto, loginDto, changePasswordDto, changeEmailDto, updateProfileDto, verifyEmailDto, resendVerificationDto } from "@application/dtos/auth.dto.js";
+ 
+ const router = Router();
+ const controller = container.resolve(AuthController);
+ 
+-router.post("/register", validate(registerDto), controller.register.bind(controller));
+-router.post("/login", validate(loginDto), controller.login.bind(controller));
++router.post("/register", guestMiddleware, validate(registerDto), controller.register.bind(controller));
++router.post("/login", guestMiddleware, validate(loginDto), controller.login.bind(controller));
+ router.post("/logout", authMiddleware, controller.logout.bind(controller));
+ router.get("/verify-email", validate(verifyEmailDto), controller.verifyEmail.bind(controller));
++router.post("/verify-email", validate(verifyEmailDto), controller.verifyEmail.bind(controller));
+ router.post("/resend-verification", validate(resendVerificationDto), controller.resendVerification.bind(controller));
+ router.put("/password", authMiddleware, validate(changePasswordDto), controller.changePassword.bind(controller));
+ router.put("/email", authMiddleware, validate(changeEmailDto), controller.changeEmail.bind(controller));
+diff --git a/Frontend - Client/tsconfig.tsbuildinfo b/Frontend - Client/tsconfig.tsbuildinfo
+index dc95177..c4dae1b 100644
+--- a/Frontend - Client/tsconfig.tsbuildinfo	
++++ b/Frontend - Client/tsconfig.tsbuildinfo	
+@@ -1 +1 @@
+-{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/api/alphavantage.ts","./src/api/authclient.ts","./src/api/chatclient.ts","./src/api/marketclient.ts","./src/api/newsclient.ts","./src/api/usageclient.ts","./src/components/analysis/chatmessageitem.tsx","./src/components/analysis/economiccalendar.tsx","./src/components/analysis/lightweightchartwidget.tsx","./src/components/analysis/newsfeed.tsx","./src/components/analysis/signalresultcard.tsx","./src/components/analysis/strategypanel.tsx","./src/components/analysis/tickerstrip.tsx","./src/components/analysis/tradingviewwidget.tsx","./src/components/auth/authlayout.tsx","./src/components/auth/protectedroute.tsx","./src/components/layout/sidenavrail.tsx","./src/components/layout/statusbar.tsx","./src/components/layout/terminalshell.tsx","./src/components/layout/terminalshelllayout.tsx","./src/components/layout/topbar.tsx","./src/context/authcontext.tsx","./src/hooks/usetickerprices.ts","./src/hooks/usevisibilitypoll.ts","./src/lib/analyzepagehelpers.tsx","./src/lib/tradingviewsymbols.ts","./src/pages/analyzepage.tsx","./src/pages/authcallbackpage.tsx","./src/pages/dashboardpage.tsx","./src/pages/loginpage.tsx","./src/pages/newspage.tsx","./src/pages/registerpage.tsx","./src/pages/settingspage.tsx"],"version":"5.9.3"}
+\ No newline at end of file
++{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/api/authclient.ts","./src/api/chatclient.ts","./src/api/marketclient.ts","./src/api/newsclient.ts","./src/api/usageclient.ts","./src/components/analysis/chatmessageitem.tsx","./src/components/analysis/economiccalendar.tsx","./src/components/analysis/lightweightchartwidget.tsx","./src/components/analysis/newsfeed.tsx","./src/components/analysis/signalresultcard.tsx","./src/components/analysis/strategypanel.tsx","./src/components/analysis/tickerstrip.tsx","./src/components/analysis/tradingviewwidget.tsx","./src/components/auth/authlayout.tsx","./src/components/auth/protectedroute.tsx","./src/components/layout/sidenavrail.tsx","./src/components/layout/statusbar.tsx","./src/components/layout/terminalshell.tsx","./src/components/layout/terminalshelllayout.tsx","./src/components/layout/topbar.tsx","./src/context/authcontext.tsx","./src/hooks/usetickerprices.ts","./src/hooks/usevisibilitypoll.ts","./src/lib/analyzepagehelpers.tsx","./src/lib/authevents.ts","./src/lib/tradingviewsymbols.ts","./src/pages/analyzepage.tsx","./src/pages/authcallbackpage.tsx","./src/pages/dashboardpage.tsx","./src/pages/economiccalendarpage.tsx","./src/pages/loginpage.tsx","./src/pages/newspage.tsx","./src/pages/registerpage.tsx","./src/pages/settingspage.tsx"],"version":"5.9.3"}
+\ No newline at end of file

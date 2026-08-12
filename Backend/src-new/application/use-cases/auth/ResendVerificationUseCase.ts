@@ -5,7 +5,7 @@ import { EmailPort } from "@application/ports";
 import { User } from "@domain/entities/User.js";
 import { Email } from "@domain/value-objects";
 import { ValidationError, NotFoundError } from "@core/errors/index.js";
-import { generateSecureToken } from "@core/utils/index.js";
+import { generateOTP } from "@core/utils/index.js";
 import { LIMITS } from "@core/constants/index.js";
 
 interface ResendVerificationInput {
@@ -33,7 +33,7 @@ export class ResendVerificationUseCase {
     }
 
     await this.verificationRepo.invalidateUserTokens(user.id);
-    const token = generateSecureToken(LIMITS.VERIFICATION_TOKEN_BYTES);
+    const token = generateOTP();
     await this.verificationRepo.create(user.id, token, 24 * 60 * 60);
     await this.emailPort.sendVerificationEmail(email.value, token);
   }

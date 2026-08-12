@@ -35,11 +35,21 @@ export interface CalendarUpdate {
   previous: string | null;
 }
 
+export interface TrackingStatus {
+  price: boolean;
+  ohlc: boolean;
+  mbook: boolean;
+  calendar: boolean;
+  uptimeSec: number;
+}
+
 export interface BrokerCallbacks {
   onPriceTick?: (tick: PriceTick) => void;
   onOHLCUpdate?: (update: OHLCUpdate) => void;
   onMarketBookUpdate?: (update: MarketBookUpdate) => void;
   onCalendarUpdate?: (update: CalendarUpdate) => void;
+  onReconnect?: () => void;
+  onTrackingStatus?: (status: TrackingStatus) => void;
 }
 
 export interface IBrokerProvider {

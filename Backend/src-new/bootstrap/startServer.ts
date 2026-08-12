@@ -10,6 +10,7 @@ import { registerMiddleware } from "./registerMiddleware.js";
 import { errorHandler } from "@core/middleware/errorHandler.js";
 import { requestLogger } from "@core/logging/requestLogger.js";
 import { requestId } from "@core/middleware/requestId.js";
+import { ipNormalizer } from "@core/middleware/ipNormalizer.js";
 import { sanitizeInput } from "@core/middleware/sanitize.js";
 import { env } from "@config/env";
 import { logger } from "@core/logging/logger.js";
@@ -27,6 +28,7 @@ export async function createApp() {
   app.set("trust proxy", env.TRUST_PROXY_HOPS);
   
   // Core middleware
+  app.use(ipNormalizer);
   app.use(requestId);
   app.use(requestLogger);
   app.use(express.json({ limit: "15mb" }));

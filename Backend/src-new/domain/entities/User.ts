@@ -86,6 +86,16 @@ export class User {
     );
   }
 
+  withEmail(newEmail: string): User {
+    return new User(
+      this.id, newEmail.toLowerCase(), this.passwordHash, this.name,
+      this.isAdmin, this.status, true, this.credits,
+      this.createdAt, this.lastActive, this.googleId,
+      this.phone, this.address, this.birthdate, this.gender, this.bio,
+      new Date()
+    );
+  }
+
   withStatus(status: UserStatus): User {
     return new User(
       this.id, this.email, this.passwordHash, this.name,

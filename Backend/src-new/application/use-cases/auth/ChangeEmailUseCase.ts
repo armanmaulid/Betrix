@@ -5,7 +5,7 @@ import { EmailPort } from "@application/ports";
 import { User } from "@domain/entities/User.js";
 import { Email } from "@domain/value-objects";
 import { ValidationError, AuthenticationError, NotFoundError, ConflictError } from "@core/errors/index.js";
-import { verifyPassword, generateSecureToken } from "@core/utils/index.js";
+import { verifyPassword, generateOTP } from "@core/utils/index.js";
 import { LIMITS } from "@core/constants/index.js";
 import { pgClient } from "@data/orm/pgClient.js";
 import { RequestInput } from "@core/utils/request.js";
@@ -56,7 +56,7 @@ export class ChangeEmailUseCase {
     }
 
     await this.verificationRepo.invalidateUserTokens(user.id);
-    const token = generateSecureToken(LIMITS.VERIFICATION_TOKEN_BYTES);
+    const token = generateOTP();
     await pgClient.query(
       `INSERT INTO email_verifications (user_id, token, expires_at, new_email)
        VALUES ($1, $2, NOW() + INTERVAL '24 hours', $3)`,

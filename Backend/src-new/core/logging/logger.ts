@@ -66,13 +66,25 @@ const consoleFormatter = printf(({ level, message, timestamp, context, ...meta }
       metaObj[key] = meta[key as keyof typeof meta];
     }
     
-    const metaStr = "\n" + JSON.stringify(metaObj, (_, v) => {
+    let metaStr = "\n" + JSON.stringify(metaObj, (_, v) => {
       if (typeof v === "string" && v.length > 1000) {
         return truncate(v, 200);
       }
       return v;
     }, 2);
-    msg += chalk.gray(metaStr);
+    
+    // Apply gray base color and then highlight statusCode
+    metaStr = chalk.gray(metaStr).replace(/"statusCode":\s*(\d+)/g, (match, code) => {
+      const num = parseInt(code, 10);
+      let colorCode = chalk.white(code);
+      if (num >= 500) colorCode = chalk.red(code);
+      else if (num >= 400) colorCode = chalk.yellow(code);
+      else if (num >= 300) colorCode = chalk.cyan(code);
+      else if (num >= 200) colorCode = chalk.green(code);
+      return `"statusCode": ${colorCode}`;
+    });
+    
+    msg += metaStr;
   }
 
   if (meta.stack) {

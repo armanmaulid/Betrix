@@ -64,7 +64,7 @@ export class AuthController {
     try {
       const useCase = container.resolve(LogoutUseCase);
       await useCase.execute({
-        sessionToken: req.body.sessionToken,
+        sessionToken: (req as any).user.token,
         request: this.getRequestInput(req),
       });
       res.json({ message: "Logout successful" });
@@ -76,7 +76,8 @@ export class AuthController {
   async verifyEmail(req: Request, res: Response, next: NextFunction) {
     try {
       const useCase = container.resolve(VerifyEmailUseCase);
-      await useCase.execute({ token: req.query.token as string });
+      const token = (req.body.token || req.query.token) as string;
+      await useCase.execute({ token });
       res.json({ message: "Email verified successfully" });
     } catch (err) {
       next(err);
@@ -188,6 +189,13 @@ export class AuthController {
       credits: user.credits,
       createdAt: user.createdAt,
       lastActive: user.lastActive,
+      phone: user.phone,
+      address: user.address,
+      birthdate: user.birthdate,
+      gender: user.gender,
+      bio: user.bio,
+      googleId: user.googleId,
+      verifiedAt: user.verifiedAt,
     };
   }
 }

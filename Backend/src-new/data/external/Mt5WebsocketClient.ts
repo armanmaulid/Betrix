@@ -11,6 +11,16 @@ export class Mt5WebsocketClient {
   private readonly MAX_RECONNECT_ATTEMPTS = 10;
   private readonly RECONNECT_DELAY = 5000;
 
+  // Status heartbeat watchdog. EA broadcasts a "tracking_status" message
+  // every ~5s (see Data.mqh::SendTrackingStatus). If none arrives within
+  // STATUS_STALE_TIMEOUT_MS, the EA is assumed dead even though the TCP
+  // socket may still look open (covers non-graceful EA death: crash, kill,
+  // terminal shutdown, where onclose can be delayed or never fire).
+  private statusWatchdog: NodeJS.Timeout | null = null;
+  private lastTrackingStatusAt = 0;
+  private readonly STATUS_STALE_TIMEOUT_MS = 15000;
+  private readonly STATUS_CHECK_INTERVAL_MS = 5000;
+
   private callbacks: BrokerCallbacks = {};
 
   setCallbacks(callbacks: BrokerCallbacks): void {
@@ -27,7 +37,8 @@ export class Mt5WebsocketClient {
         this.ws.onopen = () => {
           logger.info("MT5 WebSocket connected", { context: "MT5" });
           this.reconnectAttempts = 0;
-          this.subscribeToSymbols();
+          this.startStatusWatchdog();
+          this.callbacks.onReconnect?.();
           resolve();
         };
 
@@ -35,6 +46,7 @@ export class Mt5WebsocketClient {
         
         this.ws.onclose = () => {
           logger.warn("MT5 WebSocket disconnected", { context: "MT5" });
+          this.stopStatusWatchdog();
           this.scheduleReconnect();
         };
 
@@ -67,9 +79,23 @@ export class Mt5WebsocketClient {
     }, delay);
   }
 
-  private subscribeToSymbols(): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
-    this.ws.send(JSON.stringify({ action: "subscribe", symbols: [] }));
+  private startStatusWatchdog(): void {
+    this.stopStatusWatchdog();
+    this.lastTrackingStatusAt = Date.now(); // grace period sampai status pertama datang
+    this.statusWatchdog = setInterval(() => {
+      const staleFor = Date.now() - this.lastTrackingStatusAt;
+      if (staleFor > this.STATUS_STALE_TIMEOUT_MS) {
+        logger.warn(`No tracking_status from MT5 EA in ${staleFor}ms - assuming EA dead, forcing reconnect`, { context: "MT5" });
+        this.ws?.close();
+      }
+    }, this.STATUS_CHECK_INTERVAL_MS);
+  }
+
+  private stopStatusWatchdog(): void {
+    if (this.statusWatchdog) {
+      clearInterval(this.statusWatchdog);
+      this.statusWatchdog = null;
+    }
   }
 
   private handleMessage(data: string): void {
@@ -88,6 +114,9 @@ export class Mt5WebsocketClient {
           break;
         case "calendar_update":
           this.handleCalendarUpdate(msg);
+          break;
+        case "tracking_status":
+          this.handleTrackingStatus(msg);
           break;
       }
     } catch (err) {
@@ -158,6 +187,20 @@ export class Mt5WebsocketClient {
     }
   }
 
+  private handleTrackingStatus(msg: any): void {
+    this.lastTrackingStatusAt = Date.now();
+
+    if (this.callbacks.onTrackingStatus) {
+      this.callbacks.onTrackingStatus({
+        price: !!msg.price,
+        ohlc: !!msg.ohlc,
+        mbook: !!msg.mbook,
+        calendar: !!msg.calendar,
+        uptimeSec: typeof msg.uptime_sec === "number" ? msg.uptime_sec : 0,
+      });
+    }
+  }
+
   private handleCalendarUpdate(msg: any): void {
     if (!msg.events || !Array.isArray(msg.events)) return;
 
@@ -176,6 +219,7 @@ export class Mt5WebsocketClient {
   }
 
   disconnect(): void {
+    this.stopStatusWatchdog();
     if (this.ws) {
       this.ws.close();
       this.ws = null;

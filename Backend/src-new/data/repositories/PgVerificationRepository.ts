@@ -11,9 +11,9 @@ export class PgVerificationRepository implements VerificationRepository {
     );
   }
 
-  async verify(token: string): Promise<{ success: boolean; userId?: string; error?: string }> {
+  async verify(token: string): Promise<{ success: boolean; userId?: string; newEmail?: string; error?: string }> {
     const { rows } = await pgClient.query(
-      `SELECT user_id, expires_at, used_at FROM email_verifications WHERE token = $1`,
+      `SELECT user_id, expires_at, used_at, new_email FROM email_verifications WHERE token = $1`,
       [token]
     );
     const v = rows[0];
@@ -26,7 +26,7 @@ export class PgVerificationRepository implements VerificationRepository {
       [token]
     );
     
-    return { success: true, userId: v.user_id };
+    return { success: true, userId: v.user_id, newEmail: v.new_email };
   }
 
   async invalidateUserTokens(userId: string): Promise<void> {
