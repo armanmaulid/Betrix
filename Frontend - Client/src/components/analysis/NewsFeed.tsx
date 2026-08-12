@@ -1,3 +1,4 @@
+"use client";
 import React, { useEffect, useState, useRef } from "react";
 import { Newspaper, RefreshCw } from "lucide-react";
 import { useVisibilityPoll } from "../../hooks/useVisibilityPoll";
@@ -70,15 +71,15 @@ function stripHtml(html: string): string {
   return doc.body.textContent || "";
 }
 
-// Data dari backend /api/news via Vite proxy (localhost:3000).
+// Data dari backend /api/v1/news via Vite proxy (localhost:3000).
 // Auto-polling tiap 30 detik untuk update realtime.
-// Nanti bisa diganti pakai EventSource(/api/news/stream) setelah ada login.
+// Nanti bisa diganti pakai EventSource(/api/v1/news/stream) setelah ada login.
 export const NewsFeed = React.memo(function NewsFeed() {
   const [items, setItems] = useState<NewsItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
-  const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   // null on the very first load — that's how we avoid flashing every item
   // the first time the feed renders (only items that show up on later
   // polls count as "new").
@@ -90,8 +91,8 @@ export const NewsFeed = React.memo(function NewsFeed() {
       const token = localStorage.getItem("eaconsole.sessionToken");
       if (!token) throw new Error("No session token");
       
-      const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
-      const res = await fetch(`${BACKEND_URL}/api/news?limit=20`, {
+      const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000";
+      const res = await fetch(`${BACKEND_URL}/api/v1/news?limit=20`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.status === 401) {
@@ -213,3 +214,6 @@ export const NewsFeed = React.memo(function NewsFeed() {
     </div>
   );
 });
+
+
+

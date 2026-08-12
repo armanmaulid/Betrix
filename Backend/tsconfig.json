@@ -5,7 +5,7 @@
     "moduleResolution": "bundler",
     "lib": ["ES2022"],
     "outDir": "./dist",
-    "rootDir": "./src-new",
+    "rootDir": "./src",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -16,20 +16,21 @@
     "sourceMap": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src-new/*"],
-      "@config/*": ["src-new/config/*"],
-      "@core/*": ["src-new/core/*"],
-      "@domain/*": ["src-new/domain/*"],
-      "@data/*": ["src-new/data/*"],
-      "@application/*": ["src-new/application/*"],
-      "@presentation/*": ["src-new/presentation/*"],
-      "@bootstrap/*": ["src-new/bootstrap/*"],
-      "@background/*": ["src-new/background/*"]
+      "@/*": ["src/*"],
+      "@config/*": ["src/config/*"],
+      "@core/*": ["src/core/*"],
+      "@domain/*": ["src/domain/*"],
+      "@data/*": ["src/data/*"],
+      "@application/*": ["src/application/*"],
+      "@presentation/*": ["src/presentation/*"],
+      "@bootstrap/*": ["src/bootstrap/*"],
+      "@background/*": ["src/background/*"],
+      "@infrastructure/*": ["src/infrastructure/*"]
     },
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "types": ["node", "vitest/globals"]
   },
-  "include": ["src-new/**/*"],
-  "exclude": ["node_modules", "dist", "src"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
 }

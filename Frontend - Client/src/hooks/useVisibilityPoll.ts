@@ -1,3 +1,4 @@
+"use client";
 import { useEffect, useRef } from "react";
 
 // Menjalankan `fn` tiap `intervalMs`, tapi skip tick saat tab sedang
@@ -32,3 +33,4 @@ export function useVisibilityPoll(fn: () => void, intervalMs: number): void {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [intervalMs]);
 }
+

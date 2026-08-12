@@ -1,3 +1,4 @@
+"use client";
 import { ArrowUpRight, ArrowDownRight, Shuffle } from "lucide-react";
 
 export interface SignalResult {
@@ -99,3 +100,4 @@ function SignalCell({
     </div>
   );
 }
+

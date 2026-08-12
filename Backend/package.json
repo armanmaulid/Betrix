@@ -5,15 +5,15 @@
   "type": "module",
   "main": "dist/main.js",
   "scripts": {
-    "dev": "tsx watch src-new/main.ts",
+    "dev": "tsx watch src/main.ts",
     "build": "tsc && tsc-alias --resolve-full-paths --resolve-full-extension .js",
     "start": "node dist/main.js",
-    "migrate": "tsx src-new/data/orm/migrate.ts",
+    "migrate": "tsx src/data/orm/migrate.ts",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "lint": "eslint src-new --ext .ts",
-    "lint:fix": "eslint src-new --ext .ts --fix"
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix"
   },
   "dependencies": {
     "@upstash/redis": "^1.38.0",

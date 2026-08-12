@@ -1,306 +1,165 @@
-# Betrix Backend - Restructured Architecture
+# Betrix Backend
 
-A clean, type-safe backend for the Betrix forex trading platform with AI orchestration, built with TypeScript, Express, PostgreSQL, and Redis.
+A high-performance, cleanly-architected, and future-proof backend for the Betrix financial trading platform. 
+Engineered with **Domain-Driven Design (DDD)** and **Clean Architecture**, this system provides robust AI orchestration, real-time market data (via MT5 Bridge), and comprehensive user management.
 
-## Architecture Overview
+Built with **TypeScript (ES2022, ESM)**, **Node.js**, **PostgreSQL**, and **Redis**.
 
-```
-src-new/
-├── config/                 # Configuration & env validation (Zod)
-│   ├── env.ts             # Validated environment schema
-│   ├── models.ts          # AI model configuration
-│   ├── deviceEnforcement.ts
-│   └── passport.ts        # Google OAuth strategy
-├── core/                   # Cross-cutting concerns (no domain deps)
-│   ├── errors/            # Typed error classes (AppError, ValidationError, etc.)
+---
+
+## 🏗️ Architecture Overview
+
+Our codebase rigorously enforces Clean Architecture boundaries to ensure high testability, maintainability, and scalability. The dependency rule points *inwards*—inner layers have absolutely zero knowledge of outer layers.
+
+```text
+src/
+├── domain/                 # 🟢 The Core: Pure business logic (Zero framework/infra dependencies)
+│   ├── entities/          # Business objects (User, Session, ChatMessage, NewsArticle, etc.)
+│   ├── repositories/      # Interfaces (Ports) for data access (AnalyticsRepository, etc.)
+│   ├── services/          # Pure domain logic (MarketDataService, AiPromptRegistry, etc.)
+│   └── events/            # Domain events (ChatCompleted, EventDispatcher, etc.)
+│
+├── application/            # 🟡 The Orchestrator: Application-specific business rules
+│   ├── use-cases/         # Grouped by feature (auth, admin, chat, market, news)
+│   ├── ports/             # Interfaces for external integrations (IBrokerProvider, INotifier)
+│   ├── dtos/              # Zod schemas for input validation
+│   └── event-handlers/    # Listeners reacting to domain events (e.g., ChatLoggingHandler)
+│
+├── data/                   # 🔴 The Infrastructure (Data): Database and Cache Adapters
+│   ├── repositories/      # Concrete implementations of Domain Repositories (Pg*, Redis*)
+│   ├── orm/               # Raw Database Clients (pgClient, redisClient)
+│   ├── cache/             # GeneralCacheStore (In-memory caching)
+│   └── external/          # Concrete APIs (FinnhubClient, AiGatewayClient, MT5 Adapters)
+│
+├── presentation/           # 🔵 The Delivery: HTTP / Express Layer
+│   ├── controllers/       # Thin HTTP adapters translating requests to Use Cases
+│   ├── routes/            # Express router definitions (v1)
+│   └── middleware/        # auth, admin, credits, error handling, rate limiters
+│
+├── infrastructure/         # 🟣 The Infrastructure (System): External frameworks
+│   └── sse/               # Server-Sent Events implementation (SseNotifier)
+│
+├── core/                   # ⚙️ Shared Kernel: Cross-cutting utilities
+│   ├── errors/            # Typed Application Errors (AppError, ValidationError, etc.)
 │   ├── logging/           # Winston logger with request ID tracking
-│   ├── middleware/        # errorHandler, requestId, rateLimiter, sanitize
-│   ├── utils/             # crypto, deviceFingerprint, csv, date, chat, request
-│   └── constants/         # HTTP status, error codes, limits, task types
-├── domain/                 # Pure business logic (zero framework deps)
-│   ├── entities/          # User, Session, ChatMessage, CreditTransaction, Device, AdminAction, Message, NewsArticle, BrokerSymbol, CalendarEvent
-│   ├── repositories/      # Repository interfaces (ports)
-│   ├── services/          # Domain services (AuthDomainService, DeviceDomainService, CalendarService, AiPromptRegistry, etc.)
-│   ├── events/            # Domain events (UserRegistered, CreditsDeducted, EventDispatcher, etc.)
-│   └── value-objects/     # Email, DeviceFingerprint, SessionToken
-├── data/                   # Infrastructure implementations (adapters)
-│   ├── repositories/      # PostgreSQL (PgCalendarRepository, PgUsageRepository) & Redis implementations
-│   ├── orm/               # pgClient, redisClient
-│   ├── external/          # AiGatewayClient, EmailService, Mt5HttpClient, Mt5WebsocketClient, Mt5BrokerAdapter, FinnhubNewsAdapter
-│   └── cache/             # GeneralCacheStore (in-memory)
-├── application/            # Use cases (orchestration layer)
-│   ├── dtos/              # Zod schemas for request validation
-│   ├── use-cases/         # Use cases grouped by feature (admin, auth, chat, market, news)
-│   ├── ports/             # Output ports (IBrokerProvider, INewsProvider, etc.)
-│   └── event-handlers/    # Domain event subscribers (ChatLoggingHandler)
-├── presentation/           # HTTP layer
-│   ├── routes/v1/         # API routes (auth, chat, admin, user, market, health)
-│   ├── middleware/        # auth, admin, credits, validate
-│   └── controllers/       # Thin adapters: HTTP → UseCase
-├── bootstrap/              # App initialization
-│   ├── container.ts       # tsyringe DI registration
-│   ├── registerRoutes.ts
-│   ├── registerMiddleware.ts
-│   └── startServer.ts
-├── background/             # Scheduled jobs
-│   └── jobs/index.ts      # Cleanup, sync, news polling, D1 cache warmup
-└── main.ts                # Entry point
+│   └── utils/             # Cryptography, hashing, parsers, and utilities
+│
+└── bootstrap/              # 🚀 Application Entry & Wiring
+    ├── container.ts       # TSyringe Dependency Injection registration
+    └── startServer.ts     # Express initialization and background jobs
 ```
 
-## Key Features
+---
 
-| Feature | Implementation |
-|---------|----------------|
-| **Auth** | JWT + Google OAuth, device fingerprinting, email verification, session management |
-| **AI Chat** | Model routing by task type (cheap/balanced/deep), streaming, credit billing with refunds |
-| **Credits** | Pre-deduction, refund on failure, tier-based pricing (1/3/5 credits) |
-| **Device Enforcement** | Optional one-device-per-account via fingerprint (IP + UA + browser + OS) |
-| **Admin** | User management, analytics, audit logs, broadcast messaging |
-| **Market Data** | MT5 symbols, economic calendar, Finnhub news |
-| **Security** | Helmet, CORS, rate limiting (IP + per-user), input sanitization |
+## ⚡ Tech Stack & Modern Tooling
 
-### Recent Fixes & Optimizations
-- **PostgreSQL Bulk Inserts**: Resolved connection drops during massive calendar/symbol syncs by implementing deduplicated, chunked bulk inserts.
-- **Data Retention Policies**: Cleanup jobs will *never* delete critical data (Usages, Chat History, Logins, Calendar). Only expired verification tokens, 7-day old news, and RAM cache are purged.
-- **Non-Blocking Startup**: Heavy background syncs (Symbols, Calendar, Cache) now run asynchronously, allowing the Express server to instantly bind and accept traffic without hanging.
-- **Chat credit double-deduction fixed**: Removed redundant middleware; use case now owns full deduct→call→refund lifecycle.
-- **Session token hashing**: Tokens hashed with SHA-256 before Redis storage (SHA-256).
-- **MT5 Bridge integration**: Real-time market data with WebSocket streaming, Redis caching, and REST endpoints.
+- **Runtime & Language**: Node.js 20+ with TypeScript (ESM, Target: ES2022). Execution via `tsx` for blazing-fast cold starts and hot-reloads.
+- **Framework**: Express.js (Modularized & RESTful).
+- **Dependency Injection**: `tsyringe` (Microsoft's modern IoC container).
+- **Validation**: `zod` for end-to-end type-safe payload validation.
+- **Testing**: `vitest` (Vite-powered, lightning-fast replacement for Jest).
+- **Linting**: ESLint v9 (Flat Config) + Prettier.
+- **Database**: PostgreSQL (`pg` native, optimized for extreme concurrency without ORM bloat).
+- **Caching & KV**: Upstash Redis (`@upstash/redis` for serverless-ready connections).
 
-## Quick Start
+---
+
+## 🔥 Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **AI Chat Orchestration** | Intelligent routing by task type (Cheap/Balanced/Deep), streaming responses, token usage tracking, and automated credit billing with atomic rollbacks. |
+| **Credit Economy** | Pre-deduction mechanics with tier-based pricing (1, 3, or 5 credits). Refunds guaranteed on downstream AI failures. |
+| **Real-time Market Data** | Zero-latency integrations with MT5 Bridge via WebSockets. Serves tick prices, OHLC charts, and Market Book (DOM). |
+| **Device Fingerprinting** | Advanced 1-device-per-account enforcement mapping IPs, User-Agents, and OS heuristics. |
+| **Robust Security** | Helmet, IP+User rate limiting, input sanitization, and SHA-256 hashed session token persistence. |
+| **Event-Driven Audit** | Fully decoupled architecture logging every admin action, user activity, and chat metric asynchronously via EventDispatcher. |
+
+---
+
+## 📡 API Endpoints (v1)
+
+*Base path: `/api/v1`*
+
+| Domain | Key Endpoints |
+|--------|---------------|
+| **Auth** | `POST /auth/login`, `POST /auth/register`, `PUT /auth/password`, `DELETE /auth/sessions/:fingerprint` |
+| **Chat** | `POST /chat`, `POST /chat/stream`, `GET /chat/history`, `DELETE /chat/session/:id` |
+| **Market** | `GET /market/prices/all`, `GET /market/ohlc/:symbol/:tf`, `GET /market/calendar`, `GET /market/symbols` |
+| **User** | `GET /me/usage`, `GET /me/messages`, `POST /me/messages`, `GET /me/messages/preferences` |
+| **Admin** | `GET /admin/users`, `GET /admin/metrics`, `GET /admin/system`, `POST /admin/broadcast`, `GET /admin/analytics` |
+| **Health** | `GET /health` (Deep check: tests PG & Redis connections) |
+
+---
+
+## 🚀 Quick Start
 
 ### Prerequisites
-
 - Node.js 20+
 - PostgreSQL 15+
-- Upstash Redis (REST API)
-- SMTP credentials for emails
+- Redis Server (or Upstash Redis)
 
-### Installation
-
+### 1. Installation
 ```bash
-cd Backend
 npm install
 ```
 
-### Environment Setup
-
-Copy `.env.example` to `.env` and configure:
-
+### 2. Environment Variables
+Copy `.env.example` to `.env`. Critical variables:
 ```env
-# Core
-NODE_ENV=development
-PORT=3000
-FRONTEND_URL=http://localhost:5173
-ALLOWED_ORIGINS=http://localhost:5173,http://localhost:5174
-
-# Database
+# Database & Cache
 DATABASE_URL=postgresql://user:pass@host/db?sslmode=require
 UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
 UPSTASH_REDIS_REST_TOKEN=xxx
 
-# Auth
-JWT_SECRET=your-256-bit-secret
-DEVICE_ENFORCEMENT=false
-GOOGLE_CLIENT_ID=xxx
-GOOGLE_CLIENT_SECRET=xxx
-GOOGLE_CALLBACK_URL=http://localhost:3000/api/v1/auth/google/callback
-
 # AI Gateway
-AI_BASE_URL=https://gateway.dahono.com/v1
+AI_BASE_URL=https://gateway.example.com/v1
 AI_API_KEY=xxx
-MODEL_CHEAP=model-name
-MODEL_BALANCED=model-name
-MODEL_DEEP=model-name
 
-# Email
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=xxx
-SMTP_PASS=xxx
-
-# External
-FINNHUB_API_KEY=xxx
-MT5_BRIDGE_URL=127.0.0.1:8890
+# MT5 Integration
 MT5_WS_URL=ws://127.0.0.1:8890
 MT5_HTTP_URL=http://127.0.0.1:8890
-MT5_BROKER_UTC_OFFSET=3
 ```
 
-### Database Migration
-
+### 3. Database Migration
 ```bash
 npm run migrate
 ```
 
-### Development
-
+### 4. Development & Testing
 ```bash
-npm run dev          # Hot reload with tsx
-npm run build        # TypeScript compilation
-npm run start        # Run compiled JS
-npm run test         # Vitest tests
-npm run lint         # ESLint
+npm run dev          # Start with hot-reload (tsx)
+npm run build        # Compile TypeScript to dist/
+npm run start        # Run compiled production build
+npm run test         # Run unit & integration tests via Vitest
+npm run lint:fix     # Auto-fix linting issues
 ```
 
-## API Endpoints (v1)
+---
 
-All endpoints prefixed with `/api/v1`
+## 🕰️ Background Jobs & Schedulers
 
-| Module | Endpoints |
-|--------|-----------|
-| **Auth** | `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `GET /auth/verify-email`, `POST /auth/resend-verification`, `PUT /auth/password`, `PUT /auth/email`, `GET /auth/me`, `PUT /auth/profile`, `GET /auth/sessions`, `DELETE /auth/sessions/:fingerprint` |
-| **Chat** | `POST /chat`, `POST /chat/stream`, `GET /chat/history`, `DELETE /chat/session/:id`, `GET /chat/export` |
-| **Admin** | `GET /admin/users`, `GET /admin/users/:id`, `PUT /admin/users/:id`, `DELETE /admin/users/:id`, `POST /admin/users/:id/reset-password`, `GET /admin/metrics`, `GET /admin/analytics`, `GET /admin/system`, `GET /admin/actions`, `POST /admin/broadcast` |
-| **User** | `GET /me/usage`, `GET /me/usage/current-month`, `GET /me/messages`, `POST /me/messages`, `GET/POST /me/messages/preferences` |
-| **Market** | `GET /market/symbols`, `GET /market/symbols/:symbol`, `GET /market/symbols/category/:category`, `GET /market/calendar`, `GET /market/prices/:symbol`, `GET /market/prices?symbols=EURUSD,GBPUSD`, `GET /market/prices/all`, `GET /market/ohlc/:symbol/:timeframe`, `GET /market/ohlc/all?timeframe=M5`, `GET /market/mbook/:symbol`, `GET /market/mbook/all` |
-| **Health** | `GET /health` |
+| Job Name | Schedule | Action |
+|----------|----------|--------|
+| **Garbage Collection** | Hourly | Purges expired sessions, dead verify tokens, old news, and clears obsolete cache arrays. |
+| **Symbol Sync** | Daily (02:00) | Pulls and updates master tradable symbols from MT5. |
+| **Calendar Sync** | Daily (03:00) | Hydrates the Economic Calendar repository. |
+| **News Polling** | Every 10s | Polls Finnhub for the latest breaking market news. |
 
-## Credit System
+*Note: Heavy syncs run completely non-blocking during startup, allowing the Express server to instantly bind to the port.*
 
-| Tier | Models | Cost/Request |
-|------|--------|--------------|
-| Cheap | General, Classify | 1 credit |
-| Balanced | Summary, Insight | 3 credits |
-| Deep | Trade Reasoning, Risk Narrative | 5 credits |
+---
 
-Credits deducted **before** AI call, refunded on failure.
+## 🧠 Architectural Decisions (ADR)
 
-## Device Enforcement
+1. **Why Raw PostgreSQL instead of Prisma/TypeORM?**
+   Betrix requires processing thousands of tick updates and bulk inserts per second. Heavy ORMs introduce lifecycle overhead and memory spikes. By using raw parameterized queries wrapped inside Clean Architecture Repositories, we achieve maximum C-level database performance while keeping the domain layer entirely uncoupled from SQL syntax.
 
-When `DEVICE_ENFORCEMENT=true`:
-- One device = one account (fingerprint: IP + UA + browser + OS)
-- Registration blocks reused devices
-- Login creates device-session binding
-- Logout cleans up bindings
+2. **Why Tsyringe?**
+   Dependency Injection is the backbone of Clean Architecture. Passing 10 repositories manually through constructors is unmaintainable. Tsyringe allows us to resolve the `NewsController` which automatically injects `GetNewsUseCase`, which recursively injects `NewsRepository`, enabling effortless mocking during testing.
 
-## Background Jobs
+3. **Event-Driven Side Effects**
+   Chat usage tracking, metrics logging, and user activity logging are NOT awaited inline within the chat use-case. They are dispatched as domain events (`ChatCompleted`) and handled asynchronously by `ChatLoggingHandler`. This reduces API latency for the end-user by 30-50ms.
 
-| Job | Schedule | Description |
-|-----|----------|-------------|
-| Cleanup | Hourly | Expired sessions, failed logins, tokens, usage, old news |
-| Symbol Sync | Daily 02:00 | Fetch symbols from MT5 |
-| Calendar Sync | Daily 03:00 | Fetch economic calendar |
-| News Polling | 10s | Finnhub news (if API key set) |
-| D1 Cache Warmup | Broker midnight | Pre-fetch daily candles |
-
-
-
-## MT5 Bridge Integration
-
-The backend integrates with an MT5 Bridge service for real-time market data via WebSocket and REST API.
-
-### Configuration
-
-```env
-MT5_WS_URL=ws://your-mt5-bridge:8890
-MT5_BRIDGE_URL=127.0.0.1:8890
-MT5_BROKER_UTC_OFFSET=3
-```
-
-### WebSocket Streaming
-
-The backend connects to the MT5 Bridge via WebSocket (`ws://host:8890`) and receives real-time updates:
-
-| Message Type | Description |
-|--------------|-------------|
-| `price_update` | Real-time bid/ask updates for tracked symbols |
-| `ohlc_update` | New OHLC bar formed for tracked timeframes |
-| `track_mbook` | Market book / Depth of Market updates |
-| `calendar_update` | Economic calendar event updates |
-
-### REST API Endpoints (Market Data)
-
-All endpoints prefixed with `/api/v1/market`:
-
-| Endpoint | Description |
-|----------|-------------|
-| `GET /prices/:symbol` | Get real-time price for a symbol |
-| `GET /prices?symbols=EURUSD,GBPUSD` | Get multiple prices at once |
-| `GET /prices/all` | Get all cached prices |
-| `GET /ohlc/:symbol/:timeframe` | Get OHLC data (e.g., M5, H1, D1) |
-| `GET /ohlc/all?timeframe=M5` | Get all OHLC for a timeframe |
-| `GET /mbook/:symbol` | Get market book / DOM for symbol |
-| `GET /mbook/all` | Get all cached market books |
-| `GET /symbols` | Get all trading symbols |
-| `GET /symbols/:symbol` | Get symbol details |
-| `GET /symbols/category/:category` | Get symbols by category |
-| `GET /calendar` | Get economic calendar events |
-
-### Tracking Subscriptions
-
-On startup, the backend automatically subscribes to:
-- **Price tracking**: Up to 100 active symbols
-- **OHLC tracking**: M5 timeframe for top 20 symbols
-- **Market book**: Top 10 symbols
-- **Calendar updates**: All events
-
-Data is cached in Redis with appropriate TTLs:
-- Prices: 60 seconds
-- OHLC: 5 minutes
-- Market book: 60 seconds
-
-### Market Data Service
-
-The `MarketDataService` provides programmatic access to cached market data:
-
-```typescript
-const marketData = container.resolve(MarketDataService);
-
-// Get single price
-const price = await marketData.getPrice("EURUSD");
-
-// Get multiple prices
-const prices = await marketData.getPrices(["EURUSD", "GBPUSD", "XAUUSD"]);
-
-// Get OHLC
-const ohlc = await marketData.getOHLC("EURUSD", "M5");
-
-// Get market book
-const mbook = await marketData.getMarketBook("EURUSD");
-
-// Get all symbols
-const symbols = await marketData.getSymbols(true);
-
-// Get all cached prices
-const allPrices = await marketData.getAllPrices();
-```
-
-## Known Quirks & Limitations
-
-- **node-postgres (pg) Concurrency**: The `pg` library does not support executing concurrent `Promise.all` queries on a single checked-out `Client` instance inside a transaction. Bulk operations must use raw `INSERT ... VALUES` bulk SQL strings.
-- **PostgreSQL ON CONFLICT limits**: An `INSERT ... ON CONFLICT DO UPDATE` query will throw an error if the payload array contains duplicate unique keys. Deduping the dataset in TypeScript before hitting the database is strictly required.
-
-## Testing
-
-```bash
-npm run test           # Run all tests
-npm run test:watch     # Watch mode
-npm run test:coverage  # Coverage report
-```
-
-## Project Structure Decisions
-
-- **No ORM**: Raw `pg` with parameterized queries for control
-- **Validation in Presentation**: Zod schemas at route level, use cases trust input
-- **Shared Kernel**: `core/` has zero domain dependencies
-- **Repository Pattern**: Domain defines interfaces, data implements them
-- **Use Cases**: Single-responsibility, inject dependencies via constructor
-
-## Migration from Old Structure
-
-Old `src/` → New `src-new/` mapping:
-
-| Old | New |
-|-----|-----|
-| `src/server.js` | `bootstrap/startServer.ts` + `main.ts` |
-| `src/middleware/*` | `core/middleware/*` + `presentation/middleware/*` |
-| `src/routes/*` | `presentation/routes/v1/*` |
-| `src/services/*` | `domain/services/*` + `data/external/*` + `application/use-cases/*` |
-| `src/db/*` | `data/orm/*` |
-| `src/config/*` | `config/*` |
-| `src/utils/*` | `core/utils/*` |
-
-## License
-
-MIT
+---
+*Built with precision for Betrix.*

@@ -1,3 +1,4 @@
+"use client";
 import { useState, type ReactNode } from "react";
 import { Sparkles, Loader2 } from "lucide-react";
 
@@ -141,3 +142,4 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
     </button>
   );
 }
+

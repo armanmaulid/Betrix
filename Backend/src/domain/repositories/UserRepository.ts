@@ -1,0 +1,25 @@
+import type { User, UserStatus } from "../entities/User.js";
+import type { Email } from "../value-objects/index.js";
+
+export interface UserRepository {
+  findById(id: string): Promise<User | null>;
+  findByEmail(email: Email): Promise<User | null>;
+  findByGoogleId(googleId: string): Promise<User | null>;
+  save(user: User): Promise<User>;
+  delete(id: string): Promise<void>;
+  updateStatus(id: string, status: UserStatus): Promise<User | null>;
+  updateCredits(id: string, amount: number): Promise<User | null>;
+  updateLastActive(id: string): Promise<void>;
+  updatePassword(id: string, passwordHash: string): Promise<void>;
+  updateEmail(id: string, email: string): Promise<void>;
+  findAll(params: {
+    page: number;
+    limit: number;
+    search?: string;
+    status?: UserStatus;
+    role?: "admin" | "user";
+    verified?: boolean;
+    sortBy: string;
+    order: "ASC" | "DESC";
+  }): Promise<{ users: User[]; total: number }>;
+}

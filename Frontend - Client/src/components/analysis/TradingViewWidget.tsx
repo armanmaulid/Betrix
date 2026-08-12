@@ -1,3 +1,4 @@
+"use client";
 // @ts-nocheck
 import { useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
@@ -178,3 +179,4 @@ export function TradingViewWidget({ symbol, theme = "dark", interval = "15", cha
     </div>
   );
 }
+
