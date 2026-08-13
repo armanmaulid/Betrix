@@ -52,13 +52,13 @@ export async function createApp() {
   app.use(passport.initialize());
   app.use(sanitizeInput);
   
-  // Register custom middleware
-  registerMiddleware(app);
-  
   // Health check (before rate limiting)
   app.get("/health", (req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
+
+  // Register custom middleware (includes rate limiters)
+  registerMiddleware(app);
   
   // API routes
   registerRoutes(app);

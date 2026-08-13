@@ -115,7 +115,7 @@ export class MarketDataService {
   }
 
   async getAllOHLC(timeframe: string): Promise<any[]> {
-    return this.marketDataRepo.getAllOHLC(timeframe);
+    return this.marketDataRepo.getAllOHLC(`mt5:ohlc:*:${timeframe}`);
   }
 
   async getAllMarketBooks(): Promise<any[]> {
@@ -123,8 +123,6 @@ export class MarketDataService {
   }
 
   async handlePriceTick(tick: { symbol: string; bid: number; ask: number; spread: number; digits: number; volume: number; timestamp: number }): Promise<void> {
-    await this.marketDataRepo.cachePrice(tick);
-    
     if (env.MT5_TRACK_PRICES && env.MT5_TRACKING_SYMBOLS.includes(tick.symbol)) {
       this.notifier.broadcastGlobal("price_update", tick);
     }
@@ -135,16 +133,16 @@ export class MarketDataService {
       ...update,
       prev_close: update.prev_close ?? update.open
     };
-    await this.marketDataRepo.cacheOHLC(ohlcUpdate);
-    
+
     if (env.MT5_TRACK_OHLC && env.MT5_TRACKING_SYMBOLS.includes(update.symbol)) {
+      if (update.timeframe === "D1") {
+        await this.marketDataRepo.cacheOHLC(ohlcUpdate);
+      }
       this.notifier.broadcastGlobal("ohlc_update", ohlcUpdate);
     }
   }
 
   async handleMarketBookUpdate(update: { symbol: string; bids: Array<{ price: number; volume: number }>; asks: Array<{ price: number; volume: number }> }): Promise<void> {
-    await this.marketDataRepo.cacheMarketBook(update);
-    
     if (env.MT5_TRACK_MBOOK && env.MT5_TRACKING_SYMBOLS.includes(update.symbol)) {
       this.notifier.broadcastGlobal("mbook_update", update);
     }

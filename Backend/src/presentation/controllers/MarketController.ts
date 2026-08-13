@@ -103,7 +103,9 @@ export class MarketController {
   async getAllPrices(req: Request, res: Response, next: NextFunction) {
     try {
       const prices = await this.getMarketDataService().getAllPrices();
-      res.json({ prices });
+      const result: Record<string, any> = {};
+      prices.forEach((price: any) => { result[price.symbol] = price; });
+      res.json({ prices: result });
     } catch (err) {
       next(err);
     }
@@ -116,7 +118,9 @@ export class MarketController {
         return res.status(400).json({ error: "timeframe query parameter required", code: "VALIDATION_ERROR" });
       }
       const ohlc = await this.getMarketDataService().getAllOHLC(timeframe as string);
-      res.json({ ohlc });
+      const result: Record<string, any> = {};
+      ohlc.forEach((c: any) => { result[c.symbol] = c; });
+      res.json({ ohlc: result });
     } catch (err) {
       next(err);
     }
@@ -125,7 +129,9 @@ export class MarketController {
   async getAllMarketBooks(req: Request, res: Response, next: NextFunction) {
     try {
       const books = await this.getMarketDataService().getAllMarketBooks();
-      res.json({ marketBooks: books });
+      const result: Record<string, any> = {};
+      books.forEach((book: any) => { result[book.symbol] = book; });
+      res.json({ marketBooks: result });
     } catch (err) {
       next(err);
     }
@@ -140,7 +146,7 @@ export class MarketController {
         country: country as string,
         currency: currency as string,
         importance: importance as any,
-        limit: limit ? parseInt(limit as string) : 100
+        limit: limit ? parseInt(limit as string) : undefined
       });
       res.json({ events });
     } catch (err) {

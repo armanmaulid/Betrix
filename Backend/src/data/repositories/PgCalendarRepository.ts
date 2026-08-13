@@ -179,15 +179,17 @@ export class PgCalendarRepository implements CalendarRepository {
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";
-    const limit = query.limit || 100;
-
-    const queryStr = `
+    
+    let queryStr = `
       SELECT * FROM calendar_events 
       ${whereClause}
-      ORDER BY event_time DESC 
-      LIMIT $${paramIndex}
+      ORDER BY event_time DESC
     `;
-    params.push(limit);
+    
+    if (query.limit) {
+      queryStr += ` LIMIT $${paramIndex}`;
+      params.push(query.limit);
+    }
 
     const { rows } = await pgClient.query(queryStr, params);
     return rows.map(this.mapRow);

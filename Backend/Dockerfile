@@ -1,16 +1,22 @@
-FROM node:20-alpine
-
+# ---- Stage 1: build ----
+FROM node:20-alpine AS builder
 WORKDIR /app
 
-# Copy package files and install dependencies
 COPY package*.json ./
-RUN npm clean-install --production
+RUN npm ci
 
-# Copy source code
 COPY . .
+RUN npm run build
 
-# Expose port (default Express / Back4App port)
+# ---- Stage 2: runtime ----
+FROM node:20-alpine AS runtime
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY package*.json ./
+RUN npm ci --omit=dev
+
+COPY --from=builder /app/dist ./dist
+
 EXPOSE 3000
-
-# Start server
-CMD ["npm", "start"]
+CMD ["node", "dist/main.js"]

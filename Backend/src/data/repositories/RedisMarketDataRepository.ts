@@ -7,7 +7,7 @@ import { secondsUntilBrokerMidnight } from "@core/utils/date.js";
 export class RedisMarketDataRepository implements MarketDataRepository {
   async cachePrice(tick: PriceTick): Promise<void> {
     const cacheKey = `mt5:price:${tick.symbol}`;
-    await redisClient.setex(cacheKey, 60, JSON.stringify(tick)); // 60s TTL
+    await redisClient.setex(cacheKey, 60, tick); // 60s TTL
   }
 
   async cacheOHLC(update: OHLCUpdate): Promise<void> {
@@ -19,17 +19,17 @@ export class RedisMarketDataRepository implements MarketDataRepository {
       ? secondsUntilBrokerMidnight(env.MT5_BROKER_UTC_OFFSET)
       : 86400;
       
-    await redisClient.setex(cacheKey, Math.max(ttl, 60), JSON.stringify(update));
+    await redisClient.setex(cacheKey, Math.max(ttl, 60), update);
   }
 
   async cacheMarketBook(update: MarketBookUpdate): Promise<void> {
     const cacheKey = `mt5:mbook:${update.symbol}`;
-    await redisClient.setex(cacheKey, 60, JSON.stringify(update)); // 60s TTL
+    await redisClient.setex(cacheKey, 60, update); // 60s TTL
   }
 
   async getPrice(symbol: string): Promise<PriceTick | null> {
-    const data = await redisClient.get<string | null>(`mt5:price:${symbol}`);
-    return data ? JSON.parse(data) : null;
+    const data = await redisClient.get<any>(`mt5:price:${symbol}`);
+    return data ? (typeof data === 'string' ? JSON.parse(data) : data) : null;
   }
 
   async getAllPrices(pattern: string = "mt5:price:*"): Promise<PriceTick[]> {
@@ -38,17 +38,17 @@ export class RedisMarketDataRepository implements MarketDataRepository {
 
     const prices: PriceTick[] = [];
     for (const key of keys) {
-      const data = await redisClient.get<string | null>(key);
+      const data = await redisClient.get<any>(key);
       if (data) {
-        prices.push(JSON.parse(data));
+        prices.push(typeof data === 'string' ? JSON.parse(data) : data);
       }
     }
     return prices;
   }
 
   async getOHLC(symbol: string, timeframe: string): Promise<OHLCUpdate | null> {
-    const data = await redisClient.get<string | null>(`mt5:ohlc:${symbol}:${timeframe}`);
-    return data ? JSON.parse(data) : null;
+    const data = await redisClient.get<any>(`mt5:ohlc:${symbol}:${timeframe}`);
+    return data ? (typeof data === 'string' ? JSON.parse(data) : data) : null;
   }
 
   async getAllOHLC(pattern: string): Promise<OHLCUpdate[]> {
@@ -57,17 +57,17 @@ export class RedisMarketDataRepository implements MarketDataRepository {
 
     const ohlc: OHLCUpdate[] = [];
     for (const key of keys) {
-      const data = await redisClient.get<string | null>(key);
+      const data = await redisClient.get<any>(key);
       if (data) {
-        ohlc.push(JSON.parse(data));
+        ohlc.push(typeof data === 'string' ? JSON.parse(data) : data);
       }
     }
     return ohlc;
   }
 
   async getMarketBook(symbol: string): Promise<MarketBookUpdate | null> {
-    const data = await redisClient.get<string | null>(`mt5:mbook:${symbol}`);
-    return data ? JSON.parse(data) : null;
+    const data = await redisClient.get<any>(`mt5:mbook:${symbol}`);
+    return data ? (typeof data === 'string' ? JSON.parse(data) : data) : null;
   }
 
   async getAllMarketBooks(pattern: string = "mt5:mbook:*"): Promise<MarketBookUpdate[]> {
@@ -76,9 +76,9 @@ export class RedisMarketDataRepository implements MarketDataRepository {
 
     const books: MarketBookUpdate[] = [];
     for (const key of keys) {
-      const data = await redisClient.get<string | null>(key);
+      const data = await redisClient.get<any>(key);
       if (data) {
-        books.push(JSON.parse(data));
+        books.push(typeof data === 'string' ? JSON.parse(data) : data);
       }
     }
     return books;

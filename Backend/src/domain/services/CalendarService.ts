@@ -95,7 +95,13 @@ export class CalendarService {
   async handleLiveUpdate(update: CalendarUpdate): Promise<void> {
     try {
       const existingEvent = await this.calendarRepo.findByEventId(update.event_id);
-      if (!existingEvent) return;
+      if (!existingEvent) {
+        logger.debug(`Calendar Live Update [Event ${update.event_id}] - Actual: ${update.actual} | Forecast: ${update.forecast} | Prev: ${update.previous}`, { context: "Broker" });
+        return;
+      }
+
+      logger.debug(`Calendar Live Update [Event ${update.event_id}] ${existingEvent.currency} - ${existingEvent.eventName} - Actual: ${update.actual} | Forecast: ${update.forecast} | Prev: ${update.previous}`, { context: "Broker" });
+
 
       const updatedEvent = existingEvent.withUpdatedValues(
         update.actual !== undefined ? update.actual : existingEvent.actual,

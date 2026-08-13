@@ -25,7 +25,6 @@ export class Mt5SubscriptionJob {
         await marketDataService.handleMarketBookUpdate(update);
       },
       onCalendarUpdate: async (update) => {
-        logger.debug(`Calendar Live Update [Event ${update.event_id}] - Actual: ${update.actual} | Forecast: ${update.forecast} | Prev: ${update.previous}`, { context: "Broker" });
         const calendarService = container.resolve(CalendarService);
         await calendarService.handleLiveUpdate(update);
       },
