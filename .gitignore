@@ -46,7 +46,7 @@ test-*.json
 
 # Codebase memory / tooling
 .codebase-memory/
-.agent/skills
+.agent/
 .agents/
 .gemini/rules/
 .claude/
