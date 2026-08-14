@@ -60,21 +60,47 @@ export function TradingViewWidget({ symbol, theme = "dark", interval = "15", cha
 
       container.innerHTML = "";
 
-      const widgetDiv = document.createElement("div");
-      widgetDiv.className = "tradingview-widget-container__widget";
-      widgetDiv.style.height = "100%";
-      widgetDiv.style.width = "100%";
+      // Membuat ID unik untuk container
+      const containerId = "tv_chart_" + Math.random().toString(36).substring(2, 9);
+      container.id = containerId;
+
+      const initWidget = () => {
+        if (window.TradingView) {
+          new window.TradingView.widget({
+            autosize: true,
+            symbol,
+            interval,
+            timezone: "Etc/UTC",
+            theme,
+            style: chartStyle,
+            locale: "en",
+            enable_publishing: false,
+            allow_symbol_change: false,
+            hide_side_toolbar: true,
+            hide_top_toolbar: hideTopToolbar,
+            hide_volume: hideVolume,
+            studies: studies.length > 0 ? studies : undefined,
+            container_id: containerId,
+          });
+        }
+      };
+
+      if (window.TradingView) {
+        setIsLoading(false);
+        initWidget();
+        return;
+      }
 
       const script = document.createElement("script");
       script.type = "text/javascript";
-      script.src = "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
+      script.src = "https://s3.tradingview.com/tv.js";
       script.async = true;
 
-      // Track script load success/failure
       script.onload = () => {
         scriptLoadedRef.current = true;
         if (mountedRef.current) {
           setIsLoading(false);
+          initWidget();
         }
         if (loadTimeout) clearTimeout(loadTimeout);
       };
@@ -97,31 +123,7 @@ export function TradingViewWidget({ symbol, theme = "dark", interval = "15", cha
         }
       }, 10000);
 
-      // allow_symbol_change: false — SENGAJA dimatikan. Simbol dikontrol dari
-      // dropdown/search di app kita sendiri (biar `symbol` state kita tetap
-      // sinkron dengan tombol "Analisa Sekarang" yang meneruskannya ke
-      // /analyze). Kalau widget dibiarkan boleh ganti simbol sendiri dari
-      // dalam, app kita nggak akan tahu simbol yang lagi ditampilkan berubah.
-      script.text = JSON.stringify({
-        autosize: true,
-        symbol,
-        interval,
-        timezone: "Etc/UTC",
-        theme,
-        style: chartStyle, // Candles, Line, Area, etc
-        locale: "en",
-        enable_publishing: false,
-        allow_symbol_change: false,
-        hide_side_toolbar: true,
-        hide_top_toolbar: hideTopToolbar,
-        hide_volume: hideVolume,
-        studies: studies.length > 0 ? studies : undefined,
-        calendar: false,
-        support_host: "https://www.tradingview.com",
-      });
-
-      container.appendChild(widgetDiv);
-      container.appendChild(script);
+      document.head.appendChild(script);
     }, 150); // 150ms debounce untuk avoid rapid remount
 
     return () => {

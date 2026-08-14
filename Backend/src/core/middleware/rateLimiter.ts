@@ -68,3 +68,18 @@ export const perUserLimiter = createRateLimiter({
     return userId ? `user:${userId}` : ipKeyGenerator(req.ip || "unknown");
   },
 });
+
+// Sensitive authenticated ops (change-email sends SMTP, change-password lets
+// an attacker brute-force currentPassword). Strict per-userId: 3/hour so a
+// logged-in abuser can't email-bomb arbitrary addresses or guess passwords.
+// ponytail: ceiling 3/hour; raise only if legit UX friction reported.
+export const sensitiveLimiter = createRateLimiter({
+  name: "sensitive",
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  message: "Terlalu banyak percobaan operasi sensitif, coba lagi dalam 1 jam",
+  keyGenerator: (req) => {
+    const userId = (req as any).user?.userId;
+    return userId ? `sensitive:${userId}` : ipKeyGenerator(req.ip || "unknown");
+  },
+});

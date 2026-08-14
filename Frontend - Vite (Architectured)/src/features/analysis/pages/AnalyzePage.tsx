@@ -180,7 +180,7 @@ export function AnalyzePage() {
 
             {/* MESSAGES AREA */}
             <div className="flex-1 overflow-y-auto px-1 py-4 scroll-smooth">
-              <div className="flex flex-col gap-6 max-w-4xl mx-auto pb-4">
+              <div className="flex flex-col gap-6 w-full px-4 pb-4">
                 {messages.map((msg: any, idx: number) => (
                   <ChatMessageItem
                     key={idx}

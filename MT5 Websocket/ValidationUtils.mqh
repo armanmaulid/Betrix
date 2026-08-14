@@ -1,6 +1,6 @@
 
 
-#include <JAson.mqh>
+#include "JAson.mqh"
 
 
 struct ValidationResponse {
@@ -65,9 +65,9 @@ bool IsValidISO8601Format(const string &str) {
     if (str[4] != '-' || str[7] != '-')
         return false;
 
-    int year  = StringToInteger(StringSubstr(str, 0, 4));
-    int month = StringToInteger(StringSubstr(str, 5, 2));
-    int day   = StringToInteger(StringSubstr(str, 8, 2));
+    int year  = (int)StringToInteger(StringSubstr(str, 0, 4));
+    int month = (int)StringToInteger(StringSubstr(str, 5, 2));
+    int day   = (int)StringToInteger(StringSubstr(str, 8, 2));
 
     if (year < 1970 || month < 1 || month > 12 || day < 1 || day > 31)
         return false;
@@ -82,7 +82,7 @@ bool IsValidISO8601Format(const string &str) {
 
     // Parse time components
     if (len >= 13) {
-        hour = StringToInteger(StringSubstr(str, 11, 2));
+        hour = (int)StringToInteger(StringSubstr(str, 11, 2));
         if (hour < 0 || hour > 23)
             return false;
     }
@@ -90,7 +90,7 @@ bool IsValidISO8601Format(const string &str) {
     if (len >= 16) {
         if (str[13] != ':')
             return false;
-        minute = StringToInteger(StringSubstr(str, 14, 2));
+        minute = (int)StringToInteger(StringSubstr(str, 14, 2));
         if (minute < 0 || minute > 59)
             return false;
     }
@@ -98,7 +98,7 @@ bool IsValidISO8601Format(const string &str) {
     if (len >= 19) {
         if (str[16] != ':' && str[17] != ':')
             return false;
-        second = StringToInteger(StringSubstr(str, 17, 2));
+        second = (int)StringToInteger(StringSubstr(str, 17, 2));
         if (second < 0 || second > 59)
             return false;
     }

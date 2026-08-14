@@ -1,15 +1,15 @@
-﻿//+------------------------------------------------------------------+
+//+------------------------------------------------------------------+
 //| SocketBridgeEA.mq5 (Refactored + Working)                       |
 //| Socket Bridge Expert Advisor for MT5 - Stable Refactor          |
 //+------------------------------------------------------------------+
-#property copyright "Betrix"
+#property copyright "Betrix MT5 Websocket"
 #property version   "1.0"
 #property strict
 
-#include <CommandHandler.mqh>
-#include <Data.mqh>
-#include <WebSocketLib.mqh>
-#include <SocketManager.mqh>
+#include "CommandHandler.mqh"
+#include "Data.mqh"
+#include "WebSocketLib.mqh"
+#include "SocketManager.mqh"
 
 #define HTTP_PORT 8890
 
@@ -26,6 +26,14 @@ CData* dataManager = NULL;
 string symbols[];
 string mbookSymbols[];
 
+// Status heartbeat state (see Data.mqh::SendTrackingStatus).
+// g_eaStartTime resets every time dataManager is (re)created - i.e. every
+// time tracking config is wiped - so uptime_sec sent to the backend always
+// reflects "time since tracking was last reset", not raw process uptime.
+datetime g_eaStartTime         = 0;
+datetime g_lastStatusBroadcast = 0;
+#define STATUS_BROADCAST_INTERVAL_SEC 5
+
 //+------------------------------------------------------------------+
 int OnInit() {
    if (!InitializeWSA()) return INIT_FAILED;
@@ -40,26 +48,7 @@ void OnDeinit(const int reason) {
    CloseAllConnections();
 }
 
-void OnTradeTransaction(const MqlTradeTransaction &trans,
-                        const MqlTradeRequest &request,
-                        const MqlTradeResult &result)
-{
-    for (int i = ArraySize(WebSocketClients) - 1; i >= 0; i--) {
-        SOCKET64 clientSocket = WebSocketClients[i];
-        if (!IsSocketConnected(clientSocket)) {
-            Print("WebSocket client ", i, " disconnected");
-            closesocket(clientSocket);
-            ArrayRemove(WebSocketClients, i);
-            continue;
-        }
-        if (dataManager != NULL) {
-        
-            if(dataManager.isTrackingOrderEvent){
-               dataManager.HandleTradeTransaction(trans, request, result, clientSocket);
-            }
-        }
-    }
-}
+
 
 
 void OnTimer() {
@@ -111,14 +100,14 @@ void InitializeWebSocketServer() {
 
     if (dataManager != NULL) delete dataManager;
     dataManager = new CData();
-    dataManager.setSymbols(symbols);
-    dataManager.setMbookSymbols(mbookSymbols);
-    if (commandHandler != NULL) {
+    dataManager.SetSymbols(symbols);
+    dataManager.SetMbookSymbols(mbookSymbols);
+    if (commandHandler != NULL)
         commandHandler.SetPriceSender(dataManager);
-        commandHandler.WarmSymbolCache();
-    }
 
-    Print("SocketBridgeEA ready — listening on port ", HTTP_PORT, ", accepting connections");
+    g_eaStartTime = TimeTradeServer();
+
+    Print("WebSocket server initialized on port ", HTTP_PORT);
 }
 
 
@@ -169,6 +158,15 @@ void ProcessHttpClients() {
 }
 
 void SendUpdateToClients() {
+    // Decided once per OnTimer tick, outside the per-client loop - same
+    // "detect once, broadcast to all" principle already used elsewhere here
+    // (see CData multi-client broadcast fix) to avoid re-detection bugs.
+    bool sendStatus = false;
+    if (TimeTradeServer() - g_lastStatusBroadcast >= STATUS_BROADCAST_INTERVAL_SEC) {
+        sendStatus = true;
+        g_lastStatusBroadcast = TimeTradeServer();
+    }
+
     for (int i = ArraySize(WebSocketClients) - 1; i >= 0; i--) {
         SOCKET64 clientSocket = WebSocketClients[i];
         if (!IsSocketConnected(clientSocket)) {
@@ -178,7 +176,10 @@ void SendUpdateToClients() {
             continue;
         }
         if (dataManager != NULL) {
-        
+
+            if (sendStatus) {
+                dataManager.SendTrackingStatus(clientSocket, g_eaStartTime);
+            }
             if(dataManager.isTrackingPrice){
                dataManager.SendCurrentPrices(clientSocket);
             }
@@ -189,7 +190,7 @@ void SendUpdateToClients() {
                 dataManager.SendCurrentMbook(clientSocket);
             }
             if (dataManager.isTrackingCalendar){
-                dataManager.SendCurrentCalendar(clientSocket);
+                dataManager.SendCalendarUpdates(clientSocket);
             }
             
         }

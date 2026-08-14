@@ -36,7 +36,7 @@ export function parseInstrumentCommand(text: string): ParsedInstrumentCommand | 
   if (!INSTRUMENT_COMMANDS.includes(cmd.toLowerCase())) return null;
   const tfMatch = text.match(TIMEFRAME_PATTERN);
   return {
-    symbol: symbolRaw.toUpperCase(),
+    symbol: symbolRaw.replace(/^\/+/, '').toUpperCase(),
     timeframe: tfMatch ? tfMatch[1].toUpperCase() : "M15", // default M15 kalau timeframe tidak disebut
   };
 }
@@ -95,9 +95,10 @@ export const AGENT_TIER_LABEL: Record<"cheap" | "balanced" | "deep", string> = {
 // btc, eco, global, crypto -- lihat VALID_ASSETS di routes/news.js), jadi OIL dipakai
 // rangkap sebagai proxy energy juga. AUTO sengaja tidak dipetakan = tidak ada injeksi berita.
 export const TAB_TO_NEWS_ASSETS: Record<string, string[] | undefined> = {
+  AUTO: ["usd"],
   EQUITY: ["global"],
   MACRO: ["eco"],
-  NEWS: ["usd", "metal", "oil"],
+  NEWS: ["usd", "metal", "oil", "btc"],
 };
 
 export function buildNewsContextPrefix(tab: string, items: NewsItem[]): string {

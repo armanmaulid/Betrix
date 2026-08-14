@@ -22,6 +22,15 @@ export interface OHLCUpdate {
   prev_close: number;
 }
 
+export interface OHLCBar {
+  time: string; // ISO 8601 from EA (YYYY-MM-DDTHH:MM:SS)
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
 export interface MarketBookUpdate {
   symbol: string;
   bids: Array<{ price: number; volume: number }>;
@@ -29,6 +38,7 @@ export interface MarketBookUpdate {
 }
 
 export interface CalendarUpdate {
+  value_id: number;
   event_id: number;
   actual: string | null;
   forecast: string | null;
@@ -65,4 +75,5 @@ export interface IBrokerProvider {
   fetchSymbolCount(): Promise<number>;
   fetchSymbols(): Promise<BrokerSymbol[]>;
   fetchCalendar(period?: string): Promise<any[]>;
+  fetchHistory(symbol: string, timeframe: string, fromDate: string, toDate: string): Promise<OHLCBar[]>;
 }

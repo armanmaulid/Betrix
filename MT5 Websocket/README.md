@@ -1,568 +1,204 @@
-# SocketBridge EA — MT5 WebSocket & REST API Gateway
+# MT5 Bridge
 
-> **Turn MetaTrader 5 into a programmable trading server.**  
-> SocketBridge EA exposes MT5's trading engine, market data, and account information through a local REST API and real-time WebSocket streaming — no Manager API required.
+Expert Advisor (EA) MetaTrader 5 yang mengekspos data trading lewat **HTTP REST API** dan **WebSocket streaming**, sehingga backend eksternal (Node.js, Python, dll) bisa baca quote, historical data, economic calendar, symbol list, dan langganan stream real-time (price / OHLC / market book / calendar) tanpa perlu bikin koneksi native ke MetaTrader.
 
----
+## Fitur
 
-## Table of Contents
+- **REST (one-shot query)**
+  - `GET /v1/quote` — bid/ask/spread terkini untuk satu simbol
+  - `GET /v1/history/prices` — historical OHLC bar untuk range tanggal tertentu
+  - `GET /v1/calendar` — economic calendar (range tanggal eksplisit atau shorthand `period`)
+  - `GET /v1/symbol/list` — semua simbol yang tersedia di broker
+- **WebSocket (streaming)**
+  - Live price update (bid/ask/spread berubah)
+  - Live OHLC bar update (bar baru terbentuk)
+  - Live market book / DOM (order book berubah)
+  - Live economic calendar update (actual/forecast value berubah)
+- Tracking dikonfigurasi lewat `POST /v1/track/*`, lalu MT5 push data ke semua client WebSocket yang terhubung.
 
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Requirements](#requirements)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [REST API Reference](#rest-api-reference)
-  - [Account](#account)
-  - [Quotes & Symbols](#quotes--symbols)
-  - [Trading](#trading)
-  - [Order Management](#order-management)
-  - [History](#history)
-  - [Calendar](#calendar)
-- [WebSocket Streaming](#websocket-streaming)
-  - [Subscribing to Streams](#subscribing-to-streams)
-  - [Stream Types](#stream-types)
-- [Error Handling](#error-handling)
-- [Project Structure](#project-structure)
-- [How It Works](#how-it-works)
-- [Security Notes](#security-notes)
-- [License](#license)
-
----
-
-## Overview
-
-SocketBridge EA is a MetaTrader 5 Expert Advisor that runs a **non-blocking TCP server** directly inside the MT5 terminal. It allows any external application — Python, Node.js, C#, web dashboards, mobile apps — to:
-
-- **Place, modify, and close trades** via simple HTTP POST requests
-- **Query account info, positions, symbols, and trade history** via HTTP GET
-- **Receive real-time price ticks, OHLC bars, order book depth, trade events, and economic calendar** via persistent WebSocket connections
-
-All communication uses **JSON** over standard HTTP/WebSocket protocols.
-
----
-
-## Architecture
+## Arsitektur
 
 ```
-┌──────────────────────────────────────────────────────────┐
-│                    MetaTrader 5 Terminal                  │
-│  ┌────────────────────────────────────────────────────┐  │
-│  │              SocketBridgeEA.mq5                    │  │
-│  │         (Main EA — Event Loop @ 20ms)              │  │
-│  │                                                    │  │
-│  │  OnInit() ──► Start TCP Server (port 8890)         │  │
-│  │  OnTimer() ─► Accept ► Parse ► Route ► Respond     │  │
-│  │  OnTradeTransaction() ──► Broadcast trade events   │  │
-│  └──────────┬─────────────────────┬───────────────────┘  │
-│             │                     │                       │
-│    ┌────────▼────────┐   ┌───────▼────────┐              │
-│    │  SocketManager  │   │ CommandHandler  │              │
-│    │  (TCP/Accept)   │   │ (HTTP Router)   │              │
-│    └────────┬────────┘   └───────┬────────┘              │
-│             │                    │                        │
-│    ┌────────▼────────────────────▼────────┐               │
-│    │           CommandCore.mqh            │               │
-│    │    (Business Logic / MT5 API Calls)  │               │
-│    └──────┬──────────┬──────────┬─────────┘               │
-│           │          │          │                         │
-│    ┌──────▼──┐ ┌─────▼────┐ ┌──▼───────────┐            │
-│    │ Data.mqh│ │ History  │ │ Validation   │            │
-│    │(Streams)│ │ Manager  │ │ Utils        │            │
-│    └─────────┘ └──────────┘ └──────────────┘            │
-│                                                          │
-│    ┌─────────────────────────────────────────┐           │
-│    │  Libraries: socketlib / HttpLib /       │           │
-│    │  WebSocketLib / JAson                   │           │
-│    └─────────────────────────────────────────┘           │
-└──────────────────────────────────────────────────────────┘
-          ▲                           ▲
-          │  HTTP (REST)              │  WebSocket (Streaming)
-          ▼                           ▼
-┌──────────────────────────────────────────────────────────┐
-│            External Applications                         │
-│  Python · Node.js · C# · Web Dashboard · Mobile App     │
-└──────────────────────────────────────────────────────────┘
+Backend kamu ──HTTP POST /v1/track/*────▶ ┐
+                                          │
+Backend kamu ──WS connect────────────────▶├─▶ SocketBridgeEA.mq5 (MT5)
+                                          │      ├─ CommandHandler.mqh  (routing HTTP)
+Backend kamu ◀──WS push (streaming)───────┘      ├─ CommandCore.mqh     (query one-shot)
+                                                 └─ Data.mqh            (state + streaming)
 ```
 
----
+Satu EA = satu server (HTTP + WebSocket di port yang sama). Tidak ada proses terpisah — semuanya jalan di dalam `OnTimer()` MT5.
 
-## Requirements
+## ⚠️ Penting: konfigurasi tracking bersifat GLOBAL, bukan per-client
 
-| Requirement          | Detail                                                    |
-|----------------------|-----------------------------------------------------------|
-| **MetaTrader 5**     | Any build with MQL5 support                               |
-| **DLL Imports**      | Must be **enabled** in MT5 (`Tools > Options > Expert Advisors > Allow DLL imports`) |
-| **Port 8890**        | Must be free and allowed through the local firewall       |
-| **Operating System** | Windows (uses `ws2_32.dll` / `kernel32.dll`)              |
+Request `POST /v1/track/prices` (atau `/ohlc`, `/mbook`, `/calendar`) datang lewat **koneksi HTTP pendek yang langsung ditutup setelah dibalas** — ini koneksi yang **berbeda** dari koneksi WebSocket tempat data di-stream. Protokolnya tidak punya konsep session/client-id, jadi:
 
----
+- Config yang di-set lewat `POST /v1/track/*` berlaku untuk **semua client WebSocket** yang sedang/nanti terhubung — bukan cuma yang mengirim request itu.
+- Semua client WebSocket menerima **stream yang sama persis** (broadcast), bukan stream yang di-personalisasi per koneksi.
+- Kalau backend kamu adalah satu-satunya consumer, ini tidak masalah. Kalau kamu punya beberapa consumer dengan kebutuhan symbol/timeframe yang **berbeda**, kamu perlu jalankan **instance MT5 terpisah** per kebutuhan (bukan reuse satu EA untuk banyak subscription berbeda), atau extend protokol dengan client-id (lihat bagian [Batasan](#batasan-known-limitations)).
 
-## Installation
+## Instalasi
 
-1. **Copy all files** into your MT5 `Experts` directory:
-   ```
-   <MT5 Data Folder>\MQL5\Experts\SocketBridgeEA\
-   └── SocketBridgeEA.mq5
+1. Copy semua file (`*.mqh`, `SocketBridgeEA.mq5`) ke folder `MQL5/Experts/` (atau subfolder) di data directory MT5 kamu.
+2. Buka `SocketBridgeEA.mq5` di MetaEditor, compile (F7). Pastikan tidak ada error.
+3. Di MT5 Terminal: **Tools → Options → Expert Advisors** → centang:
+   - "Allow WebRequest for listed URL" (kalau diperlukan untuk versi lanjutan)
+   - "Allow DLL imports" (**wajib** — EA ini pakai `Ws2_32.dll` dan `kernel32.dll` untuk socket)
+4. Drag `SocketBridgeEA` ke chart mana saja. Chart itu harus tetap terbuka & AutoTrading harus aktif (EA jalan lewat `OnTimer`, bukan `OnTick`, jadi tidak perlu ada tick masuk terus-menerus, tapi terminal/chart-nya harus tetap hidup).
+5. Default port: **8890** (`#define HTTP_PORT 8890` di `SocketBridgeEA.mq5`, ubah sebelum compile kalau perlu).
+6. **Untuk `GET /v1/calendar` dan `POST /v1/track/calendar`:** aktifkan calendar events di terminal (Tools → Options → Server, atau otomatis kalau ada Market Watch symbol dengan calendar terhubung) — kalau tidak, `CalendarValueHistory`/`CalendarValueLast` akan mengembalikan array kosong.
 
-   <MT5 Data Folder>\MQL5\Include\
-   ├── CommandCore.mqh
-   ├── CommandHandler.mqh
-   ├── Data.mqh
-   ├── HistoryManager.mqh
-   ├── HttpLib.mqh
-   ├── JAson.mqh
-   ├── SocketManager.mqh
-   ├── ValidationUtils.mqh
-   ├── WebSocketLib.mqh
-   └── socketlib.mqh
-   ```
+## API Reference
 
-2. **Compile** `SocketBridgeEA.mq5` in MetaEditor (F7).
-
-3. **Attach** the EA to any chart in MT5.
-
-4. **Enable DLL imports** when prompted, or set it globally in `Tools > Options > Expert Advisors`.
-
-5. The EA will start listening on `http://localhost:8890`. You should see initialization messages in the Experts tab.
-
----
-
-## Configuration
-
-Configuration is set via `#define` macros in `SocketBridgeEA.mq5`:
-
-| Macro                 | Default | Description                                    |
-|-----------------------|---------|------------------------------------------------|
-| `HTTP_PORT`           | `8890`  | TCP port the server listens on                 |
-| `SOCKET_BUFFER_SIZE`  | `4096`  | Receive buffer size in bytes                   |
-| `TIMER_INTERVAL_MS`   | `20`    | Event loop interval (ms) — controls latency    |
-
-> To change these values, edit the `#define` lines in `SocketBridgeEA.mq5` and recompile.
-
----
-
-## REST API Reference
-
-**Base URL:** `http://localhost:8890`
-
-All responses are JSON. All POST requests accept a JSON body with `Content-Type: application/json`.
-
----
-
-### Account
-
-#### `GET /v1/account`
-
-Returns account information.
-
-**Response:**
+### `GET /v1/quote?symbol=EURUSD`
 ```json
-{
-  "balance": 10000.00,
-  "equity": 10250.50,
-  "margin": 500.00,
-  "free_margin": 9750.50,
-  "margin_level": 2050.10,
-  "leverage": 100,
-  "currency": "USD",
-  "server": "MetaQuotes-Demo",
-  "name": "John Doe",
-  "login": 12345678,
-  "company": "MetaQuotes"
-}
+{ "symbol": "EURUSD", "ask": 1.0851, "bid": 1.0849, "spread": 20, "digits": 5, "volume": 12, "time": "2026-08-09T10:15:23.412Z" }
 ```
 
----
-
-### Quotes & Symbols
-
-#### `GET /v1/quote?symbol=EURUSD`
-
-Returns the current bid/ask price for a symbol.
-
-**Query Parameters:**
-
-| Parameter | Required | Description          |
-|-----------|----------|----------------------|
-| `symbol`  | Yes      | Symbol name          |
-
----
-
-#### `GET /v1/symbol/info?symbol=EURUSD`
-
-Returns detailed symbol configuration (spread, lot sizes, trade modes, etc.).
-
-**Query Parameters:**
-
-| Parameter | Required | Description          |
-|-----------|----------|----------------------|
-| `symbol`  | Yes      | Symbol name          |
-
----
-
-#### `GET /v1/symbol/list`
-
-Returns a list of all available symbols in the Market Watch.
-
----
-
-### Trading
-
-#### `POST /v1/order`
-
-Place a new trade order.
-
-**Request Body:**
+### `GET /v1/history/prices?symbol=EURUSD&time_frame=H1&from_date=2026-08-01&to_date=2026-08-08`
+`time_frame`: `M1 M5 M15 M30 H1 H4 D1 W1 MN1`. Tanggal format `YYYY-MM-DD` atau `YYYY-MM-DDTHH:MM:SS`.
 ```json
-{
-  "symbol": "EURUSD",
-  "volume": 0.1,
-  "order_type": "buy",
-  "sl": 1.0800,
-  "tp": 1.1200,
-  "price": 1.1000,
-  "magic": 12345,
-  "comment": "API trade"
-}
+{ "from_date": "...", "to_date": "...", "data": [ { "time": "...", "open": 1.085, "high": 1.086, "low": 1.084, "close": 1.0855, "volume": 1523 } ] }
 ```
 
-| Field        | Required | Description                                                                 |
-|--------------|----------|-----------------------------------------------------------------------------|
-| `symbol`     | Yes      | Trading symbol                                                              |
-| `volume`     | Yes      | Lot size                                                                    |
-| `order_type` | Yes      | `buy`, `sell`, `buy_limit`, `sell_limit`, `buy_stop`, `sell_stop`           |
-| `sl`         | No       | Stop Loss price                                                             |
-| `tp`         | No       | Take Profit price                                                           |
-| `price`      | No       | Entry price (required for pending orders)                                   |
-| `magic`      | No       | Magic number for EA identification                                          |
-| `comment`    | No       | Order comment                                                               |
+### `GET /v1/calendar?period=today` atau `?from_date=...&to_date=...`
+`period` (opsional, shorthand): `today | yesterday | tomorrow | this_week | last_week | next_week | this_month | last_month | next_month`. Kalau `period` dikirim, `from_date`/`to_date` diabaikan.
 
-> **Filling Modes:** The EA automatically tries FOK → IOC → RETURN to find a supported filling mode.
+### `GET /v1/symbol/list`
+Daftar semua simbol broker (bukan cuma yang ada di Market Watch). Bisa jadi payload besar di broker dengan ribuan instrumen — lihat pola sync di bagian [Cara Integrasi ke Backend](#cara-integrasi-ke-backend) biar gak perlu ambil ulang tiap kali connect.
 
----
-
-#### `POST /v1/order/modify`
-
-Modify an existing order or position (SL, TP, or pending price).
-
-**Request Body:**
+### `GET /v1/symbol/count`
 ```json
-{
-  "ticket": 123456789,
-  "sl": 1.0850,
-  "tp": 1.1150,
-  "price": 1.0950
-}
+{ "count": 20000 }
 ```
+Fingerprint murah buat cek "apa daftar simbol berubah" tanpa perlu narik seluruh list. Cocok dipanggil tiap kali backend connect ke EA, sebelum decide perlu `GET /v1/symbol/list` atau tidak.
 
----
-
-#### `POST /v1/order/close`
-
-Close an open position. Supports partial close.
-
-**Request Body:**
+### `POST /v1/track/prices`
 ```json
-{
-  "ticket": 123456789,
-  "volume": 0.05
-}
+{ "symbols": ["EURUSD", "GBPUSD"] }
+```
+Kirim `symbols: []` (array kosong) untuk **stop** tracking price.
+
+### `POST /v1/track/ohlc`
+```json
+{ "ohlc": [ { "symbol": "EURUSD", "time_frame": "M5", "depth": 3 } ] }
+```
+`depth` harus 1–10. Response berisi `accepted` dan `rejected` (dengan alasan) per item.
+
+### `POST /v1/track/mbook`
+```json
+{ "symbols": ["EURUSD"] }
 ```
 
-| Field    | Required | Description                                          |
-|----------|----------|------------------------------------------------------|
-| `ticket` | Yes      | Position ticket number                               |
-| `volume` | No       | Partial close volume (omit to close full position)   |
-
----
-
-### Order Management
-
-#### `GET /v1/order/list`
-
-Returns all active positions and pending orders.
-
----
-
-#### `GET /v1/order/info?ticket=123456789`
-
-Returns details for a specific order/position.
-
-**Query Parameters:**
-
-| Parameter | Required | Description          |
-|-----------|----------|----------------------|
-| `ticket`  | Yes      | Ticket number        |
-
----
-
-### History
-
-#### `GET /v1/history/orders`
-
-Returns historical order records with advanced deal-linking. Reconstructs the full lifecycle of each trade including entry, exit, pip profit, and whether it was triggered by a pending order.
-
-**Query Parameters:**
-
-| Parameter    | Required | Description                               |
-|--------------|----------|-------------------------------------------|
-| `from`       | No       | Start date (ISO 8601: `2024-01-01T00:00:00Z`) |
-| `to`         | No       | End date (ISO 8601)                       |
-
----
-
-#### `GET /v1/history/prices`
-
-Returns historical OHLC bar data.
-
-**Query Parameters:**
-
-| Parameter   | Required | Description                                      |
-|-------------|----------|--------------------------------------------------|
-| `symbol`    | Yes      | Symbol name                                      |
-| `timeframe` | Yes      | Timeframe (`M1`, `M5`, `M15`, `H1`, `H4`, `D1`, etc.) |
-| `from`      | Yes      | Start date (ISO 8601)                            |
-| `to`        | Yes      | End date (ISO 8601)                              |
-
----
-
-### Calendar
-
-#### `GET /v1/calendar`
-
-Returns upcoming economic calendar events.
-
-**Query Parameters:**
-
-| Parameter  | Required | Description                                |
-|------------|----------|--------------------------------------------|
-| `country`  | No       | Country code filter (e.g., `US`, `EU`)     |
-| `currency` | No       | Currency filter (e.g., `USD`, `EUR`)       |
-| `days`     | No       | Number of days to look ahead               |
-
----
+### `POST /v1/track/calendar`
+```json
+{ "country": "US", "currency": "" }
+```
+Kedua field opsional — kosong berarti "semua". Kirim keduanya kosong (`{}`) untuk stop tracking calendar.
 
 ## WebSocket Streaming
 
-Connect to `ws://localhost:8890` to receive real-time data streams. After the WebSocket handshake, subscribe to specific data streams using POST-style subscription messages.
+Connect ke `ws://<host>:8890` (handshake WebSocket standar). Setelah connect, server akan push pesan JSON berbentuk:
 
-### Subscribing to Streams
+| `type` | Trigger |
+|---|---|
+| `price_update` | Bid/ask salah satu symbol yang di-track berubah |
+| `ohlc_update` | Bar baru terbentuk untuk salah satu request OHLC yang di-track |
+| `track_mbook` | Order book / DOM berubah untuk salah satu symbol yang di-track |
+| `calendar_update` | Ada event calendar yang actual/forecast/previous-nya berubah |
 
-Send HTTP POST requests to the subscription endpoints. Once subscribed, the EA will push JSON updates through the WebSocket connection whenever data changes.
-
----
-
-### Stream Types
-
-#### Price Ticks — `POST /v1/track/prices`
-
-Subscribe to real-time bid/ask price updates.
-
+Contoh `price_update`:
 ```json
-{ "symbols": ["EURUSD", "GBPUSD", "USDJPY"] }
+{ "type": "price_update", "timestamp": 1754732345, "symbol": "EURUSD", "volume": 12, "bid": 1.0849, "ask": 1.0851, "spread": 20, "digits": 5 }
 ```
 
-**Push Update:**
-```json
-{
-  "type": "price",
-  "symbol": "EURUSD",
-  "bid": 1.1050,
-  "ask": 1.1052,
-  "time": "2024-01-15T10:30:00Z"
-}
+## Cara Integrasi ke Backend
+
+### Node.js
+```js
+import WebSocket from "ws";
+
+// 1. Set apa yang mau di-track (sekali di awal, atau kapan pun mau ganti)
+await fetch("http://mt5-host:8890/v1/track/prices", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({ symbols: ["EURUSD", "XAUUSD"] }),
+});
+
+// 2. Dengerin stream-nya
+const ws = new WebSocket("ws://mt5-host:8890");
+ws.on("message", (raw) => {
+  const msg = JSON.parse(raw.toString());
+  switch (msg.type) {
+    case "price_update":
+      console.log(msg.symbol, msg.bid, msg.ask);
+      break;
+    case "ohlc_update":
+    case "track_mbook":
+    case "calendar_update":
+      // handle sesuai kebutuhan
+      break;
+  }
+});
+ws.on("close", () => {
+  // reconnect + POST /v1/track/* ulang kalau perlu (state tracking hidup selama EA jalan,
+  // jadi reconnect saja biasanya cukup, config tidak hilang)
+});
 ```
-
----
-
-#### OHLC Bars — `POST /v1/track/ohlc`
-
-Subscribe to bar close events on specific symbols and timeframes.
-
-```json
-{ "symbol": "EURUSD", "timeframe": "M1" }
-```
-
----
-
-#### Market Depth (Level 2) — `POST /v1/track/mbook`
-
-Subscribe to order book changes.
-
-```json
-{ "symbol": "EURUSD" }
-```
-
-> **Optimization:** Uses an XOR-based hash function over the entire order book. Updates are only pushed when the hash changes, minimizing bandwidth usage.
-
----
-
-#### Trade Events — `POST /v1/track/orders`
-
-Subscribe to trade execution events (fills, TP/SL hits, manual closes).
-
-```json
-{}
-```
-
-**Push Update (example — SL hit):**
-```json
-{
-  "type": "trade_event",
-  "ticket": 123456789,
-  "symbol": "EURUSD",
-  "reason": "sl",
-  "profit": -25.30
-}
-```
-
----
-
-#### Economic Calendar — `POST /v1/track/calendar`
-
-Subscribe to upcoming economic calendar event notifications.
-
-```json
-{ "country": "US", "currency": "USD" }
-```
-
----
-
-## Error Handling
-
-All errors are returned as JSON with an appropriate HTTP status code:
-
-```json
-{
-  "error": true,
-  "code": 400,
-  "message": "Invalid symbol: INVALIDPAIR"
-}
-```
-
-| Code | Meaning                                          |
-|------|--------------------------------------------------|
-| 400  | Bad Request — invalid parameters or missing fields |
-| 404  | Not Found — unknown endpoint or symbol           |
-| 500  | Server Error — MT5 trade execution failure       |
-
-Trade execution errors include MT5's native retcode description for easy debugging.
-
----
-
-## Project Structure
-
-```
-SocketBridgeEA/
-│
-├── SocketBridgeEA.mq5      # Main EA — event loop, initialization, trade events
-│
-├── SocketManager.mqh        # TCP server socket management (bind, accept, non-blocking I/O)
-├── CommandHandler.mqh       # HTTP router — parses requests, routes to handlers
-├── CommandCore.mqh          # Business logic — executes MT5 API calls, builds responses
-├── Data.mqh                 # Real-time streaming engine — subscriptions & change detection
-├── HistoryManager.mqh       # Trade history reconstruction — deal/order/position linking
-├── ValidationUtils.mqh      # Input validation — symbols, dates, JSON structure checks
-│
-├── socketlib.mqh            # Low-level Winsock2 API bindings for MQL5
-├── HttpLib.mqh              # HTTP request/response parsing
-├── WebSocketLib.mqh         # WebSocket handshake & frame encoding/decoding
-└── JAson.mqh                # JSON serialization/deserialization library
-```
-
----
-
-## How It Works
-
-```
-1. OnInit()
-   └── WSAStartup → Create TCP Socket → Bind to port 8890 → Listen → Start 20ms Timer
-
-2. OnTimer() (every 20ms)
-   ├── AcceptNewClients()      → Accept incoming TCP connections
-   ├── ProcessHttpClients()    → Read data from HTTP sockets
-   │   ├── Standard HTTP?      → Route → Execute → JSON Response → Close socket
-   │   └── WebSocket Upgrade?  → Handshake → Move to WebSocket client list
-   └── SendUpdateToClients()   → For each WS client:
-       ├── Check price changes    → Push tick updates
-       ├── Check OHLC changes     → Push bar close events
-       ├── Check book hash        → Push market depth updates
-       └── Check calendar         → Push calendar events
-
-3. OnTradeTransaction()        → Triggered by MT5 on trade fills
-   └── Evaluate deal reason (TP/SL/manual) → Broadcast to all WS clients
-```
-
-**Key Design Decisions:**
-
-- **Non-blocking I/O**: All sockets use `FIONBIO` mode. The EA never blocks MT5's thread — critical since EAs share a single thread per symbol.
-- **State Hashing**: Market book updates use XOR hashing to detect changes efficiently, avoiding unnecessary JSON serialization and network I/O.
-- **Smart Deal Linking**: HistoryManager correlates MT5's fragmented deals, orders, and positions by `POSITION_ID` and chronological order to reconstruct complete trade lifecycles.
-- **UTC Normalization**: All timestamps are normalized to UTC (ISO 8601), correcting MT5's server time offset using `TimeTradeServer() - TimeGMT()`.
-
----
-
-## Usage Examples
 
 ### Python
 ```python
+import json
 import requests
+import websocket
 
-# Get account info
-account = requests.get("http://localhost:8890/v1/account").json()
-print(f"Balance: {account['balance']}")
+requests.post(
+    "http://mt5-host:8890/v1/track/prices",
+    json={"symbols": ["EURUSD", "XAUUSD"]},
+)
 
-# Place a trade
-trade = requests.post("http://localhost:8890/v1/order", json={
-    "symbol": "EURUSD",
-    "volume": 0.1,
-    "order_type": "buy",
-    "sl": 1.0800,
-    "tp": 1.1200
-}).json()
-print(f"Order placed: {trade}")
+def on_message(ws, message):
+    msg = json.loads(message)
+    if msg["type"] == "price_update":
+        print(msg["symbol"], msg["bid"], msg["ask"])
+
+ws = websocket.WebSocketApp("ws://mt5-host:8890", on_message=on_message)
+ws.run_forever()
 ```
 
-### JavaScript (Node.js)
-```javascript
-const WebSocket = require('ws');
-const ws = new WebSocket('ws://localhost:8890');
+### Pola sync symbol list (hindari re-transfer besar tiap connect)
 
-ws.on('open', () => {
-  console.log('Connected to SocketBridge EA');
-});
+Pola yang direkomendasikan buat backend yang nyimpen symbol list ke database (mis. PostgreSQL): pakai `GET /v1/symbol/count` sebagai fingerprint murah sebelum decide perlu narik full list atau tidak.
 
-ws.on('message', (data) => {
-  const update = JSON.parse(data);
-  console.log('Received:', update);
-});
+```
+backend connect ke EA
+  │
+  ▼
+GET /v1/symbol/count  →  { "count": N }
+  │
+  ├─ belum pernah sync sebelumnya  ──▶ GET /v1/symbol/list, simpan semua + simpan N
+  │
+  ├─ N sama dengan yang tersimpan  ──▶ skip, gak perlu narik ulang
+  │
+  └─ N beda dengan yang tersimpan  ──▶ GET /v1/symbol/list ulang, replace + update N
 ```
 
-### cURL
-```bash
-# Get current quote
-curl http://localhost:8890/v1/quote?symbol=EURUSD
+⚠️ **Catatan akurasi:** `count` cuma fingerprint jumlah, bukan checksum isi. Kalau broker kebetulan hapus 1 symbol dan nambah 1 symbol lain di waktu yang sama, jumlahnya tetap sama padahal isinya berubah — backend bisa salah kira "tidak ada perubahan". Risikonya kecil untuk kebanyakan kasus, tapi kalau butuh akurasi penuh, upgrade ke pembanding hash isi list (pola yang sama seperti hash-based change detection yang dipakai di market book streaming) alih-alih count saja.
 
-# Close a position
-curl -X POST http://localhost:8890/v1/order/close \
-  -H "Content-Type: application/json" \
-  -d '{"ticket": 123456789}'
-```
+**Catatan koneksi:** kalau WebSocket putus, cukup reconnect ke `ws://host:8890` — kamu **tidak perlu** POST ulang ke `/v1/track/*`, karena config tracking disimpan di EA (bukan per-koneksi) dan tetap aktif selama EA-nya jalan. POST ulang cuma perlu kalau memang mau **mengubah** daftar symbol/timeframe/filter.
 
----
+## Batasan (Known Limitations)
 
-## Security Notes
+- **Broadcast-only, bukan multi-tenant**: semua client WebSocket dapat stream & config yang sama (lihat bagian ⚠️ di atas). Backend perlu tahu ini kalau mau attach beberapa consumer sekaligus dengan kebutuhan berbeda.
+- **Tidak ada autentikasi** di level protokol — siapa pun yang bisa reach `host:8890` bisa baca data & ubah config tracking. Amankan lewat firewall / VPN / reverse proxy, jangan expose port ini langsung ke internet publik.
+- **Max payload WebSocket 65535 byte** per frame (dibatasi oleh format frame yang dipakai — lihat `WebSocketLib.mqh`). Kalau depth OHLC atau symbol list sangat besar, payload bisa kepotong ditolak (`SendWebSocketTextFrame` akan gagal & log error, bukan corrupt data).
+- **EA harus tetap attached & terminal harus tetap hidup.** Kalau MT5 restart / EA di-remove dari chart, semua koneksi & config tracking hilang (perlu reconnect + re-POST config).
+- **`GET /v1/calendar` dan `POST /v1/track/calendar`** bergantung pada data economic calendar dari MT5/broker — kalau broker tidak menyediakan feed calendar, endpoint ini akan selalu kosong.
 
-> ⚠️ **This EA is designed for local use only.**
+## Changelog (perbaikan terakhir)
 
-- The server binds to `localhost` — it is **not** exposed to the internet by default.
-- There is **no authentication** mechanism. Do not expose port 8890 to untrusted networks.
-- If remote access is needed, use a reverse proxy (e.g., Nginx) with TLS and authentication in front of the EA.
-- Always run on a **firewall-protected** machine.
-
----
-
-## License
-
-This project is proprietary software developed by **Betrix**. All rights reserved.
+- **Data.mqh** — deteksi perubahan (price/OHLC/market book/calendar) sekarang dijalankan **sekali per tick**, lalu hasilnya di-broadcast ke semua client WebSocket yang terhubung (`CData::BroadcastData`). Sebelumnya, deteksi dijalankan ulang per-client di dalam loop, sehingga state "sudah terkirim" ikut ter-update oleh client pertama — client kedua dst di tick yang sama jadi tidak dapat update tersebut (untuk calendar, event-nya hilang permanen karena `change_id` dari `CalendarValueLast` adalah cursor yang tidak bisa di-replay).
+- **Data.mqh** — `SendCurrentMbook()` sekarang pakai `TimeTradeServer()`, bukan `TimeCurrent()`, untuk timestamp per-item order book (konsisten dengan bagian lain yang sudah pakai `TimeTradeServer()`; `TimeCurrent()` bisa stale saat market tutup).
+- **WebSocketLib.mqh** — `SendWebSocketTextFrame()` sebelumnya pakai buffer tetap `uchar frame[2048]` padahal header frame-nya sendiri mengklaim dukungan payload sampai 65535 byte — payload JSON di atas ~2044 byte berpotensi menulis di luar batas array. Sekarang buffer di-alokasi dinamis sesuai ukuran payload.
+- **HttpLib.mqh** — `SendHttpResponse()` sebelumnya manggil `send()` sekali dan mengabaikan return value-nya. Di socket non-blocking (dipakai semua client di project ini), `send()` tidak menjamin seluruh buffer terkirim dalam satu panggilan — untuk response besar (mis. `GET /v1/symbol/list` di broker dengan puluhan ribu instrumen, bisa beberapa MB), sisa byte yang tidak terkirim akan hilang diam-diam dan client menerima body yang terpotong. Sekarang dikirim lewat `SendAll()` yang loop sampai semua byte benar-benar terkirim (dengan timeout 5 detik supaya satu client yang macet tidak membekukan seluruh EA).
+- **CommandCore.mqh / CommandHandler.mqh** — tambah endpoint `GET /v1/symbol/count`, fingerprint murah (cuma jumlah simbol) buat backend cek perlu sync ulang symbol list atau tidak tanpa narik seluruh payload tiap kali connect.

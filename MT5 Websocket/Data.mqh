@@ -1,598 +1,174 @@
 //+------------------------------------------------------------------+
-//| Data.mqh - Updated with OHLC functionality                     |
-//| Price data sending functionality for MT5 socket communication   |
+//| Data.mqh                                                        |
+//| Real-time data streaming for MT5 socket communication           |
+//| Handles: Price tracking, OHLC bar tracking, Market Book (DOM)   |
 //+------------------------------------------------------------------+
 #ifndef DATA_MQH
 #define DATA_MQH
 
-#include <JAson.mqh>
-#include <socketlib.mqh>
-#include <WebSocketLib.mqh>
+#include "JAson.mqh"
+#include "socketlib.mqh"
+#include "WebSocketLib.mqh"
 
-// Forward declaration
-class CCommandHandler;
+//+------------------------------------------------------------------+
+//| Structs                                                          |
+//+------------------------------------------------------------------+
 
-// Structure to hold symbol price data
-struct SymbolPriceData {
-    string symbol;
-    double lastBid;
-    double lastAsk;
-    bool initialized;
-};
-
+// Input struct: what the client requests for OHLC tracking
 struct OhlcRequest {
    string symbol;
    ENUM_TIMEFRAMES timeframe;
    int depth;
 };
 
-// Structure to hold OHLC data for tracking
-struct OhlcData {
+// Internal struct: tracks price change detection per symbol
+struct SymbolPriceData {
     string symbol;
-    ENUM_TIMEFRAMES timeframe;
-    int depth;
-    datetime lastBarTime;
-    bool initialized;
+    double lastBid;
+    double lastAsk;
+    bool   initialized;
 };
 
+// Internal struct: tracks OHLC new-bar detection per symbol/timeframe
+struct OhlcData {
+    string          symbol;
+    ENUM_TIMEFRAMES timeframe;
+    int             depth;
+    datetime        lastBarTime;
+    bool            initialized;
+};
+
+
 //+------------------------------------------------------------------+
-//| Data Class                                                      |
+//| CData Class Declaration                                          |
 //+------------------------------------------------------------------+
 class CData {
 private:
     SOCKET64 client_socket;
-    string symbols[];
-    SymbolPriceData symbolData[];     // Array to store last prices for each symbol
 
-    string mbookSymbols[];            // Symbols for market book tracking
-    ulong lastBookHashes[];           // Hash for each symbol
-    bool firstRun;
+    // ── Price tracking state ──
+    string          symbols[];
+    SymbolPriceData symbolData[];
 
-    datetime lastSentTime;
-    CCommandHandler *commandHandler;  // Reference to command handler
-    OhlcData ohlcRequests[];          // Array to store OHLC tracking requests
+    // ── OHLC tracking state ──
+    OhlcData ohlcRequests[];
 
-    // Calendar tracking state
-    ulong lastCalendarChangeId;
-    string calendarCurrencies[];               // empty = no currency filter (all)
-    string calendarCountries[];                // empty = no country filter (all) - ISO 3166-1 alpha-2, e.g. "US","EU"
-    ENUM_CALENDAR_EVENT_IMPORTANCE calendarMinImportance;
+    // ── Market Book tracking state ──
+    string mbookSymbols[];
+    ulong  lastBookHashes[];
+    bool   mbookFirstRun;
 
-    // Private methods
-    ulong CalculateBookHash(MqlBookInfo &bookInfo[]);
-    void SendSymbolPrice(string symbol);
-    void SendSymbolPrice(string symbol, SOCKET64 sock);
-    void SendSymbolOhlc(string symbol, ENUM_TIMEFRAMES timeframe, int depth);
-    bool HasPriceChanged(string symbol, double currentBid, double currentAsk);
-    bool HasNewBar(string symbol, ENUM_TIMEFRAMES timeframe);
-    void UpdateStoredPrice(string symbol, double bid, double ask);
-    void UpdateLastBarTime(string symbol, ENUM_TIMEFRAMES timeframe, datetime barTime);
-    int FindSymbolIndex(string symbol);
-    int FindOhlcIndex(string symbol, ENUM_TIMEFRAMES timeframe);
+    // ── Calendar tracking state ──
+    ulong  calendarChangeId;
+    string calendarCountry;
+    string calendarCurrency;
+
+    // ── Core helpers ──
+    void   Init();
+    void   SendData(string jsonData);
+    string TimeframeToString(ENUM_TIMEFRAMES tf);
+
+    // ── Price helpers ──
+    void   SendSymbolPrice(string symbol);
+    bool   HasPriceChanged(string symbol, double currentBid, double currentAsk);
+    void   UpdateStoredPrice(string symbol, double bid, double ask);
+    int    FindSymbolIndex(string symbol);
     double GetSymbolBid(string symbol);
     double GetSymbolAsk(string symbol);
     double GetSymbolSpread(string symbol);
-    void SendPriceData(string jsonData);
-    void SendOhlcData(string jsonData);
-    void SendOrderEventData(string jsonData);
-    void SendCalendarData(string jsonData);
-    string TimeframeToString(ENUM_TIMEFRAMES tf);
-    string CalendarImportanceToString(ENUM_CALENDAR_EVENT_IMPORTANCE imp);
-    string ToIso8601Utc(datetime t);
-    bool CalendarValuePassesFilter(MqlCalendarValue &val);
-    string BuildCalendarEventJson(MqlCalendarValue &val);
+
+    // ── OHLC helpers ──
+    void   SendSymbolOhlc(string symbol, ENUM_TIMEFRAMES timeframe, int depth);
+    bool   HasNewBar(string symbol, ENUM_TIMEFRAMES timeframe);
+    void   UpdateLastBarTime(string symbol, ENUM_TIMEFRAMES timeframe, datetime barTime);
+    int    FindOhlcIndex(string symbol, ENUM_TIMEFRAMES timeframe);
+
+    // ── Market Book helpers ──
+    ulong  CalculateBookHash(MqlBookInfo &bookInfo[]);
 
 public:
     bool isTrackingPrice;
     bool isTrackingOhlc;
-    bool isTrackingOrderEvent;
     bool isTrackingMbook;
     bool isTrackingCalendar;
 
-    // Constructors
+    // ── Constructors ──
     CData();
     CData(SOCKET64 socket);
-    CData(SOCKET64 socket, CCommandHandler *cmdHandler);
 
-    // Public methods
-    void setSymbols(const string &inputSymbols[]);
-    void setMbookSymbols(const string &inputSymbols[]);
-    void setOhlcs(const OhlcRequest &requests[]);
-    void setOrderEvents(bool Enabled);
-    void setCalendarFilter(const string &countries[], const string &currencies[], string minImportance);
+    // ── Configuration (called by CommandCore) ──
+    void SetSymbols(const string &inputSymbols[]);
+    void SetOhlcRequests(const OhlcRequest &requests[]);
+    void SetMbookSymbols(const string &inputSymbols[]);
+    void SetCalendarTracking(string country, string currency);
+
+    // ── Streaming (called by EA timer loop) ──
     void SendCurrentPrices(SOCKET64 sock);
     void SendCurrentOhlcs(SOCKET64 sock);
-    bool ShouldSendUpdate(int intervalSeconds = 1);
     void SendCurrentMbook(SOCKET64 sock);
-    void SendCurrentCalendar(SOCKET64 sock);
-    void HandleTradeTransaction(const MqlTradeTransaction &trans, const MqlTradeRequest &request, const MqlTradeResult &result, SOCKET64 sock);
+    void SendCalendarUpdates(SOCKET64 sock);
+
+    // ── Status heartbeat (called by EA timer loop, throttled) ──
+    // Lets the backend detect "EA restarted / tracking config wiped" without
+    // relying solely on WS onclose - covers non-graceful EA death too (crash,
+    // kill, terminal shutdown), where onclose can be delayed or never fire.
+    void SendTrackingStatus(SOCKET64 sock, datetime eaStartTime);
 };
 
+
 //+------------------------------------------------------------------+
-//| Empty constructor                                                |
+//|                                                                  |
+//|   ███  SECTION: Core                                             |
+//|                                                                  |
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+//| Shared field initialization                                      |
+//+------------------------------------------------------------------+
+void CData::Init() {
+    client_socket      = INVALID_SOCKET64;
+    isTrackingPrice    = false;
+    isTrackingOhlc     = false;
+    isTrackingMbook    = false;
+    isTrackingCalendar = false;
+    mbookFirstRun      = true;
+    calendarChangeId   = 0;
+    calendarCountry    = "";
+    calendarCurrency   = "";
+    ArrayResize(symbols, 0);
+    ArrayResize(symbolData, 0);
+    ArrayResize(ohlcRequests, 0);
+    ArrayResize(mbookSymbols, 0);
+    ArrayResize(lastBookHashes, 0);
+}
+
+//+------------------------------------------------------------------+
+//| Default constructor                                              |
 //+------------------------------------------------------------------+
 CData::CData() {
-    client_socket = INVALID_SOCKET64;
-    lastSentTime = 0;
-    commandHandler = NULL;
-    isTrackingPrice = false;
-    isTrackingOhlc = false;
-    isTrackingOrderEvent = false;
-    isTrackingMbook = false;
-    isTrackingCalendar = false;
-    lastCalendarChangeId = 0;
-    calendarMinImportance = CALENDAR_IMPORTANCE_LOW;
-    ArrayResize(calendarCurrencies, 0);
-    ArrayResize(calendarCountries, 0);
-    firstRun = true;  // Add this line
-    ArrayResize(symbols, 0);
-    ArrayResize(mbookSymbols, 0);
-    ArrayResize(symbolData, 0);
-    ArrayResize(ohlcRequests, 0);
-    ArrayResize(lastBookHashes, 0);  // Add this line
+    Init();
 }
 
 //+------------------------------------------------------------------+
-//| Constructor with socket                                          |
+//| Constructor with pre-connected socket                            |
 //+------------------------------------------------------------------+
 CData::CData(SOCKET64 socket) : client_socket(socket) {
-    lastSentTime = 0;
-    commandHandler = NULL;
-    isTrackingPrice = false;
-    isTrackingOhlc = false;
-    isTrackingOrderEvent = false;
-    isTrackingMbook = false;
-    isTrackingCalendar = false;
-    lastCalendarChangeId = 0;
-    calendarMinImportance = CALENDAR_IMPORTANCE_LOW;
-    ArrayResize(calendarCurrencies, 0);
-    ArrayResize(calendarCountries, 0);
-    firstRun = true;  // Add this line
-    ArrayResize(symbols, 0);
-    ArrayResize(mbookSymbols, 0);  // Add this line
-    ArrayResize(symbolData, 0);
-    ArrayResize(ohlcRequests, 0);
-    ArrayResize(lastBookHashes, 0);  // Add this line
+    Init();
 }
 
 //+------------------------------------------------------------------+
-//| Constructor with socket and command handler                     |
+//| Send JSON data over the active WebSocket connection              |
 //+------------------------------------------------------------------+
-CData::CData(SOCKET64 socket, CCommandHandler *cmdHandler) : client_socket(socket), commandHandler(cmdHandler) {
-    lastSentTime = 0;
-    isTrackingPrice = false;
-    isTrackingOhlc = false;
-    isTrackingOrderEvent = false;
-    isTrackingMbook = false;
-    isTrackingCalendar = false;
-    lastCalendarChangeId = 0;
-    calendarMinImportance = CALENDAR_IMPORTANCE_LOW;
-    ArrayResize(calendarCurrencies, 0);
-    ArrayResize(calendarCountries, 0);
-    firstRun = true;  // Add this line
-    ArrayResize(symbols, 0);
-    ArrayResize(mbookSymbols, 0);  // Add this line
-    ArrayResize(symbolData, 0);
-    ArrayResize(ohlcRequests, 0);
-    ArrayResize(lastBookHashes, 0);  // Add this line
-}
-
-//+------------------------------------------------------------------+
-void CData::setSymbols(const string &inputSymbols[]) {
-    ArrayResize(symbols, 0);
-    ArrayResize(symbolData, 0);
-
-    int count = ArraySize(inputSymbols);
-    if(count > 0) {
-        ArrayResize(symbols, count);
-        ArrayResize(symbolData, count);
-
-        for(int i = 0; i < count; i++) {      
-            symbols[i] = inputSymbols[i];
-
-            symbolData[i].symbol = inputSymbols[i];
-            symbolData[i].lastBid = 0.0;
-            symbolData[i].lastAsk = 0.0;
-            symbolData[i].initialized = false;
-        }
-    }
-
-    Print("Symbols set for price tracking: ", count, " symbols");
-    for(int i = 0; i < count; i++) {
-        Print("Symbol[", i, "]: ", symbols[i]);
-    }
-
-    isTrackingPrice = (ArraySize(symbols) > 0);
-}
-
-//+------------------------------------------------------------------+
-//| Set OHLC tracking requests                                       |
-//+------------------------------------------------------------------+
-void CData::setOhlcs(const OhlcRequest &requests[]) {
-    ArrayResize(ohlcRequests, 0);
-    
-    int count = ArraySize(requests);
-    if(count > 0) {
-        ArrayResize(ohlcRequests, count);
-        
-        for(int i = 0; i < count; i++) {
-            ohlcRequests[i].symbol = requests[i].symbol;
-            ohlcRequests[i].timeframe = requests[i].timeframe;
-            ohlcRequests[i].depth = requests[i].depth;
-            ohlcRequests[i].lastBarTime = 0;
-            ohlcRequests[i].initialized = false;
-        }
-    }
-    
-    Print("OHLC requests set for tracking: ", count, " requests");
-    for(int i = 0; i < count; i++) {
-        Print("OHLC[", i, "]: ", ohlcRequests[i].symbol, " ", TimeframeToString(ohlcRequests[i].timeframe), " depth=", ohlcRequests[i].depth);
-    }
-    
-    isTrackingOhlc = (ArraySize(ohlcRequests) > 0);
-}
-
-//+------------------------------------------------------------------+
-//| Set Order EVENT tracking requests                                |
-//+------------------------------------------------------------------+
-void CData::setOrderEvents(bool Enabled) {
-    isTrackingOrderEvent = Enabled;
-}
-
-void CData::HandleTradeTransaction(const MqlTradeTransaction &trans, const MqlTradeRequest &request, const MqlTradeResult &result, SOCKET64 sock)
-{
-    client_socket = sock;
-
-    // We only care about executed deals (closed orders)
-    if (trans.type != TRADE_TRANSACTION_DEAL_ADD)
-        return;
-
-    ulong deal_ticket = trans.deal;
-
-    // Access deal details
-    if (!HistoryDealSelect(deal_ticket))
-        return;
-
-    ENUM_DEAL_ENTRY deal_entry = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(deal_ticket, DEAL_ENTRY);
-
-    // Only act on deal closures (exits)
-    if (deal_entry != DEAL_ENTRY_OUT)
-        return;
-
-    string symbol = HistoryDealGetString(deal_ticket, DEAL_SYMBOL);
-    double price = HistoryDealGetDouble(deal_ticket, DEAL_PRICE);
-    double profit = HistoryDealGetDouble(deal_ticket, DEAL_PROFIT);
-    double swap = HistoryDealGetDouble(deal_ticket, DEAL_SWAP);
-    double commission = HistoryDealGetDouble(deal_ticket, DEAL_COMMISSION);
-    ulong order_ticket = (ulong)HistoryDealGetInteger(deal_ticket, DEAL_ORDER);
-    ENUM_DEAL_TYPE deal_type = (ENUM_DEAL_TYPE)HistoryDealGetInteger(deal_ticket, DEAL_TYPE);
-
-    // Get position ID to find the TP/SL levels
-    ulong position_id = (ulong)HistoryDealGetInteger(deal_ticket, DEAL_POSITION_ID);
-    Print(StringFormat("DEBUG: Position ID: %I64d", position_id));
-    
-    // Try to get TP/SL from the position history
-    double sl = 0.0, tp = 0.0;
-    ENUM_ORDER_TYPE order_type = ORDER_TYPE_BUY;
-    
-    // Method 1: Look for the opening deal
-    if (HistorySelectByPosition(position_id))
-    {
-        int deals_total = HistoryDealsTotal();
-        Print(StringFormat("DEBUG: Found %d deals for position", deals_total));
-        
-        for (int i = 0; i < deals_total; i++)
-        {
-            ulong deal = HistoryDealGetTicket(i);
-            ENUM_DEAL_ENTRY entry_type = (ENUM_DEAL_ENTRY)HistoryDealGetInteger(deal, DEAL_ENTRY);
-            
-            if (entry_type == DEAL_ENTRY_IN) // Opening deal
-            {
-                ulong open_order = (ulong)HistoryDealGetInteger(deal, DEAL_ORDER);
-                Print(StringFormat("DEBUG: Found opening order: %I64d", open_order));
-                
-                if (HistoryOrderSelect(open_order))
-                {
-                    sl = HistoryOrderGetDouble(open_order, ORDER_SL);
-                    tp = HistoryOrderGetDouble(open_order, ORDER_TP);
-                    order_type = (ENUM_ORDER_TYPE)HistoryOrderGetInteger(open_order, ORDER_TYPE);
-                    Print(StringFormat("DEBUG: From opening order - TP: %.5f, SL: %.5f", tp, sl));
-                    break;
-                }
-            }
-        }
-    }
-
-    // Get symbol point value for comparison tolerance
-    double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
-    double tolerance = point * 10;
-
-    string reason = "Unknown";
-
-    Print(StringFormat("DEBUG: Final values - price=%.5f, tp=%.5f, sl=%.5f, tolerance=%.5f", 
-                       price, tp, sl, tolerance));
-
-    // Determine exit reason by comparing exit price to SL/TP levels
-    if (tp > 0 && MathAbs(price - tp) <= tolerance)
-    {
-        reason = "TP";
-        Print("DEBUG: Detected as TP hit!");
-    }
-    else if (sl > 0 && MathAbs(price - sl) <= tolerance)
-    {
-        reason = "SL";
-        Print("DEBUG: Detected as SL hit!");
-    }
-    else
-    {
-        Print(StringFormat("DEBUG: No match - TP diff: %.5f, SL diff: %.5f", 
-                          (tp > 0) ? MathAbs(price - tp) : -1,
-                          (sl > 0) ? MathAbs(price - sl) : -1));
-        
-        // Fallback: Use deal reason if available
-        ENUM_DEAL_REASON deal_reason = (ENUM_DEAL_REASON)HistoryDealGetInteger(deal_ticket, DEAL_REASON);
-        Print(StringFormat("DEBUG: Deal reason: %d", deal_reason));
-        
-        if (deal_reason == DEAL_REASON_TP)
-            reason = "TP";
-        else if (deal_reason == DEAL_REASON_SL)
-            reason = "SL";
-        else
-            reason = "Manual";
-    }
-
-    // Determine original side from the ORDER TYPE (not deal type)
-    string side = "";
-    if (order_type == ORDER_TYPE_BUY || order_type == ORDER_TYPE_BUY_LIMIT || order_type == ORDER_TYPE_BUY_STOP || order_type == ORDER_TYPE_BUY_STOP_LIMIT)
-        side = "BUY";
-    else if (order_type == ORDER_TYPE_SELL || order_type == ORDER_TYPE_SELL_LIMIT || order_type == ORDER_TYPE_SELL_STOP || order_type == ORDER_TYPE_SELL_STOP_LIMIT)
-        side = "SELL";
-    else
-        side = "UNKNOWN";
-
-    // Calculate gross profit (before swap/commission) for additional info
-    double gross_profit = profit + swap + commission;
-
-    string json = StringFormat("{\"type\":\"trade_event\",\"symbol\":\"%s\",\"ticket\":%I64d,\"side\":\"%s\",\"reason\":\"%s\",\"profit\":%.2f,\"gross_profit\":%.2f,\"swap\":%.2f,\"commission\":%.2f}",
-                               symbol, order_ticket, side, reason, profit, gross_profit, swap, commission);
-    SendOrderEventData(json);
-}
-
-//+------------------------------------------------------------------+
-//| Set Mbook tracking                                               |
-//+------------------------------------------------------------------+
-void CData::setMbookSymbols(const string &inputSymbols[]) {
-
-    for (int i = 0; i < ArraySize(mbookSymbols); i++) {
-        if (MarketBookRelease(mbookSymbols[i])) {
-            Print("Unsubscribed from market book: ", mbookSymbols[i]);
-        } else {
-            Print("Failed to unsubscribe: ", mbookSymbols[i], " (", GetLastError(), ")");
-        }
-    }
-
-    ArrayResize(mbookSymbols, 0);
-
-    int count = ArraySize(inputSymbols);
-    if(count > 0) {
-        ArrayResize(mbookSymbols, count);
-
-        for(int i = 0; i < count; i++) {      
-            mbookSymbols[i] = inputSymbols[i];
-
-            if (MarketBookAdd(mbookSymbols[i])) {
-                Print("Subscribed to market book: ", mbookSymbols[i]);
-            } else {
-                Print("Failed to subscribe to: ", mbookSymbols[i], " (", GetLastError(), ")");
-            }
-        }
-    }
-
-    Print("Symbols set for mbook tracking: ", count, " symbols");
-    for(int i = 0; i < count; i++) {
-        Print("Symbol[", i, "]: ", mbookSymbols[i]);
-    }
-
-    isTrackingMbook = (ArraySize(mbookSymbols) > 0);
-}
-
-
-//+------------------------------------------------------------------+
-//| Send current OHLC data for all tracked symbols/timeframes        |
-//+------------------------------------------------------------------+
-void CData::SendCurrentOhlcs(SOCKET64 sock) {
-    client_socket = sock;
-    
-    for(int i = 0; i < ArraySize(ohlcRequests); i++) {
-        string symbol = ohlcRequests[i].symbol;
-        ENUM_TIMEFRAMES timeframe = ohlcRequests[i].timeframe;
-        
-        if(HasNewBar(symbol, timeframe) || !ohlcRequests[i].initialized) {
-            SendSymbolOhlc(symbol, timeframe, ohlcRequests[i].depth);
-            
-            // Update last bar time
-            MqlRates rates[];
-            if(CopyRates(symbol, timeframe, 0, 1, rates) > 0) {
-                UpdateLastBarTime(symbol, timeframe, rates[0].time);
-                ohlcRequests[i].initialized = true;
-            }
-        }
-    }
-}
-
-//+------------------------------------------------------------------+
-//| Send current market book data (hash-based change detection)     |
-//+------------------------------------------------------------------+
-void CData::SendCurrentMbook(SOCKET64 sock) {
-    client_socket = sock;
-
-    for (int i = 0; i < ArraySize(mbookSymbols); i++) {
-        string symbol = mbookSymbols[i];
-        MqlBookInfo bookInfo[];
-
-        if (!MarketBookGet(symbol, bookInfo)) {
-            int err = GetLastError();
-            Print("Failed to get market book for ", symbol, " error: ", (err));
-            continue;
-        }
-
-
-        // Ensure hash array is large enough
-        if (i >= ArraySize(lastBookHashes)) {
-            ArrayResize(lastBookHashes, i + 1);
-            lastBookHashes[i] = 0;
-        }
-
-        // Calculate current hash
-        ulong currentHash = CalculateBookHash(bookInfo);
-
-        // Skip if no change (except first run)
-        if (currentHash == lastBookHashes[i] && !firstRun) {
-            continue;
-        }
-
-        // Store new hash
-        lastBookHashes[i] = currentHash;
-
-        // Build and send JSON
-        string jsonStr = "{";
-        jsonStr += "\"type\":\"track_mbook\",";
-        jsonStr += "\"symbol\":\"" + symbol + "\",";
-        jsonStr += "\"market_book\":[";
-
-        string timeStr = TimeToString(TimeCurrent(), TIME_DATE | TIME_MINUTES | TIME_SECONDS);
-        for (int j = 0; j < ArraySize(bookInfo); j++) {
-            if (j > 0) jsonStr += ",";
-
-            string typeStr = (bookInfo[j].type == BOOK_TYPE_BUY) ? "BOOK_TYPE_BUY" : "BOOK_TYPE_SELL";
-
-            jsonStr += StringFormat(
-                "{\"time\":\"%s\",\"price\":%.5f,\"volume\":%.0f,\"volumereal\":%.2f,\"type\":\"%s\"}",
-                timeStr,
-                bookInfo[j].price,
-                bookInfo[j].volume,
-                bookInfo[j].volume_real,
-                typeStr
-            );
-        }
-
-        jsonStr += "]}";
-
-        SendPriceData(jsonStr);
-    }
-    
-    firstRun = false;
-}
-
-
-//+------------------------------------------------------------------+
-//| Calculate hash for market book data                             |
-//+------------------------------------------------------------------+
-ulong CData::CalculateBookHash(MqlBookInfo &bookInfo[]) {
-    ulong hash = 0;
-    int size = ArraySize(bookInfo);
-    
-    for (int i = 0; i < size; i++) {
-        ulong priceHash = (ulong)(bookInfo[i].price * 100000);
-        ulong volumeHash = (ulong)bookInfo[i].volume;
-        ulong volumeRealHash = (ulong)(bookInfo[i].volume_real * 100);
-        ulong typeHash = (ulong)bookInfo[i].type;
-        
-        hash ^= priceHash + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-        hash ^= volumeHash + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-        hash ^= volumeRealHash + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-        hash ^= typeHash + 0x9e3779b9 + (hash << 6) + (hash >> 2);
-    }
-    
-    return hash;
-}
-
-
-//+------------------------------------------------------------------+
-//| Send OHLC data for specific symbol and timeframe                 |
-//+------------------------------------------------------------------+
-void CData::SendSymbolOhlc(string symbol, ENUM_TIMEFRAMES timeframe, int depth) {
-    MqlRates rates[];
-    
-    int copied = CopyRates(symbol, timeframe, 0, depth, rates);
-    if(copied <= 0) {
-        Print("Failed to copy rates for ", symbol, " ", TimeframeToString(timeframe));
+void CData::SendData(string jsonData) {
+    if (client_socket == INVALID_SOCKET64) {
+        Print("Socket not connected - cannot send data");
         return;
     }
-    
-    int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
-    
-    Print("OHLC update for ", symbol, " ", TimeframeToString(timeframe), " - ", copied, " bars");
-    
-    string jsonStr = "{";
-    jsonStr += "\"type\":\"ohlc_update\",";
-    jsonStr += "\"symbol\":\"" + symbol + "\",";
-    jsonStr += "\"timeframe\":\"" + TimeframeToString(timeframe) + "\",";
-    jsonStr += "\"bars\":[";
-    
-    for(int i = 0; i < copied; i++) {
-        if(i > 0) jsonStr += ",";
-        
-        jsonStr += "{";
-        jsonStr += "\"time\":\"" + TimeToString(rates[i].time, TIME_DATE|TIME_MINUTES|TIME_SECONDS) + "\",";
-        jsonStr += "\"open\":" + DoubleToString(rates[i].open, digits) + ",";
-        jsonStr += "\"high\":" + DoubleToString(rates[i].high, digits) + ",";
-        jsonStr += "\"low\":" + DoubleToString(rates[i].low, digits) + ",";
-        jsonStr += "\"close\":" + DoubleToString(rates[i].close, digits) + ",";
-        jsonStr += "\"volume\":" + IntegerToString(rates[i].tick_volume);
-        jsonStr += "}";
-    }
-    
-    jsonStr += "]";
-    jsonStr += "}";
-    
-    SendOhlcData(jsonStr);
-}
-
-
-//+------------------------------------------------------------------+
-//| Check if there's a new bar for the symbol/timeframe             |
-//+------------------------------------------------------------------+
-bool CData::HasNewBar(string symbol, ENUM_TIMEFRAMES timeframe) {
-    int index = FindOhlcIndex(symbol, timeframe);
-    if(index < 0) return false;
-    
-    if(!ohlcRequests[index].initialized) {
-        return true;
-    }
-    
-    MqlRates rates[];
-    if(CopyRates(symbol, timeframe, 0, 1, rates) <= 0) {
-        return false;
-    }
-    
-    return (rates[0].time > ohlcRequests[index].lastBarTime);
+    SendWebSocketTextFrame(client_socket, jsonData);
 }
 
 //+------------------------------------------------------------------+
-//| Update last bar time for symbol/timeframe                       |
-//+------------------------------------------------------------------+
-void CData::UpdateLastBarTime(string symbol, ENUM_TIMEFRAMES timeframe, datetime barTime) {
-    int index = FindOhlcIndex(symbol, timeframe);
-    if(index >= 0) {
-        ohlcRequests[index].lastBarTime = barTime;
-    }
-}
-
-//+------------------------------------------------------------------+
-//| Find OHLC index for symbol/timeframe combination                |
-//+------------------------------------------------------------------+
-int CData::FindOhlcIndex(string symbol, ENUM_TIMEFRAMES timeframe) {
-    for(int i = 0; i < ArraySize(ohlcRequests); i++) {
-        if(ohlcRequests[i].symbol == symbol && ohlcRequests[i].timeframe == timeframe) {
-            return i;
-        }
-    }
-    return -1;
-}
-
-//+------------------------------------------------------------------+
-//| Convert timeframe enum to string                                |
+//| Convert timeframe enum to human-readable string                  |
 //+------------------------------------------------------------------+
 string CData::TimeframeToString(ENUM_TIMEFRAMES tf) {
     switch(tf) {
@@ -605,14 +181,129 @@ string CData::TimeframeToString(ENUM_TIMEFRAMES tf) {
         case PERIOD_D1:  return "D1";
         case PERIOD_W1:  return "W1";
         case PERIOD_MN1: return "MN1";
-        default: return "UNKNOWN";
+        default:         return "UNKNOWN";
     }
 }
 
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//|   ███  SECTION: Configuration                                    |
+//|                                                                  |
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+//| Set symbols for price tracking                                   |
+//+------------------------------------------------------------------+
+void CData::SetSymbols(const string &inputSymbols[]) {
+    ArrayResize(symbols, 0);
+    ArrayResize(symbolData, 0);
+
+    int count = ArraySize(inputSymbols);
+    if(count > 0) {
+        ArrayResize(symbols, count);
+        ArrayResize(symbolData, count);
+
+        for(int i = 0; i < count; i++) {
+            symbols[i] = inputSymbols[i];
+
+            symbolData[i].symbol      = inputSymbols[i];
+            symbolData[i].lastBid     = 0.0;
+            symbolData[i].lastAsk     = 0.0;
+            symbolData[i].initialized = false;
+        }
+    }
+
+    Print("Symbols set for price tracking: ", count, " symbols");
+    for(int i = 0; i < count; i++)
+        Print("Symbol[", i, "]: ", symbols[i]);
+
+    isTrackingPrice = (count > 0);
+}
+
+//+------------------------------------------------------------------+
+//| Set OHLC tracking requests                                       |
+//+------------------------------------------------------------------+
+void CData::SetOhlcRequests(const OhlcRequest &requests[]) {
+    ArrayResize(ohlcRequests, 0);
+
+    int count = ArraySize(requests);
+    if(count > 0) {
+        ArrayResize(ohlcRequests, count);
+
+        for(int i = 0; i < count; i++) {
+            ohlcRequests[i].symbol      = requests[i].symbol;
+            ohlcRequests[i].timeframe   = requests[i].timeframe;
+            ohlcRequests[i].depth       = requests[i].depth;
+            ohlcRequests[i].lastBarTime = 0;
+            ohlcRequests[i].initialized = false;
+        }
+    }
+
+    Print("OHLC requests set for tracking: ", count, " requests");
+    for(int i = 0; i < count; i++)
+        Print("OHLC[", i, "]: ", ohlcRequests[i].symbol, " ",
+              TimeframeToString(ohlcRequests[i].timeframe),
+              " depth=", ohlcRequests[i].depth);
+
+    isTrackingOhlc = (count > 0);
+}
+
+//+------------------------------------------------------------------+
+//| Set symbols for Market Book (DOM) tracking                       |
+//+------------------------------------------------------------------+
+void CData::SetMbookSymbols(const string &inputSymbols[]) {
+    // Unsubscribe from previous symbols
+    for (int i = 0; i < ArraySize(mbookSymbols); i++) {
+        if (MarketBookRelease(mbookSymbols[i]))
+            Print("Unsubscribed from market book: ", mbookSymbols[i]);
+        else
+            Print("Failed to unsubscribe: ", mbookSymbols[i], " (", GetLastError(), ")");
+    }
+
+    ArrayResize(mbookSymbols, 0);
+
+    // Subscribe to new symbols
+    int count = ArraySize(inputSymbols);
+    if(count > 0) {
+        ArrayResize(mbookSymbols, count);
+
+        for(int i = 0; i < count; i++) {
+            mbookSymbols[i] = inputSymbols[i];
+
+            if (MarketBookAdd(mbookSymbols[i]))
+                Print("Subscribed to market book: ", mbookSymbols[i]);
+            else
+                Print("Failed to subscribe to: ", mbookSymbols[i], " (", GetLastError(), ")");
+        }
+    }
+
+    Print("Symbols set for mbook tracking: ", count, " symbols");
+    for(int i = 0; i < count; i++)
+        Print("Symbol[", i, "]: ", mbookSymbols[i]);
+
+    // Reset change-detection state so new symbols always send on first tick
+    ArrayResize(lastBookHashes, 0);
+    mbookFirstRun = true;
+
+    isTrackingMbook = (count > 0);
+}
+
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//|   ███  SECTION: Price Tracking                                   |
+//|                                                                  |
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+//| Stream price updates for all tracked symbols (change-detect)     |
+//+------------------------------------------------------------------+
 void CData::SendCurrentPrices(SOCKET64 sock) {
     client_socket = sock;
+
     for (int i = 0; i < ArraySize(symbols); i++) {
-        string symbol = symbols[i];
+        string symbol     = symbols[i];
         double currentBid = GetSymbolBid(symbol);
         double currentAsk = GetSymbolAsk(symbol);
 
@@ -623,33 +314,37 @@ void CData::SendCurrentPrices(SOCKET64 sock) {
     }
 }
 
+//+------------------------------------------------------------------+
+//| Build and send JSON for a single symbol's price                  |
+//+------------------------------------------------------------------+
 void CData::SendSymbolPrice(string symbol) {
-    double bid = GetSymbolBid(symbol);
-    double ask = GetSymbolAsk(symbol);
-    double spread = GetSymbolSpread(symbol);
-    int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
-    datetime ts = TimeTradeServer();
-    long tickVolume = SymbolInfoInteger(symbol, SYMBOL_VOLUME);
+    double   bid    = GetSymbolBid(symbol);
+    double   ask    = GetSymbolAsk(symbol);
+    double   spread = GetSymbolSpread(symbol);
+    int      digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+    datetime ts     = TimeTradeServer();
+
     MqlTick tick;
     long realVolume = 0;
-    if(SymbolInfoTick(symbol, tick)) {
-        realVolume = tick.volume_real > 0 ? tick.volume_real : tick.volume;
-    }
+    if(SymbolInfoTick(symbol, tick))
+        realVolume = (long)(tick.volume_real > 0 ? tick.volume_real : tick.volume);
 
-    string jsonStr = "{";
-    jsonStr += "\"type\":\"price_update\",";
-    jsonStr += "\"timestamp\":" + IntegerToString((long)ts) + ",";
-    jsonStr += "\"symbol\":\"" + symbol + "\",";
-    jsonStr += "\"volume\":" + IntegerToString(realVolume) + ",";
-    jsonStr += "\"bid\":" + DoubleToString(bid, digits) + ",";
-    jsonStr += "\"ask\":" + DoubleToString(ask, digits) + ",";
-    jsonStr += "\"spread\":" + DoubleToString(spread, digits) + ",";
-    jsonStr += "\"digits\":" + IntegerToString(digits);
-    jsonStr += "}";
+    CJAVal jRes;
+    jRes["type"]      = "price_update";
+    jRes["timestamp"] = (long)ts;
+    jRes["symbol"]    = symbol;
+    jRes["volume"]    = (long)realVolume;
+    jRes["bid"]       = bid;
+    jRes["ask"]       = ask;
+    jRes["spread"]    = spread;
+    jRes["digits"]    = (long)digits;
 
-    SendPriceData(jsonStr);
+    SendData(jRes.Serialize());
 }
 
+//+------------------------------------------------------------------+
+//| Check if bid or ask has changed since last send                  |
+//+------------------------------------------------------------------+
 bool CData::HasPriceChanged(string symbol, double currentBid, double currentAsk) {
     int index = FindSymbolIndex(symbol);
     if(index < 0) return false;
@@ -659,31 +354,36 @@ bool CData::HasPriceChanged(string symbol, double currentBid, double currentAsk)
         return true;
     }
 
-    if(symbolData[index].lastBid != currentBid || symbolData[index].lastAsk != currentAsk) {
-        return true;
-    }
-
-    return false;
+    return (symbolData[index].lastBid != currentBid ||
+            symbolData[index].lastAsk != currentAsk);
 }
 
+//+------------------------------------------------------------------+
+//| Store latest bid/ask for change detection                        |
+//+------------------------------------------------------------------+
 void CData::UpdateStoredPrice(string symbol, double bid, double ask) {
     int index = FindSymbolIndex(symbol);
     if(index >= 0) {
-        symbolData[index].lastBid = bid;
-        symbolData[index].lastAsk = ask;
+        symbolData[index].lastBid     = bid;
+        symbolData[index].lastAsk     = ask;
         symbolData[index].initialized = true;
     }
 }
 
+//+------------------------------------------------------------------+
+//| Find symbol in the symbolData tracking array                     |
+//+------------------------------------------------------------------+
 int CData::FindSymbolIndex(string symbol) {
     for(int i = 0; i < ArraySize(symbolData); i++) {
-        if(symbolData[i].symbol == symbol) {
+        if(symbolData[i].symbol == symbol)
             return i;
-        }
     }
     return -1;
 }
 
+//+------------------------------------------------------------------+
+//| Symbol info wrappers                                             |
+//+------------------------------------------------------------------+
 double CData::GetSymbolBid(string symbol) {
     return SymbolInfoDouble(symbol, SYMBOL_BID);
 }
@@ -696,201 +396,336 @@ double CData::GetSymbolSpread(string symbol) {
     return SymbolInfoInteger(symbol, SYMBOL_SPREAD) * SymbolInfoDouble(symbol, SYMBOL_POINT);
 }
 
-void CData::SendPriceData(string jsonData) {
-    if (client_socket == INVALID_SOCKET64) {
-        Print("Socket not connected - cannot send price data");
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//|   ███  SECTION: OHLC Tracking                                   |
+//|                                                                  |
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+//| Stream OHLC bar updates for all tracked requests (new-bar detect)|
+//+------------------------------------------------------------------+
+void CData::SendCurrentOhlcs(SOCKET64 sock) {
+    client_socket = sock;
+
+    for(int i = 0; i < ArraySize(ohlcRequests); i++) {
+        string symbol           = ohlcRequests[i].symbol;
+        ENUM_TIMEFRAMES tf      = ohlcRequests[i].timeframe;
+
+        if(HasNewBar(symbol, tf)) {
+            SendSymbolOhlc(symbol, tf, ohlcRequests[i].depth);
+
+            // Update tracking state
+            MqlRates rates[];
+            if(CopyRates(symbol, tf, 0, 1, rates) > 0) {
+                UpdateLastBarTime(symbol, tf, rates[0].time);
+                ohlcRequests[i].initialized = true;
+            }
+        }
+    }
+}
+
+//+------------------------------------------------------------------+
+//| Build and send JSON for OHLC bars of one symbol/timeframe        |
+//+------------------------------------------------------------------+
+void CData::SendSymbolOhlc(string symbol, ENUM_TIMEFRAMES timeframe, int depth) {
+    MqlRates rates[];
+
+    int copied = CopyRates(symbol, timeframe, 0, depth, rates);
+    if(copied <= 0) {
+        Print("Failed to copy rates for ", symbol, " ", TimeframeToString(timeframe));
         return;
     }
-    SendWebSocketTextFrame(client_socket, jsonData + "}");
-}
 
-void CData::SendOhlcData(string jsonData) {
-    if (client_socket == INVALID_SOCKET64) {
-        Print("Socket not connected - cannot send OHLC data");
-        return;
-    }
-    SendWebSocketTextFrame(client_socket, jsonData + "}");
-}
+    Print("OHLC update for ", symbol, " ", TimeframeToString(timeframe), " - ", copied, " bars");
 
-void CData::SendOrderEventData(string jsonData) {
-    if (client_socket == INVALID_SOCKET64) {
-        Print("Socket not connected - cannot send Order Event data");
-        return;
-    }
-    SendWebSocketTextFrame(client_socket, jsonData + "}");
-}
+    CJAVal jRes;
+    jRes["type"]      = "ohlc_update";
+    jRes["symbol"]    = symbol;
+    jRes["timeframe"] = TimeframeToString(timeframe);
 
-//+------------------------------------------------------------------+
-//| Set economic calendar streaming filter                          |
-//+------------------------------------------------------------------+
-void CData::setCalendarFilter(const string &countries[], const string &currencies[], string minImportance) {
-    ArrayResize(calendarCountries, ArraySize(countries));
-    for (int i = 0; i < ArraySize(countries); i++) {
-        calendarCountries[i] = countries[i];
+    CJAVal jBars;
+    jBars.Clear(jtARRAY);
+
+    for(int i = 0; i < copied; i++) {
+        CJAVal jBar;
+        jBar["time"]   = TimeToString(rates[i].time, TIME_DATE|TIME_MINUTES|TIME_SECONDS);
+        jBar["open"]   = rates[i].open;
+        jBar["high"]   = rates[i].high;
+        jBar["low"]    = rates[i].low;
+        jBar["close"]  = rates[i].close;
+        jBar["volume"] = (long)rates[i].tick_volume;
+
+        jBars.Add(jBar);
     }
 
-    ArrayResize(calendarCurrencies, ArraySize(currencies));
-    for (int i = 0; i < ArraySize(currencies); i++) {
-        calendarCurrencies[i] = currencies[i];
-    }
+    jRes["bars"].Set(jBars);
 
-    if (minImportance == "high")
-        calendarMinImportance = CALENDAR_IMPORTANCE_HIGH;
-    else if (minImportance == "medium")
-        calendarMinImportance = CALENDAR_IMPORTANCE_MODERATE;
-    else
-        calendarMinImportance = CALENDAR_IMPORTANCE_LOW;
-
-    // Prime change_id on first activation so we don't flood the client
-    // with the entire calendar history on the very next poll.
-    if (lastCalendarChangeId == 0) {
-        MqlCalendarValue primeValues[];
-        CalendarValueLast(lastCalendarChangeId, primeValues);
-    }
-
-    isTrackingCalendar = true;
-
-    Print("Calendar tracking enabled - countries: ", ArraySize(calendarCountries),
-          ", currencies: ", ArraySize(calendarCurrencies),
-          ", min importance: ", minImportance);
+    SendData(jRes.Serialize());
 }
 
 //+------------------------------------------------------------------+
-//| Format datetime calendar jadi ISO-8601 UTC ("Z").                |
-//| PENTING: MqlCalendarValue.time BUKAN pure GMT - epoch-nya di-    |
-//| shift sama seperti TimeTradeServer() (nunjukin digit jam broker |
-//| kalau di-format naif, konfirmasi empiris: MT5 terminal & hasil   |
-//| tanpa koreksi ini match persis). Wajib dikoreksi pakai selisih   |
-//| (TimeTradeServer() - TimeGMT()) dulu - lihat MQL5 Book "Universal|
-//| Time": untuk mengikat event ke waktu server, koreksi pakai       |
-//| (TimeTradeServer() - TimeGMT()).                                  |
+//| Check if a new bar has formed since last send                    |
 //+------------------------------------------------------------------+
-string CData::ToIso8601Utc(datetime t) {
-    datetime trueUtc = t - (TimeTradeServer() - TimeGMT());
-    MqlDateTime dt;
-    TimeToStruct(trueUtc, dt);
-    return StringFormat("%04d-%02d-%02dT%02d:%02d:%02dZ", dt.year, dt.mon, dt.day, dt.hour, dt.min, dt.sec);
-}
+bool CData::HasNewBar(string symbol, ENUM_TIMEFRAMES timeframe) {
+    int index = FindOhlcIndex(symbol, timeframe);
+    if(index < 0) return false;
 
-//+------------------------------------------------------------------+
-//| Convert calendar importance enum to string                      |
-//+------------------------------------------------------------------+
-string CData::CalendarImportanceToString(ENUM_CALENDAR_EVENT_IMPORTANCE imp) {
-    switch (imp) {
-        case CALENDAR_IMPORTANCE_HIGH:     return "high";
-        case CALENDAR_IMPORTANCE_MODERATE: return "medium";
-        case CALENDAR_IMPORTANCE_LOW:      return "low";
-        default:                           return "none";
-    }
-}
-
-//+------------------------------------------------------------------+
-//| Check whether a calendar value matches the active filter        |
-//+------------------------------------------------------------------+
-bool CData::CalendarValuePassesFilter(MqlCalendarValue &val) {
-    MqlCalendarEvent evt;
-    if (!CalendarEventById(val.event_id, evt))
-        return false;
-
-    if (evt.importance < calendarMinImportance)
-        return false;
-
-    bool hasCountryFilter  = (ArraySize(calendarCountries) > 0);
-    bool hasCurrencyFilter = (ArraySize(calendarCurrencies) > 0);
-
-    if (!hasCountryFilter && !hasCurrencyFilter)
+    if(!ohlcRequests[index].initialized)
         return true;
 
-    MqlCalendarCountry country;
-    if (!CalendarCountryById(evt.country_id, country))
+    MqlRates rates[];
+    if(CopyRates(symbol, timeframe, 0, 1, rates) <= 0)
         return false;
 
-    if (hasCountryFilter) {
-        bool matched = false;
-        for (int i = 0; i < ArraySize(calendarCountries); i++) {
-            if (calendarCountries[i] == country.code) { matched = true; break; }
-        }
-        if (!matched) return false;
-    }
-
-    if (hasCurrencyFilter) {
-        bool matched = false;
-        for (int i = 0; i < ArraySize(calendarCurrencies); i++) {
-            if (calendarCurrencies[i] == country.currency) { matched = true; break; }
-        }
-        if (!matched) return false;
-    }
-
-    return true;
+    return (rates[0].time > ohlcRequests[index].lastBarTime);
 }
 
 //+------------------------------------------------------------------+
-//| Build JSON for a single calendar value                          |
+//| Store the latest bar time for new-bar detection                  |
 //+------------------------------------------------------------------+
-string CData::BuildCalendarEventJson(MqlCalendarValue &val) {
-    MqlCalendarEvent evt;
-    CalendarEventById(val.event_id, evt);
-    MqlCalendarCountry country;
-    CalendarCountryById(evt.country_id, country);
-
-    string safeName = evt.name;
-    StringReplace(safeName, "\"", "'");
-
-    string actualStr   = val.HasActualValue()   ? DoubleToString(val.GetActualValue(), 3)   : "null";
-    string forecastStr = val.HasForecastValue() ? DoubleToString(val.GetForecastValue(), 3) : "null";
-    string previousStr = val.HasPreviousValue() ? DoubleToString(val.GetPreviousValue(), 3) : "null";
-
-    string json = "{";
-    json += "\"event_id\":" + IntegerToString((long)val.event_id) + ",";
-    json += "\"value_id\":" + IntegerToString((long)val.id) + ",";
-    json += "\"name\":\"" + safeName + "\",";
-    json += "\"country\":\"" + country.code + "\",";
-    json += "\"currency\":\"" + country.currency + "\",";
-    json += "\"importance\":\"" + CalendarImportanceToString(evt.importance) + "\",";
-    json += "\"time\":\"" + ToIso8601Utc(val.time) + "\",";
-    json += "\"period\":\"" + ToIso8601Utc(val.period) + "\",";
-    json += "\"actual\":" + actualStr + ",";
-    json += "\"forecast\":" + forecastStr + ",";
-    json += "\"previous\":" + previousStr;
-    json += "}";
-
-    return json;
+void CData::UpdateLastBarTime(string symbol, ENUM_TIMEFRAMES timeframe, datetime barTime) {
+    int index = FindOhlcIndex(symbol, timeframe);
+    if(index >= 0)
+        ohlcRequests[index].lastBarTime = barTime;
 }
 
 //+------------------------------------------------------------------+
-//| Send calendar updates since the last change_id (delta-based)    |
+//| Find OHLC request index for a symbol/timeframe pair              |
 //+------------------------------------------------------------------+
-void CData::SendCurrentCalendar(SOCKET64 sock) {
+int CData::FindOhlcIndex(string symbol, ENUM_TIMEFRAMES timeframe) {
+    for(int i = 0; i < ArraySize(ohlcRequests); i++) {
+        if(ohlcRequests[i].symbol == symbol && ohlcRequests[i].timeframe == timeframe)
+            return i;
+    }
+    return -1;
+}
+
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//|   ███  SECTION: Market Book (DOM) Tracking                       |
+//|                                                                  |
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+//| Stream market book updates (hash-based change detection)         |
+//+------------------------------------------------------------------+
+void CData::SendCurrentMbook(SOCKET64 sock) {
+    client_socket = sock;
+
+    for (int i = 0; i < ArraySize(mbookSymbols); i++) {
+        string symbol = mbookSymbols[i];
+        MqlBookInfo bookInfo[];
+
+        if (!MarketBookGet(symbol, bookInfo)) {
+            Print("Failed to get market book for ", symbol, " error: ", GetLastError());
+            continue;
+        }
+
+        // Ensure hash array is large enough
+        if (i >= ArraySize(lastBookHashes)) {
+            ArrayResize(lastBookHashes, i + 1);
+            lastBookHashes[i] = 0;
+        }
+
+        // Calculate current hash
+        ulong currentHash = CalculateBookHash(bookInfo);
+
+        // Skip if no change (except first run)
+        if (currentHash == lastBookHashes[i] && !mbookFirstRun)
+            continue;
+
+        // Store new hash
+        lastBookHashes[i] = currentHash;
+
+        // Build and send JSON
+        CJAVal jRes;
+        jRes["type"]   = "track_mbook";
+        jRes["symbol"] = symbol;
+
+        CJAVal jBook;
+        jBook.Clear(jtARRAY);
+
+        string timeStr = TimeToString(TimeCurrent(), TIME_DATE | TIME_MINUTES | TIME_SECONDS);
+        for (int j = 0; j < ArraySize(bookInfo); j++) {
+            CJAVal jItem;
+            jItem["time"]       = timeStr;
+            jItem["price"]      = bookInfo[j].price;
+            jItem["volume"]     = (long)bookInfo[j].volume;
+            jItem["volumereal"] = bookInfo[j].volume_real;
+            jItem["type"]       = (bookInfo[j].type == BOOK_TYPE_BUY) ? "BOOK_TYPE_BUY" : "BOOK_TYPE_SELL";
+            jBook.Add(jItem);
+        }
+
+        jRes["market_book"].Set(jBook);
+        SendData(jRes.Serialize());
+    }
+
+    mbookFirstRun = false;
+}
+
+//+------------------------------------------------------------------+
+//| Hash the entire book snapshot for change detection                |
+//+------------------------------------------------------------------+
+ulong CData::CalculateBookHash(MqlBookInfo &bookInfo[]) {
+    ulong hash = 0;
+    int size = ArraySize(bookInfo);
+
+    for (int i = 0; i < size; i++) {
+        ulong priceHash      = (ulong)(bookInfo[i].price * 100000);
+        ulong volumeHash     = (ulong)bookInfo[i].volume;
+        ulong volumeRealHash = (ulong)(bookInfo[i].volume_real * 100);
+        ulong typeHash       = (ulong)bookInfo[i].type;
+
+        hash ^= priceHash      + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        hash ^= volumeHash     + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        hash ^= volumeRealHash + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+        hash ^= typeHash       + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+    }
+
+    return hash;
+}
+
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//|   ███  SECTION: Calendar Tracking                                |
+//|                                                                  |
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+//| Configure calendar event streaming filters                       |
+//+------------------------------------------------------------------+
+void CData::SetCalendarTracking(string country, string currency) {
+    // Treat "ALL" as NULL (no filter in MQL5)
+    calendarCountry  = (country == "ALL" ? NULL : country);
+    calendarCurrency = (currency == "ALL" ? NULL : currency);
+    calendarChangeId = 0;
+
+    // Empty filters = disable tracking
+    bool enabled = (country != "" || currency != "");
+    isTrackingCalendar = enabled;
+
+    if (enabled) {
+        // Initialize change_id to current database state
+        // First call with change_id=0 returns 0 events but sets the cursor
+        MqlCalendarValue values[];
+        CalendarValueLast(calendarChangeId, values, calendarCountry, calendarCurrency);
+        Print("Calendar tracking enabled — country: ",
+              (country != "" ? country : "ALL"),
+              ", currency: ",
+              (currency != "" ? currency : "ALL"),
+              ", change_id: ", calendarChangeId);
+    } else {
+        Print("Calendar tracking disabled");
+    }
+}
+
+//+------------------------------------------------------------------+
+//| Stream calendar event updates (change_id-based detection)        |
+//+------------------------------------------------------------------+
+void CData::SendCalendarUpdates(SOCKET64 sock) {
     client_socket = sock;
 
     MqlCalendarValue values[];
-    int count = CalendarValueLast(lastCalendarChangeId, values);
+    int count = CalendarValueLast(calendarChangeId, values,
+                                  calendarCountry, calendarCurrency);
+
     if (count <= 0)
         return;
 
-    string jsonStr = "{\"type\":\"calendar_update\",\"events\":[";
-    bool first = true;
+    Print("Calendar update: ", count, " event(s) changed");
+
+    CJAVal jRes;
+    jRes["type"] = "calendar_update";
+
+    CJAVal jEvents;
+    jEvents.Clear(jtARRAY);
+
     for (int i = 0; i < count; i++) {
-        if (!CalendarValuePassesFilter(values[i]))
-            continue;
+        CJAVal row;
 
-        if (!first) jsonStr += ",";
-        jsonStr += BuildCalendarEventJson(values[i]);
-        first = false;
+        // Enrich with event metadata
+        MqlCalendarEvent eventInfo;
+        MqlCalendarCountry countryInfo;
+        string eventName    = "Unknown";
+        int    importance   = 0;
+        string currency     = "";
+        string country_code = "";
+
+        if (CalendarEventById(values[i].event_id, eventInfo)) {
+            eventName    = eventInfo.name;
+            importance   = eventInfo.importance;
+            if (CalendarCountryById(eventInfo.country_id, countryInfo)) {
+                currency     = countryInfo.currency;
+                country_code = countryInfo.code;
+            }
+        }
+
+        row["value_id"]     = (long)values[i].id;
+        row["event_id"]     = (long)values[i].event_id;
+        row["name"]         = eventName;
+        row["country_code"] = country_code;
+        row["currency"]     = currency;
+        row["importance"]   = (long)importance;
+
+        // Format time as ISO 8601
+        string t = TimeToString(values[i].time, TIME_DATE | TIME_MINUTES | TIME_SECONDS);
+        StringReplace(t, ".", "-");
+        StringReplace(t, " ", "T");
+        row["time"] = t;
+
+        // Values are stored × 1,000,000; LONG_MIN means not yet available
+        if (values[i].actual_value != LONG_MIN)
+            row["actual"] = (double)values[i].actual_value / 1000000.0;
+        else
+            row["actual"].Clear();
+
+        if (values[i].forecast_value != LONG_MIN)
+            row["forecast"] = (double)values[i].forecast_value / 1000000.0;
+        else
+            row["forecast"].Clear();
+
+        if (values[i].prev_value != LONG_MIN)
+            row["previous"] = (double)values[i].prev_value / 1000000.0;
+        else
+            row["previous"].Clear();
+
+        jEvents.Add(row);
     }
-    jsonStr += "]}";
 
-    // Nothing matched the filter this round - skip the send entirely
-    if (!first)
-        SendCalendarData(jsonStr);
+    jRes["events"].Set(jEvents);
+    SendData(jRes.Serialize());
 }
 
-void CData::SendCalendarData(string jsonData) {
-    if (client_socket == INVALID_SOCKET64) {
-        Print("Socket not connected - cannot send calendar data");
-        return;
-    }
-    SendWebSocketTextFrame(client_socket, jsonData);
+
+//+------------------------------------------------------------------+
+//|                                                                  |
+//|   ███  SECTION: Status Heartbeat                                 |
+//|                                                                  |
+//+------------------------------------------------------------------+
+
+//+------------------------------------------------------------------+
+//| Broadcast current tracking flags + EA uptime (throttled by       |
+//| caller to ~every 5s, not every timer tick). Backend compares     |
+//| this against what it expects from its own .env config, and uses  |
+//| the absence of this message (staleness) to detect a dead EA.     |
+//+------------------------------------------------------------------+
+void CData::SendTrackingStatus(SOCKET64 sock, datetime eaStartTime) {
+    client_socket = sock;
+
+    CJAVal jRes;
+    jRes["type"]       = "tracking_status";
+    jRes["price"]      = isTrackingPrice;
+    jRes["ohlc"]       = isTrackingOhlc;
+    jRes["mbook"]      = isTrackingMbook;
+    jRes["calendar"]   = isTrackingCalendar;
+    jRes["uptime_sec"] = (long)(TimeTradeServer() - eaStartTime);
+
+    SendData(jRes.Serialize());
 }
+
 
 #endif // DATA_MQH

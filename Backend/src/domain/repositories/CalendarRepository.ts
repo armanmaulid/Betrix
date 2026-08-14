@@ -21,4 +21,5 @@ export interface CalendarRepository {
   getMaxEventTime(): Promise<Date | null>;
   findByQuery(query: CalendarQuery): Promise<CalendarEvent[]>;
   findByEventId(eventId: number): Promise<CalendarEvent | null>;
+  findByValueId(valueId: number): Promise<CalendarEvent | null>;
 }

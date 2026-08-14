@@ -5,6 +5,7 @@ import { BrokerSymbol } from "@domain/entities/BrokerSymbol.js";
 import { logger } from "@core/logging/logger.js";
 import { env } from "@config/env.js";
 import { INotifier } from "@application/ports/INotifier.js";
+import { IBrokerProvider } from "@application/ports/IBrokerProvider.js";
 
 interface PriceData {
   symbol: string;
@@ -46,8 +47,26 @@ export class MarketDataService {
   constructor(
     @inject("MarketDataRepository") private marketDataRepo: MarketDataRepository,
     @inject("SymbolRepository") private symbolRepo: SymbolRepository,
-    @inject("INotifier") private notifier: INotifier
+    @inject("INotifier") private notifier: INotifier,
+    @inject("IBrokerProvider") private brokerClient: IBrokerProvider
   ) {}
+
+  // Minutes per bar per timeframe. Used to compute a date range wide enough
+  // to cover ~100 bars (with 1.5x buffer for holidays/weekends gaps).
+  private static readonly TF_MINUTES: Record<string, number> = {
+    M1: 1, M5: 5, M15: 15, M30: 30, H1: 60, H4: 240, D1: 1440, W1: 10080, MN1: 43200,
+  };
+
+  private dateRangeFor(timeframe: string): { fromDate: string; toDate: string } {
+    const minutes = MarketDataService.TF_MINUTES[timeframe] ?? 1440;
+    const bufferMs = minutes * 60 * 1000 * 100 * 1.5;
+    const now = Date.now();
+    const fromMs = now - bufferMs;
+    return {
+      fromDate: new Date(fromMs).toISOString().slice(0, 10),
+      toDate: new Date(now).toISOString().slice(0, 10),
+    };
+  }
 
   async getPrice(symbol: string): Promise<PriceData | null> {
     const data = await this.marketDataRepo.getPrice(symbol);
@@ -63,9 +82,19 @@ export class MarketDataService {
     return results;
   }
 
-  async getOHLC(symbol: string, timeframe: string): Promise<OHLCData | null> {
-    const data = await this.marketDataRepo.getOHLC(symbol, timeframe);
-    return data || null;
+  async getOHLC(symbol: string, timeframe: string): Promise<OHLCData[]> {
+    const { fromDate, toDate } = this.dateRangeFor(timeframe);
+    const bars = await this.brokerClient.fetchHistory(symbol, timeframe, fromDate, toDate);
+    return bars.map(b => ({
+      symbol,
+      timeframe,
+      time: Math.floor(new Date(b.time).getTime() / 1000),
+      open: b.open,
+      high: b.high,
+      low: b.low,
+      close: b.close,
+      volume: b.volume,
+    }));
   }
 
   async getMarketBook(symbol: string): Promise<MarketBookData | null> {

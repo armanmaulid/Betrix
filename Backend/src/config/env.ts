@@ -22,9 +22,9 @@ const envSchema = z.object({
   MODEL_CHEAP: z.string().min(1),
   MODEL_BALANCED: z.string().min(1),
   MODEL_DEEP: z.string().min(1),
-  MODEL_CHEAP_MAX_TOKENS: z.coerce.number().default(1024),
-  MODEL_BALANCED_MAX_TOKENS: z.coerce.number().default(2048),
-  MODEL_DEEP_MAX_TOKENS: z.coerce.number().default(4096),
+  MODEL_CHEAP_MAX_TOKENS: z.coerce.number().default(2048),
+  MODEL_BALANCED_MAX_TOKENS: z.coerce.number().default(4096),
+  MODEL_DEEP_MAX_TOKENS: z.coerce.number().default(8192),
   
   SMTP_HOST: z.string().default("smtp.gmail.com"),
   SMTP_PORT: z.coerce.number().default(587),

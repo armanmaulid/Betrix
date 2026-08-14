@@ -150,13 +150,15 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
       setFilter((prev) => ({
         ...prev,
         countries: new Set(countries),
-        currencies: new Set(currencies),
+        currencies: new Set(["USD"]), // Default hanya USD sesuai permintaan user
       }));
     } else {
       setFilter((prev) => {
         const nextCountries = new Set(prev.countries);
         countries.forEach((c) => nextCountries.add(c));
-        return { ...prev, countries: nextCountries };
+        const nextCurrencies = new Set(prev.currencies);
+        // Jangan auto-tambah currency baru jika sudah init, biarkan user yg atur
+        return { ...prev, countries: nextCountries, currencies: nextCurrencies };
       });
     }
   }, [data]);
@@ -259,7 +261,7 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
   function resetFilters() {
     setFilter({
       countries: new Set(availableCountries),
-      currencies: new Set(availableCurrencies),
+      currencies: new Set(["USD"]),
       impacts: new Set(["high", "medium"]),
       showOnlyWithData: false,
       period: "this_week",

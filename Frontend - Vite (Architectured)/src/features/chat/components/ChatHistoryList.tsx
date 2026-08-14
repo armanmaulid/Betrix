@@ -28,7 +28,7 @@ export function ChatHistoryList() {
   }, [view]);
 
   const loadSession = (session: any) => {
-    setCurrentSessionId(session.session_id);
+    setCurrentSessionId(session.sessionId);
     if (session.turns && Array.isArray(session.turns)) {
       setMessages(
         session.turns.flatMap((turn: any) => [
@@ -36,8 +36,8 @@ export function ChatHistoryList() {
           { 
             role: 'agent', 
             content: turn.reply || "...", 
-            tools: turn.model_used,
-            thinkingTime: turn.latency_ms ? `${(turn.latency_ms / 1000).toFixed(1)}s` : undefined,
+            tools: turn.modelUsed,
+            thinkingTime: turn.latencyMs ? `${(turn.latencyMs / 1000).toFixed(1)}s` : undefined,
             isTyping: false
           }
         ])
@@ -48,8 +48,8 @@ export function ChatHistoryList() {
         { 
           role: 'agent', 
           content: session.reply || "...", 
-          tools: session.model_used,
-          thinkingTime: session.latency_ms ? `${(session.latency_ms / 1000).toFixed(1)}s` : undefined,
+          tools: session.modelUsed,
+          thinkingTime: session.latencyMs ? `${(session.latencyMs / 1000).toFixed(1)}s` : undefined,
           isTyping: false
         }
       ]);
@@ -60,7 +60,7 @@ export function ChatHistoryList() {
   const handleDeleteSession = (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
     const prevSessions = recentSessions;
-    setRecentSessions(prev => prev.filter(s => (s.session_id || s.id) !== sessionId));
+    setRecentSessions(prev => prev.filter(s => s.sessionId !== sessionId));
     deleteChatSession(sessionId)
       .then(() => {
         fetchHistory();
@@ -88,21 +88,21 @@ export function ChatHistoryList() {
   return (
     <>
       {recentSessions.map((session: any) => (
-        <div key={session.session_id || session.id} className="flex items-center justify-between border border-[#222] bg-[#0a0a0a] page-container py-2 group hover:border-[#444] transition-colors shadow-sm mt-1">
+        <div key={session.sessionId} className="flex items-center justify-between border border-[#222] bg-[#0a0a0a] page-container py-2 group hover:border-[#444] transition-colors shadow-sm mt-1">
           <div className="flex items-center gap-2 text-[#ccc] w-full max-w-[80%]">
             <MessageSquare size={14} className="text-[#ff9900] shrink-0" />
             <span onClick={() => loadSession(session)} className="text-[11px] truncate hover:text-white cursor-pointer transition-colors w-full">
-              {session.title || session.message}
+              {session.title || (session.turns && session.turns[0]?.message)}
             </span>
           </div>
           <div className="flex items-center gap-4 text-[#555] text-[10px]">
             <div className="flex items-center gap-1.5 shrink-0">
               <span className="text-[#ff9900] font-bold">Q</span>
-              <span>{timeAgo(session.created_at)}</span>
+              <span>{timeAgo(session.createdAt)}</span>
             </div>
             <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
-                onClick={(e) => handleDeleteSession(e, session.session_id || session.id)}
+                onClick={(e) => handleDeleteSession(e, session.sessionId)}
                 className="hover:text-[#ff4444] transition-colors"
               >
                 <Trash2 size={12} />

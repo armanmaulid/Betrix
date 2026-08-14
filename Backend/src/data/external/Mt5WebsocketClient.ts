@@ -1,4 +1,5 @@
 import { injectable, singleton } from "tsyringe";
+import { WebSocket } from "ws";
 import { env } from "@config/env.js";
 import { logger } from "@core/logging/logger.js";
 import { BrokerCallbacks } from "@application/ports/IBrokerProvider.js";
@@ -42,7 +43,7 @@ export class Mt5WebsocketClient {
           resolve();
         };
 
-        this.ws.onmessage = (event) => this.handleMessage(event.data);
+        this.ws.onmessage = (event) => this.handleMessage(event.data.toString());
         
         this.ws.onclose = () => {
           logger.warn("MT5 WebSocket disconnected", { context: "MT5" });
@@ -206,6 +207,7 @@ export class Mt5WebsocketClient {
 
     for (const event of msg.events) {
       const update = {
+        value_id: event.value_id,
         event_id: event.event_id,
         actual: event.actual,
         forecast: event.forecast,

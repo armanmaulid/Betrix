@@ -21,7 +21,7 @@ export const sendMessageDto = z.object({
   })).max(20).optional(),
   sessionId: z.string().uuid().optional(),
   tier: modelTierSchema.optional(),
-  image: z.string().optional(),
+  image: z.string().nullish(),
 });
 
 export const getHistoryDto = z.object({

@@ -183,7 +183,7 @@ export class PgCalendarRepository implements CalendarRepository {
     let queryStr = `
       SELECT * FROM calendar_events 
       ${whereClause}
-      ORDER BY event_time DESC
+      ORDER BY event_time ASC
     `;
     
     if (query.limit) {
@@ -199,6 +199,14 @@ export class PgCalendarRepository implements CalendarRepository {
     const { rows } = await pgClient.query(
       `SELECT * FROM calendar_events WHERE event_id = $1 LIMIT 1`,
       [eventId]
+    );
+    return rows.length > 0 ? this.mapRow(rows[0]) : null;
+  }
+
+  async findByValueId(valueId: number): Promise<CalendarEvent | null> {
+    const { rows } = await pgClient.query(
+      `SELECT * FROM calendar_events WHERE value_id = $1 LIMIT 1`,
+      [valueId]
     );
     return rows.length > 0 ? this.mapRow(rows[0]) : null;
   }

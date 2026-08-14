@@ -2,6 +2,7 @@ import { injectable, singleton } from "tsyringe";
 import { env } from "@config/env.js";
 import { logger } from "@core/logging/logger.js";
 import { BrokerSymbol } from "@domain/entities/BrokerSymbol.js";
+import { OHLCBar } from "@application/ports/IBrokerProvider.js";
 
 interface Mt5Symbol {
   name: string;
@@ -137,5 +138,11 @@ export class Mt5HttpClient {
   async fetchCalendar(period = "today"): Promise<any[]> {
     const data = await this.fetchWithRetry<any>(`${this.getHttpBase()}/v1/calendar?period=${period}`);
     return Array.isArray(data) ? data : (data && typeof data === 'object' && 'data' in data ? (data as { data?: any[] }).data ?? [] : []);
+  }
+
+  async fetchHistory(symbol: string, timeframe: string, fromDate: string, toDate: string): Promise<OHLCBar[]> {
+    const url = `${this.getHttpBase()}/v1/history/prices?symbol=${encodeURIComponent(symbol)}&time_frame=${encodeURIComponent(timeframe)}&from_date=${encodeURIComponent(fromDate)}&to_date=${encodeURIComponent(toDate)}`;
+    const data = await this.fetchWithRetry<{ data?: OHLCBar[] }>(url);
+    return data.data ?? [];
   }
 }

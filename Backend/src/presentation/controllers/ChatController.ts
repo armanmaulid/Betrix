@@ -69,8 +69,9 @@ export class ChatController {
         usage: result.usage,
       })}\n\n`);
       res.end();
-    } catch (err) {
-      res.write(`event: error\ndata: ${JSON.stringify({ error: "Failed to stream message" })}\n\n`);
+    } catch (err: any) {
+      const errorMessage = err.message || "Failed to stream message";
+      res.write(`event: error\ndata: ${JSON.stringify({ error: errorMessage })}\n\n`);
       res.end();
     }
   }

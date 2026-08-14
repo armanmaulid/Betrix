@@ -1,4 +1,7 @@
 # Dependencies
+.agent/skills
+.agents
+.gemini/rules
 node_modules/
 
 # Environment variables
@@ -38,4 +41,21 @@ Thumbs.db
 # Cookies and temp files
 cookies.txt
 *.tmp
+*.bak
 test-*.json
+
+# Codebase memory / tooling
+.codebase-memory/
+.agent/skills
+.agents/
+.gemini/rules/
+.claude/
+
+# Test coverage
+coverage/
+
+# TypeScript
+*.tsbuildinfo
+
+# Vercel
+.vercel/

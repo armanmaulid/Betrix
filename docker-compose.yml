@@ -8,12 +8,13 @@ services:
       - ./Backend/.env
     environment:
       DATABASE_URL: postgresql://betrix:betrixpass@postgres:5432/betrix
-      REDIS_URL: redis://redis:6379
+      UPSTASH_REDIS_REST_URL: http://srh:80
+      UPSTASH_REDIS_REST_TOKEN: local_dev_token
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
-        condition: service_healthy
+      srh:
+        condition: service_started
     restart: unless-stopped
 
   postgres:
@@ -22,6 +23,8 @@ services:
       POSTGRES_USER: betrix
       POSTGRES_PASSWORD: betrixpass
       POSTGRES_DB: betrix
+    ports:
+      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -33,6 +36,8 @@ services:
 
   redis:
     image: redis:7-alpine
+    ports:
+      - "6379:6379"
     volumes:
       - redisdata:/data
     healthcheck:
@@ -40,6 +45,19 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  srh:
+    image: hiett/serverless-redis-http:latest
+    environment:
+      SRH_MODE: env
+      SRH_TOKEN: local_dev_token
+      SRH_CONNECTION_STRING: redis://redis:6379
+    ports:
+      - "8079:80"
+    depends_on:
+      redis:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

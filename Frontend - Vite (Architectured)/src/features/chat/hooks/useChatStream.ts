@@ -49,9 +49,9 @@ export function useChatStream() {
     const imageToSend = attachedImage;
     setAttachedImage(null);
 
-    // 2. Extract clean history
+    // 2. Extract clean history — normalize 'agent' → 'assistant' (backend only accepts user|assistant)
     const chatHistory = messages.filter((m: any) => !m.isTyping).map((m: any) => ({
-      role: m.role,
+      role: m.role === 'agent' ? 'assistant' : m.role,
       content: m.content || "",
       image: m.image
     }));
@@ -115,8 +115,8 @@ export function useChatStream() {
         messageToSend = `[KESALAHAN INPUT USER]\nUser mencoba menggunakan command instrumen namun simbolnya tidak valid. Beritahu user: ${invalidReason}\n\n[PERMINTAAN USER]\n${text}`;
       } else {
         try {
-          const candle = await fetchOHLC(instrument.symbol, instrument.timeframe);
-          const candles = candle ? [candle] : [];
+          const result = await fetchOHLC(instrument.symbol, instrument.timeframe);
+          const candles = result?.candles ?? [];
           messageToSend = newsPrefix + buildTradeAnalysisPrompt(instrument, candles, text);
         } catch (err: any) {
           messageToSend = newsPrefix + `[DATA PASAR TIDAK TERSEDIA: ${err?.message || "gagal mengambil data MT5"}]\n\nUser meminta analisa ${instrument.symbol} (${instrument.timeframe}) tapi data MT5 gagal diambil. Beritahu user datanya sedang tidak tersedia, JANGAN mengarang harga.\n\n[PERMINTAAN USER]\n${text}`;

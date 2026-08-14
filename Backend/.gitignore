@@ -6,6 +6,7 @@ dist/
 .env
 .env.local
 .env.production
+.env.bak
 
 # Logs
 logs/
@@ -23,3 +24,21 @@ Thumbs.db
 
 # Agent/tool directories
 .agents/
+.agent/skills
+.gemini/rules
+.codebase-memory/
+
+# Build & cache
+build/
+.cache/
+.eslintcache
+
+# Test coverage
+coverage/
+
+# TypeScript
+*.tsbuildinfo
+
+# Temp files
+*.tmp
+test-*.json

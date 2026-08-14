@@ -9,6 +9,7 @@ import { INotifier } from "@application/ports/INotifier.js";
 import { CalendarUpdate } from "@application/ports/IBrokerProvider.js";
 
 interface Mt5CalendarEvent {
+  value_id?: number;
   event_id: number;
   name: string;
   country_code: string;
@@ -69,15 +70,19 @@ export class CalendarService {
   }
 
   private transformMt5Event(e: Mt5CalendarEvent): CalendarEvent {
-    // Use event_id as value_id (unique per event)
-    const valueId = e.event_id;
+    // Use actual value_id if available, fallback to event_id
+    const valueId = e.value_id ?? e.event_id;
     const importanceMap: CalendarImportance[] = [CalendarImportance.NONE, CalendarImportance.LOW, CalendarImportance.MEDIUM, CalendarImportance.HIGH];
     const importance = importanceMap[e.importance] || CalendarImportance.NONE;
+
+    const sign = env.MT5_BROKER_UTC_OFFSET >= 0 ? "+" : "-";
+    const hours = Math.abs(env.MT5_BROKER_UTC_OFFSET).toString().padStart(2, "0");
+    const timezoneStr = `${sign}${hours}:00`;
 
     return CalendarEvent.create({
       valueId,
       eventId: e.event_id,
-      eventTime: new Date(e.time),
+      eventTime: new Date(`${e.time}${timezoneStr}`),
       country: e.country_code,
       currency: e.currency,
       eventName: e.name,
@@ -94,13 +99,13 @@ export class CalendarService {
 
   async handleLiveUpdate(update: CalendarUpdate): Promise<void> {
     try {
-      const existingEvent = await this.calendarRepo.findByEventId(update.event_id);
+      const existingEvent = await this.calendarRepo.findByValueId(update.value_id);
       if (!existingEvent) {
-        logger.debug(`Calendar Live Update [Event ${update.event_id}] - Actual: ${update.actual} | Forecast: ${update.forecast} | Prev: ${update.previous}`, { context: "Broker" });
+        logger.debug(`Calendar Live Update [Value ${update.value_id}] - Actual: ${update.actual} | Forecast: ${update.forecast} | Prev: ${update.previous}`, { context: "Broker" });
         return;
       }
 
-      logger.debug(`Calendar Live Update [Event ${update.event_id}] ${existingEvent.currency} - ${existingEvent.eventName} - Actual: ${update.actual} | Forecast: ${update.forecast} | Prev: ${update.previous}`, { context: "Broker" });
+      logger.debug(`Calendar Live Update [Value ${update.value_id}] ${existingEvent.currency} - ${existingEvent.eventName} - Actual: ${update.actual} | Forecast: ${update.forecast} | Prev: ${update.previous}`, { context: "Broker" });
 
 
       const updatedEvent = existingEvent.withUpdatedValues(

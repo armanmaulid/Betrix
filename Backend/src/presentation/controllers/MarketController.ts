@@ -44,12 +44,16 @@ export class MarketController {
   async getOHLC(req: Request, res: Response, next: NextFunction) {
     try {
       const { symbol, timeframe } = req.params;
-      const ohlc = await this.getMarketDataService().getOHLC(symbol.toUpperCase(), timeframe.toUpperCase());
-      if (!ohlc) {
+      const candles = await this.getMarketDataService().getOHLC(symbol.toUpperCase(), timeframe.toUpperCase());
+      if (candles.length === 0) {
         return res.status(404).json({ error: "OHLC data not found", code: "NOT_FOUND" });
       }
-      res.json(ohlc);
+      res.json({ symbol: symbol.toUpperCase(), timeframe: timeframe.toUpperCase(), candles });
     } catch (err) {
+      const msg = (err as Error).message;
+      if (msg.includes("Failed after") || msg.includes("ECONNREFUSED") || msg.includes("fetch failed")) {
+        return res.status(503).json({ error: "MT5 bridge unavailable", code: "BROKER_UNAVAILABLE" });
+      }
       next(err);
     }
   }

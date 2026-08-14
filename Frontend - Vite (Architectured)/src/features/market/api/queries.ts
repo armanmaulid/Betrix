@@ -20,6 +20,5 @@ export function useEconomicCalendar(fromDate: string, toDate: string) {
     queryKey: marketKeys.calendar(fromDate, toDate),
     queryFn: () => fetchEconomicCalendar(fromDate, toDate),
     staleTime: 60 * 1000, // 1 minute cache
-    refetchInterval: 60 * 1000, // Refetch every minute automatically
   });
 }

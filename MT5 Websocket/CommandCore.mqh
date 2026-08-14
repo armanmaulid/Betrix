@@ -6,49 +6,15 @@
 #property copyright "Copyright 2025, MetaQuotes Ltd."
 #property link      "https://www.mql5.com"
 
-#include <Data.mqh>
-#include <HttpLib.mqh>
-#include <HistoryManager.mqh>
-#include <Trade/Trade.mqh>
-#include <ValidationUtils.mqh>
+#include "Data.mqh"
+#include "HttpLib.mqh"
+#include "ValidationUtils.mqh"
+#include "JAson.mqh"
 
 struct JsonResponse {
     string jsonContent;
     int status;
 };
-
-
-struct Order {
-    ulong ticket;
-    string symbol;
-    double volume;
-    string order_type;     // "buy", "sell", "buy_limit", etc.
-    double sl;
-    double tp;
-    double price;
-    ulong magic;
-    string comment;
-    string type_filling;   // "IOC", "FOK", etc.
-    bool async;
-    datetime expiration;   // For pending orders only
-
-    // Constructor with defaults
-    void Init() {
-        ticket        = 0;
-        symbol        = "";
-        volume        = 0.0;
-        order_type    = "";
-        sl            = 0.0;
-        tp            = 0.0;
-        price         = 0.0;
-        magic         = 123456;
-        comment       = "";
-        type_filling  = "";       // Will map this string later to ENUM_ORDER_TYPE_FILLING
-        async         = false;
-        expiration    = 0;        // 0 means no expiration
-    }
-};
-
 
 //+------------------------------------------------------------------+
 //| CCommandCore Class Declaration                                   |
@@ -56,531 +22,165 @@ struct Order {
 class CCommandCore {
 private:
     CData *dataSender;
-    string cachedSymbolListJson;
-    int cachedSymbolCount;
-    
+
+    // Response helpers
     JsonResponse SendError(int status, string details = "");
     JsonResponse SendJson(string jsonContent, int status = 200);
-    void BuildSymbolListCache();
+
+    // Shared tracking helpers (dedupe SetSymbols / SetMbook logic)
+    void ValidateSymbolsArray(string &symbols[], string &validSymbols[], string &invalidSymbols[]);
+    JsonResponse BuildTrackResponse(string &validSymbols[], string &invalidSymbols[]);
+
 public:
-    // Constructor
     CCommandCore(CData *ps = NULL) {
         dataSender = ps;
-        cachedSymbolListJson = "";
-        cachedSymbolCount = -1;
     }
 
-
+    // Tracking commands
     JsonResponse SetSymbols(string &symbols[]);
-    JsonResponse SetOhlcRequests(OhlcRequest &symbols[]);
-    JsonResponse SetOrderEvents(bool enabled);
+    JsonResponse SetOhlcRequests(OhlcRequest &requests[], string &rejected[]);
     JsonResponse SetMbook(string &symbols[]);
-    JsonResponse SetCalendarFilter(string &countries[], string &currencies[], string minImportance);
+    JsonResponse SetCalendarTracking(string country, string currency);
+
+    // Read commands
     JsonResponse GetQuote(string symbol);
-    JsonResponse GetCalendar(string countryCode, string currency, int days);
-    JsonResponse RetriveHistoricalData(string symbol, string timeFrame, string from_date_str, string to_date_str);
-    JsonResponse GetHistoryByMode(string mode, string from_date_str, string to_date_str);
-    JsonResponse GetOrderList();
-    JsonResponse PlaceOrder(Order &order);
-    JsonResponse CloseOrder(ulong ticket, double volume, bool async);
-    JsonResponse GetAccountInformation();
-    JsonResponse GetSymbolInfo(string symbol);
+    // from_date/to_date already validated+parsed by the caller (ValidateDateRange),
+    // so this only does the CopyRates + JSON build; no re-parsing of raw strings here.
+    JsonResponse RetriveHistoricalData(string symbol, ENUM_TIMEFRAMES tf, datetime from_date, datetime to_date);
     JsonResponse GetSymbolList();
+    // Cheap fingerprint for backend cache-invalidation - just the count, no
+    // per-symbol serialization. See GetSymbolList() for the full payload.
     JsonResponse GetSymbolCount();
-    void WarmSymbolCache();
-    JsonResponse OrderInformation(ulong ticket);
-    JsonResponse ModifyOrder(Order &order);
-    
-    
+    // from_date/to_date are only used when period == ""; caller already
+    // validated+parsed them via ValidateDateRange in that case.
+    JsonResponse GetCalendar(datetime from_date, datetime to_date, string period = "");
 };
 
 
-
 //+------------------------------------------------------------------+
-//| Commands logic                                                   |
+//| CALENDAR                                                          |
 //+------------------------------------------------------------------+
+JsonResponse CCommandCore::GetCalendar(datetime from_date, datetime to_date, string period) {
+    if (period != "") {
+        MqlDateTime dt;
+        // Fix: TimeTradeServer() instead of TimeCurrent(). TimeCurrent()
+        // freezes at the last received tick and goes stale whenever the
+        // market is closed (weekends, illiquid symbols). TimeTradeServer()
+        // keeps counting regardless of tick flow.
+        TimeToStruct(TimeTradeServer(), dt);
+        dt.hour = 0; dt.min = 0; dt.sec = 0;
+        datetime start_of_today = StructToTime(dt);
 
-//+------------------------------------------------------------------+
-//| Place Order Command                                              |
-//+------------------------------------------------------------------+
-JsonResponse CCommandCore::PlaceOrder(Order &order) {
-    CTrade trade;
+        if (period == "today") {
+            from_date = start_of_today;
+            to_date = start_of_today + 86400 - 1;
+        } else if (period == "yesterday") {
+            from_date = start_of_today - 86400;
+            to_date = start_of_today - 1;
+        } else if (period == "tomorrow") {
+            from_date = start_of_today + 86400;
+            to_date = start_of_today + 2 * 86400 - 1;
+        } else if (period == "this_week" || period == "last_week" || period == "next_week") {
+            int days_from_monday = dt.day_of_week - 1;
+            if(days_from_monday < 0) days_from_monday = 6;
+            datetime start_of_week = start_of_today - (days_from_monday * 86400);
 
-    // Set pre-trade configs
-    trade.SetExpertMagicNumber(order.magic);
-    trade.SetAsyncMode(order.async);
+            if (period == "this_week") {
+                from_date = start_of_week;
+            } else if (period == "last_week") {
+                from_date = start_of_week - 7 * 86400;
+            } else if (period == "next_week") {
+                from_date = start_of_week + 7 * 86400;
+            }
+            to_date = from_date + 7 * 86400 - 1;
+        } else if (period == "this_month" || period == "last_month" || period == "next_month") {
+            if (period == "last_month") {
+                dt.mon -= 1;
+                if(dt.mon < 1) { dt.mon = 12; dt.year -= 1; }
+            } else if (period == "next_month") {
+                dt.mon += 1;
+                if(dt.mon > 12) { dt.mon = 1; dt.year += 1; }
+            }
+            dt.day = 1;
+            from_date = StructToTime(dt);
 
-    // Set filling type if provided
-    if (order.type_filling != "") {
-        ENUM_ORDER_TYPE_FILLING filling = parseFillingType(order.type_filling);
-        if (filling == (ENUM_ORDER_TYPE_FILLING)-1) {
-            return SendError(400, "invalid order type filling");
+            dt.mon += 1;
+            if(dt.mon > 12) { dt.mon = 1; dt.year += 1; }
+            to_date = StructToTime(dt) - 1;
+        } else {
+            return SendError(400, "Invalid period value: " + period);
         }
-        trade.SetTypeFilling(filling);
+    }
+    // else: from_date/to_date passed in as-is (already validated by the caller)
+
+    MqlCalendarValue values[];
+    if(!CalendarValueHistory(values, from_date, to_date)) {
+        return SendError(500, "Failed to retrieve calendar history or no data available");
     }
 
-    bool result = false;
-    double price = 0;
-    bool is_pending = false;
+    CJAVal jData;
+    jData.Clear(jtARRAY);
 
-    // Determine if market or pending
-    if (order.order_type == "buy" || order.order_type == "sell") {
-        price = SymbolInfoDouble(order.symbol, SYMBOL_ASK);
-    } else {
-        if (order.price <= 0) {
-            return SendError(400, "price is required for pending orders");
-        }
-        price = order.price;
-        is_pending = true;
-    }
+    int count = ArraySize(values);
+    for(int i = 0; i < count; i++) {
+        CJAVal row;
 
-    // Expiration type
-    ENUM_ORDER_TYPE_TIME time_type_enum = ORDER_TIME_GTC;
-    if (order.expiration > 0) {
-        time_type_enum = ORDER_TIME_SPECIFIED;
-    }
+        MqlCalendarEvent eventInfo;
+        MqlCalendarCountry countryInfo;
+        string eventName = "Unknown";
+        int importance = 0;
+        string currency = "";
+        string country_code = "";
 
-    // Place order
-    if (order.order_type == "buy") {
-        result = trade.PositionOpen(order.symbol, ORDER_TYPE_BUY, order.volume, price, order.sl, order.tp, order.comment);
-    } else if (order.order_type == "sell") {
-        result = trade.PositionOpen(order.symbol, ORDER_TYPE_SELL, order.volume, price, order.sl, order.tp, order.comment);
-    } else if (order.order_type == "buy_limit") {
-        result = trade.BuyLimit(order.volume, price, order.symbol, order.sl, order.tp, time_type_enum, order.expiration, order.comment);
-    } else if (order.order_type == "buy_stop") {
-        result = trade.BuyStop(order.volume, order.symbol, price, order.sl, order.tp, time_type_enum, order.expiration, order.comment);
-    } else if (order.order_type == "sell_limit") {
-        result = trade.SellLimit(order.volume, order.symbol, price, order.sl, order.tp, time_type_enum, order.expiration, order.comment);
-    } else {
-        result = trade.SellStop(order.volume, order.symbol, price, order.sl, order.tp, time_type_enum, order.expiration, order.comment);
-    }
-
-    // Handle result
-    if (result) {
-        ulong order_ticket = trade.ResultOrder();
-        ulong deal_ticket = trade.ResultDeal();
-        double volume = order.volume;
-        double bid = SymbolInfoDouble(order.symbol, SYMBOL_BID);
-        double ask = SymbolInfoDouble(order.symbol, SYMBOL_ASK);
-
-        string json = StringFormat(
-            "\"msg\":\"order_send\","
-            "\"type\":\"%s\","
-            "\"deal\":%d,"
-            "\"order\":%d,"
-            "\"volume\":%.2f,"
-            "\"price\":%.5f,"
-            "\"bid\":%.5f,"
-            "\"ask\":%.5f",
-            StringFormat("order_type_%s", StringToLower(order.order_type)),
-            deal_ticket,
-            order_ticket,
-            volume,
-            price,
-            bid,
-            ask
-        );
-
-        return SendJson(json);
-    } else {
-        Print("Order placement failed: ", trade.ResultRetcodeDescription());
-        return SendError(500, trade.ResultRetcodeDescription());
-    }
-}
-
-//+------------------------------------------------------------------+
-//| Close Order Command                                              |
-//+------------------------------------------------------------------+
-JsonResponse CCommandCore::CloseOrder(ulong ticket, double volume, bool async) {
-    if (!PositionSelectByTicket(ticket)) {
-        return SendError(404, "Position not found for ticket: " + (string)ticket);
-    }
-
-    string symbol = PositionGetString(POSITION_SYMBOL);
-    double positionVolume = PositionGetDouble(POSITION_VOLUME);
-
-    if (positionVolume <= 0.0) {
-        return SendError(400, "Position has no remaining volume to close");
-    }
-
-    if (volume <= 0.0 || volume > positionVolume) {
-        volume = positionVolume;
-    }
-
-    CTrade trade;
-    trade.SetAsyncMode(async);
-
-    bool result = trade.PositionClosePartial(ticket, volume);
-
-    if (!result) {
-        return SendError(500, "Failed to close position: " + trade.ResultRetcodeDescription());
-    }
-
-    if (async) {
-        return SendJson("\"message\":\"close order submitted\"");
-    }
-
-    int retcode = trade.ResultRetcode();
-    if (retcode == TRADE_RETCODE_DONE || retcode == TRADE_RETCODE_DONE_PARTIAL) {
-        // Extract result data
-        ulong order_ticket = trade.ResultOrder();
-        ulong deal         = trade.ResultDeal();
-        double price       = trade.ResultPrice();
-        double bid         = SymbolInfoDouble(symbol, SYMBOL_BID);
-        double ask         = SymbolInfoDouble(symbol, SYMBOL_ASK);
-
-        string type = (volume == positionVolume) ? "fully_closed" : "partial_closed";
-
-        string json = StringFormat(
-            "\"message\":\"order closed successfully\"," \
-            "\"ticket\":%d," \
-            "\"type\":\"%s\"," \
-            "\"deal\":%d," \
-            "\"order\":%d," \
-            "\"volume\":%.2f," \
-            "\"price\":%.5f," \
-            "\"bid\":%.5f," \
-            "\"ask\":%.5f" \,
-            ticket,
-            type,
-            deal,
-            order_ticket,
-            volume,
-            price,
-            bid,
-            ask
-        );
-
-        return SendJson(json);
-    } else {
-        return SendError(500, "Close failed: " + trade.ResultRetcodeDescription());
-    }
-}
-
-//+------------------------------------------------------------------+
-//| modify order                                                     |
-//+------------------------------------------------------------------+
-JsonResponse CCommandCore::ModifyOrder(Order &order) {
-    CTrade trade;
-    trade.SetAsyncMode(order.async);
-
-    // Select position by ticket
-    if (!PositionSelectByTicket(order.ticket)) {
-        return SendError(404, "could not find position.");
-    }
-
-    string symbol = PositionGetString(POSITION_SYMBOL);
-
-    // Get current SL/TP if not provided
-    double current_sl = PositionGetDouble(POSITION_SL);
-    double current_tp = PositionGetDouble(POSITION_TP);
-
-    double sl = (order.sl > 0) ? order.sl : current_sl;
-    double tp = (order.tp > 0) ? order.tp : current_tp;
-
-    // Modify the position
-    bool result = trade.PositionModify(symbol, sl, tp);
-
-    string type = "unknown";
-    if (sl != current_sl && tp != current_tp) type = "sl_tp_updated";
-    else if (sl != current_sl) type = "sl_updated";
-    else if (tp != current_tp) type = "tp_updated";
-
-    // Build the lowercase JSON response
-    string json = StringFormat(
-        "\"msg\":\"order_modify\","
-        "\"ticket\":%d,"
-        "\"deal\":%d,"
-        "\"order\":%d,"
-        "\"volume\":%.2f,"
-        "\"price\":%.5f,"
-        "\"bid\":%.5f,"
-        "\"ask\":%.5f",
-        order.ticket,
-        (ulong)trade.ResultDeal(),
-        (ulong)trade.ResultOrder(),
-        PositionGetDouble(POSITION_VOLUME),
-        PositionGetDouble(POSITION_PRICE_OPEN),
-        SymbolInfoDouble(symbol, SYMBOL_BID),
-        SymbolInfoDouble(symbol, SYMBOL_ASK)
-    );
-
-    if (result) {
-        return SendJson(json);
-    } else {
-        return SendError(500, trade.ResultRetcodeDescription());
-    }
-}
-
-
-
-
-
-//+------------------------------------------------------------------+
-//| Get order info                                                   |
-//+------------------------------------------------------------------+
-JsonResponse CCommandCore::OrderInformation(ulong ticket) {
-    if (!PositionSelectByTicket(ticket)) {
-        return SendError(404, "Position not found: " + (string)ticket);
-    }
-
-    string symbol = PositionGetString(POSITION_SYMBOL);
-    double volume = PositionGetDouble(POSITION_VOLUME);
-    double price_open = PositionGetDouble(POSITION_PRICE_OPEN);
-    double sl = PositionGetDouble(POSITION_SL);
-    double tp = PositionGetDouble(POSITION_TP);
-    double price_current = SymbolInfoDouble(symbol, SYMBOL_BID);
-    double swap = PositionGetDouble(POSITION_SWAP);
-    double profit = PositionGetDouble(POSITION_PROFIT);
-    datetime open_time = (datetime)PositionGetInteger(POSITION_TIME);
-    datetime time_update = (datetime)PositionGetInteger(POSITION_TIME_UPDATE);
-    long magic = PositionGetInteger(POSITION_MAGIC);
-    string comment = PositionGetString(POSITION_COMMENT);
-    ENUM_POSITION_TYPE type = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
-    long reason = PositionGetInteger(POSITION_REASON);
-
-    double change = price_current - price_open;
-
-    string json = StringFormat(
-        "\"ticket\":%I64d,"
-        "\"open_time\":\"%s\","
-        "\"time_update\":\"%s\","
-        "\"type\":\"%s\","
-        "\"magic\":%d,"
-        "\"identifier\":%I64d,"
-        "\"reason\":%d,"
-        "\"volume\":%.2f,"
-        "\"price_open\":%.5f,"
-        "\"sl\":%.5f,"
-        "\"tp\":%.5f,"
-        "\"price_current\":%.5f,"
-        "\"swap\":%.2f,"
-        "\"profit\":%.2f,"
-        "\"symbol\":\"%s\","
-        "\"external_id\":null,"
-        "\"comment\":%s,"
-        "\"change\":%.2f",
-        ticket,
-        ToIso8601(open_time),
-        ToIso8601(time_update),
-        EnumToString(type),
-        magic,
-        ticket,
-        reason,
-        volume,
-        price_open,
-        sl,
-        tp,
-        price_current,
-        swap,
-        profit,
-        symbol,
-        comment == "" ? "null" : "\"" + comment + "\"",
-        change
-    );
-
-    return SendJson(json);
-}
-
-//+------------------------------------------------------------------+
-//| Get order list                                                   |
-//+------------------------------------------------------------------+
-JsonResponse CCommandCore::GetOrderList() {
-    string openedJson = "";
-    string pendingJson = "";
-
-    // ----------- Opened Positions -----------
-    int totalPositions = PositionsTotal();
-
-    for (int i = 0; i < totalPositions; i++) {
-        if (!PositionGetTicket(i)) continue;
-
-        ulong ticket = PositionGetInteger(POSITION_TICKET);
-        string symbol = PositionGetString(POSITION_SYMBOL);
-        datetime open_time = (datetime)PositionGetInteger(POSITION_TIME);
-        datetime time_update = (datetime)PositionGetInteger(POSITION_TIME_UPDATE);
-        ENUM_POSITION_TYPE type = (ENUM_POSITION_TYPE)PositionGetInteger(POSITION_TYPE);
-        long magic = PositionGetInteger(POSITION_MAGIC);
-        double volume = PositionGetDouble(POSITION_VOLUME);
-        double price_open = PositionGetDouble(POSITION_PRICE_OPEN);
-        double sl = PositionGetDouble(POSITION_SL);
-        double tp = PositionGetDouble(POSITION_TP);
-        double price_current = SymbolInfoDouble(symbol, SYMBOL_BID);
-        double profit = PositionGetDouble(POSITION_PROFIT);
-        double swap = PositionGetDouble(POSITION_SWAP);
-        string comment = PositionGetString(POSITION_COMMENT);
-        long reason = PositionGetInteger(POSITION_REASON);
-        double change = price_current - price_open;
-
-        string entry = StringFormat(
-            "{"
-            "\"ticket\":%I64d,"
-            "\"open_time\":\"%s\","
-            "\"time_update\":\"%s\","
-            "\"type\":\"%s\","
-            "\"magic\":%d,"
-            "\"identifier\":%I64d,"
-            "\"reason\":%d,"
-            "\"volume\":%.2f,"
-            "\"price_open\":%.5f,"
-            "\"sl\":%.5f,"
-            "\"tp\":%.5f,"
-            "\"price_current\":%.5f,"
-            "\"swap\":%.2f,"
-            "\"profit\":%.2f,"
-            "\"symbol\":\"%s\","
-            "\"comment\":%s,"
-            "\"external_id\":null,"
-            "\"change\":%.2f"
-            "}",
-            ticket,
-            TimeToString(open_time, TIME_DATE | TIME_MINUTES | TIME_SECONDS),
-            TimeToString(time_update, TIME_DATE | TIME_MINUTES | TIME_SECONDS),
-            EnumToString(type),
-            magic,
-            ticket,
-            reason,
-            volume,
-            price_open,
-            sl,
-            tp,
-            price_current,
-            swap,
-            profit,
-            symbol,
-            comment == "" ? "null" : "\"" + comment + "\"",
-            change
-        );
-
-        openedJson += (openedJson == "" ? "" : ",") + entry;
-    }
-
-    // ----------- Pending Orders -----------
-    int totalOrders = OrdersTotal();
-
-    for (int i = 0; i < totalOrders; i++) {
-        ulong ticket = OrderGetTicket(i);
-        if (!OrderSelect(ticket)) {
-            Print("Failed to select order #", ticket);
-            continue;
+        if (CalendarEventById(values[i].event_id, eventInfo)) {
+            eventName = eventInfo.name;
+            importance = eventInfo.importance;
+            if (CalendarCountryById(eventInfo.country_id, countryInfo)) {
+                currency = countryInfo.currency;
+                country_code = countryInfo.code;
+            }
         }
 
-        ENUM_ORDER_TYPE orderType = (ENUM_ORDER_TYPE)OrderGetInteger(ORDER_TYPE);
-        bool isPending =
-            orderType == ORDER_TYPE_BUY_LIMIT || orderType == ORDER_TYPE_SELL_LIMIT ||
-            orderType == ORDER_TYPE_BUY_STOP || orderType == ORDER_TYPE_SELL_STOP ||
-            orderType == ORDER_TYPE_BUY_STOP_LIMIT || orderType == ORDER_TYPE_SELL_STOP_LIMIT;
+        row["value_id"] = (long)values[i].id;
+        row["event_id"] = (long)values[i].event_id;
+        row["name"] = eventName;
+        row["country_code"] = country_code;
+        row["currency"] = currency;
+        row["importance"] = (long)importance;
 
-        if (!isPending) continue;
+        string t = TimeToString(values[i].time, TIME_DATE | TIME_MINUTES | TIME_SECONDS);
+        StringReplace(t, ".", "-");
+        StringReplace(t, " ", "T");
+        row["time"] = t;
 
-        string symbol = OrderGetString(ORDER_SYMBOL);
-        datetime open_time = (datetime)OrderGetInteger(ORDER_TIME_SETUP);
-        datetime time_update = (datetime)OrderGetInteger(ORDER_TIME_SETUP); //TODO: for now using this fix later
-        long magic = OrderGetInteger(ORDER_MAGIC);
-        double volume = OrderGetDouble(ORDER_VOLUME_CURRENT);
-        double price_open = OrderGetDouble(ORDER_PRICE_OPEN);
-        double sl = OrderGetDouble(ORDER_SL);
-        double tp = OrderGetDouble(ORDER_TP);
-        double price_current = SymbolInfoDouble(symbol, SYMBOL_BID);
-        //double profit ; pending orders dont have profit ig
-        string comment = OrderGetString(ORDER_COMMENT);
-        long reason = OrderGetInteger(ORDER_REASON);
-        double change = price_current - price_open;
-        datetime time_done = (datetime)OrderGetInteger(ORDER_TIME_DONE);
-        double price_stoplimit = OrderGetDouble(ORDER_PRICE_STOPLIMIT);
-        long pos_id = OrderGetInteger(ORDER_POSITION_ID);
-        long pos_byid = OrderGetInteger(ORDER_POSITION_BY_ID);
-        double vol_initial = OrderGetDouble(ORDER_VOLUME_INITIAL);
-        double vol_current = OrderGetDouble(ORDER_VOLUME_CURRENT);
+        if (values[i].actual_value != LONG_MIN) row["actual"] = (double)values[i].actual_value / 1000000.0;
+        else row["actual"].Clear();
 
-        string entry = StringFormat(
-            "{"
-            "\"ticket\":%I64d,"
-            "\"open_time\":\"%s\","
-            "\"time_update\":\"%s\","
-            "\"type\":\"%s\","
-            "\"magic\":%d,"
-            "\"identifier\":%I64d,"
-            "\"reason\":%d,"
-            "\"volume\":%.2f,"
-            "\"price_open\":%.5f,"
-            "\"sl\":%.5f,"
-            "\"tp\":%.5f,"
-            "\"price_current\":%.5f,"
-            "\"symbol\":\"%s\","
-            "\"comment\":%s,"
-            "\"external_id\":null,"
-            "\"change\":%.2f,"
-            "\"time_done\":\"%s\","
-            "\"time_setup\":\"%s\","
-            "\"order_reason\":%d,"
-            "\"position_id\":%I64d,"
-            "\"position_byid\":%I64d,"
-            "\"volume_initial\":%.2f,"
-            "\"volume_current\":%.2f,"
-            "\"price_stoplimit\":%.5f"
-            "}",
-            ticket,
-            TimeToString(open_time, TIME_DATE | TIME_MINUTES | TIME_SECONDS),
-            TimeToString(time_update, TIME_DATE | TIME_MINUTES | TIME_SECONDS),
-            EnumToString(orderType),
-            magic,
-            ticket,
-            reason,
-            volume,
-            price_open,
-            sl,
-            tp,
-            price_current,
-            symbol,
-            comment == "" ? "null" : "\"" + comment + "\"",
-            change,
-            TimeToString(time_done, TIME_DATE | TIME_MINUTES | TIME_SECONDS),
-            TimeToString(open_time, TIME_DATE | TIME_MINUTES | TIME_SECONDS),
-            reason,
-            pos_id,
-            pos_byid,
-            vol_initial,
-            vol_current,
-            price_stoplimit
-        );
+        if (values[i].forecast_value != LONG_MIN) row["forecast"] = (double)values[i].forecast_value / 1000000.0;
+        else row["forecast"].Clear();
 
-        pendingJson += (pendingJson == "" ? "" : ",") + entry;
+        if (values[i].prev_value != LONG_MIN) row["previous"] = (double)values[i].prev_value / 1000000.0;
+        else row["previous"].Clear();
+
+        jData.Add(row);
     }
 
+    CJAVal jRes;
+    jRes["count"] = (long)count;
+    jRes["data"].Set(jData);
 
-    string finalJson = StringFormat(
-        "\"msg\":\"order_list\","
-        "\"count\":%d,"
-        "\"opened\":[%s],"
-        "\"pending\":[%s]",
-        totalPositions + OrdersTotal(),
-        openedJson,
-        pendingJson
-    );
-
-    return SendJson(finalJson);
+    return SendJson(jRes.Serialize());
 }
 
 
-
 //+------------------------------------------------------------------+
-//| Retrieve historical data Command                                 |
+//| HISTORICAL DATA                                                   |
 //+------------------------------------------------------------------+
-JsonResponse CCommandCore::RetriveHistoricalData(string symbol, string timeFrame, string from_date_str, string to_date_str)
-{
+JsonResponse CCommandCore::RetriveHistoricalData(string symbol, ENUM_TIMEFRAMES tf, datetime from_date, datetime to_date) {
     if(!SymbolSelect(symbol, true)) {
         return SendError(400, "Symbol not found: '" + symbol +"'");
     }
 
-    // Convert ISO8601 strings to datetime
-    StringReplace(from_date_str, "T", " ");
-    StringReplace(to_date_str, "T", " ");
-
-    datetime from_date = StringToTime(from_date_str);
-    datetime to_date   = StringToTime(to_date_str);
-
-    ENUM_TIMEFRAMES tf = getTimeFrameEnum(timeFrame);
     MqlRates rates[];
     int bars = CopyRates(symbol, tf, from_date, to_date, rates);
     if(bars <= 0) {
@@ -594,768 +194,255 @@ JsonResponse CCommandCore::RetriveHistoricalData(string symbol, string timeFrame
     StringReplace(norm_to, ".", "-");
     StringReplace(norm_to, " ", "T");
 
- 
-    string jsonData = "[";
+    CJAVal jData;
+    jData.Clear(jtARRAY);
+
     for(int i = 0; i < bars; i++) {
         string t = TimeToString(rates[i].time, TIME_DATE | TIME_SECONDS);
         StringReplace(t, ".", "-");
         StringReplace(t, " ", "T");
 
-        jsonData += "{";
-        jsonData += "\"time\":\"" + t + "\",";
-        jsonData += "\"open\":" + DoubleToString(rates[i].open, 5) + ",";
-        jsonData += "\"high\":" + DoubleToString(rates[i].high, 5) + ",";
-        jsonData += "\"low\":"  + DoubleToString(rates[i].low, 5) + ",";
-        jsonData += "\"close\":" + DoubleToString(rates[i].close, 5) + ",";
-        jsonData += "\"volume\":" + IntegerToString(rates[i].tick_volume);
-        jsonData += "}";
-        if(i < bars - 1)
-            jsonData += ",";
+        CJAVal jBar;
+        jBar["time"] = t;
+        jBar["open"] = rates[i].open;
+        jBar["high"] = rates[i].high;
+        jBar["low"] = rates[i].low;
+        jBar["close"] = rates[i].close;
+        jBar["volume"] = (long)rates[i].tick_volume;
+
+        jData.Add(jBar);
     }
-    jsonData += "]";
 
- 
-    string jsonStr = "\"from_date\":\"" + norm_from + "\",";
-    jsonStr += "\"to_date\":\"" + norm_to + "\",";
-    jsonStr += "\"data\":" + jsonData;
+    CJAVal jRes;
+    jRes["from_date"] = norm_from;
+    jRes["to_date"] = norm_to;
+    jRes["data"].Set(jData);
 
-    return SendJson(jsonStr);
+    return SendJson(jRes.Serialize());
 }
 
+
 //+------------------------------------------------------------------+
-//| Get Account Command                                              |
+//| QUOTE                                                             |
 //+------------------------------------------------------------------+
-JsonResponse CCommandCore::GetAccountInformation() {
-    string json = StringFormat(
-        "\"company\":\"%s\","
-        "\"currency\":\"%s\","
-        "\"name\":\"%s\","
-        "\"server\":\"%s\","
-        "\"login\":%I64d,"
-        "\"trade_mode\":%d,"
-        "\"leverage\":%d,"
-        "\"limit_orders\":%d,"
-        "\"margin_so_mode\":%d,"
-        "\"trade_allowed\":%d,"
-        "\"trade_expert\":%d,"
-        "\"margin_mode\":%d,"
-        "\"currency_digits\":%d,"
-        "\"fifo_close\":%d,"
-        "\"hedge_allowed\":%d,"
-        "\"balance\":%.2f,"
-        "\"credit\":%.2f,"
-        "\"profit\":%.2f,"
-        "\"equity\":%.2f,"
-        "\"margin\":%.2f,"
-        "\"margin_free\":%.2f,"
-        "\"margin_level\":%.2f,"
-        "\"margin_so_cal\":%.2f,"
-        "\"margin_so_so\":%.2f"
-        ,
-        AccountInfoString(ACCOUNT_COMPANY),
-        AccountInfoString(ACCOUNT_CURRENCY),
-        AccountInfoString(ACCOUNT_NAME),
-        AccountInfoString(ACCOUNT_SERVER),
-        AccountInfoInteger(ACCOUNT_LOGIN),
-        (int)AccountInfoInteger(ACCOUNT_TRADE_MODE),
-        (int)AccountInfoInteger(ACCOUNT_LEVERAGE),
-        (int)AccountInfoInteger(ACCOUNT_LIMIT_ORDERS),
-        (int)AccountInfoInteger(ACCOUNT_MARGIN_SO_MODE),
-        (int)AccountInfoInteger(ACCOUNT_TRADE_ALLOWED),
-        (int)AccountInfoInteger(ACCOUNT_TRADE_EXPERT),
-        (int)AccountInfoInteger(ACCOUNT_MARGIN_MODE),
-        (int)AccountInfoInteger(ACCOUNT_CURRENCY_DIGITS),
-        (int)AccountInfoInteger(ACCOUNT_FIFO_CLOSE),
-        (int)AccountInfoInteger(ACCOUNT_HEDGE_ALLOWED),
-        AccountInfoDouble(ACCOUNT_BALANCE),
-        AccountInfoDouble(ACCOUNT_CREDIT),
-        AccountInfoDouble(ACCOUNT_PROFIT),
-        AccountInfoDouble(ACCOUNT_EQUITY),
-        AccountInfoDouble(ACCOUNT_MARGIN),
-        AccountInfoDouble(ACCOUNT_MARGIN_FREE),
-        AccountInfoDouble(ACCOUNT_MARGIN_LEVEL),
-        AccountInfoDouble(ACCOUNT_MARGIN_SO_CALL),
-        AccountInfoDouble(ACCOUNT_MARGIN_SO_SO)
+JsonResponse CCommandCore::GetQuote(string symbol) {
+    if(!SymbolSelect(symbol, true)) {
+        return SendError(404, "Symbol not found : '" + symbol + "'");
+    }
+
+    MqlTick tick;
+    if(!SymbolInfoTick(symbol, tick)) {
+        return SendError(500, "Failed to get tick for: '" + symbol + "'");
+    }
+
+    datetime time = (datetime)(tick.time_msc / 1000);
+    int ms        = (int)(tick.time_msc % 1000);
+
+    // ISO 8601: "YYYY-MM-DDTHH:MM:SS.mmmZ"
+    string isoTime = StringFormat(
+        "%sT%s.%03dZ",
+        TimeToString(time, TIME_DATE),
+        TimeToString(time, TIME_MINUTES | TIME_SECONDS),
+        ms
     );
 
-    return SendJson(json);
+    CJAVal jRes;
+    jRes["symbol"] = symbol;
+    jRes["ask"] = tick.ask;
+    jRes["bid"] = tick.bid;
+    jRes["flags"] = (long)tick.flags;
+    jRes["time"] = isoTime;
+    jRes["volume"] = (long)tick.volume;
+
+    return SendJson(jRes.Serialize());
 }
 
 
 //+------------------------------------------------------------------+
-//| get History positions / orders / deal                            |
+//| SYMBOL LIST                                                       |
 //+------------------------------------------------------------------+
-JsonResponse CCommandCore::GetHistoryByMode(string mode, string from_date_str, string to_date_str)
-{
-    // Convert ISO8601 to datetime
-    StringReplace(from_date_str, "T", " ");
-    StringReplace(to_date_str, "T", " ");
-    
-    datetime from_date = StringToTime(from_date_str);
-    datetime to_date   = StringToTime(to_date_str);
-
-    // Clear/reset arrays
-    ArrayResize(dealInfo, 0);
-    ArrayResize(orderInfo, 0);
-    ArrayResize(positionInfo, 0);
-
-    uint dataFlag = 0;
-    if (mode == "deals")
-        dataFlag = GET_DEALS_HISTORY_DATA;
-    else if (mode == "orders")
-        dataFlag = GET_ORDERS_HISTORY_DATA;
-    else if (mode == "positions")
-        dataFlag = GET_POSITIONS_HISTORY_DATA;
-    else {
-        return SendError(400, "Invalid mode: '" + mode + "'");
-    }
-
-    if (!GetHistoryData(from_date, to_date, dataFlag)) {
-        return SendError(500, "Failed to retrieve history data");
-    }
-
-    string jsonData = "\"data\":[";
-    string rows = "";
-
-    if (mode == "deals") {
-        for (int i = 0; i < ArraySize(dealInfo); i++) {
-            string row = StringFormat(
-                "{"
-                "\"symbol\":\"%s\","
-                "\"time\":%d,"
-                "\"ticket\":%d,"
-                "\"position_id\":%d,"
-                "\"order_ticket\":%d,"
-                "\"type\":\"%s\","
-                "\"entry\":\"%s\","
-                "\"reason\":\"%s\","
-                "\"volume\":%.2f,"
-                "\"price\":%.5f,"
-                "\"sl_price\":%.5f,"
-                "\"tp_price\":%.5f,"
-                "\"swap\":%.2f,"
-                "\"commission\":%.2f,"
-                "\"profit\":%.2f,"
-                "\"comment\":\"%s\","
-                "\"magic\":%d"
-                "}",
-                dealInfo[i].symbol,
-                dealInfo[i].time,
-                dealInfo[i].ticket,
-                dealInfo[i].positionId,
-                dealInfo[i].order,
-                EnumToString(dealInfo[i].type),
-                EnumToString(dealInfo[i].entry),
-                EnumToString(dealInfo[i].reason),
-                dealInfo[i].volume,
-                dealInfo[i].price,
-                dealInfo[i].slPrice,
-                dealInfo[i].tpPrice,
-                dealInfo[i].swap,
-                dealInfo[i].commission,
-                dealInfo[i].profit,
-                dealInfo[i].comment,
-                dealInfo[i].magic
-            );
-            rows += row + (i < ArraySize(dealInfo) - 1 ? "," : "");
-        }
-    }
-    else if (mode == "orders") {
-        for (int i = 0; i < ArraySize(orderInfo); i++) {
-            string row = StringFormat(
-                "{"
-                "\"ticket\":%d,"
-                "\"symbol\":\"%s\","
-                "\"time_setup\":%d,"
-                "\"type\":\"%s\","
-                "\"position_id\":%d,"
-                "\"state\":\"%s\","
-                "\"type_filling\":\"%s\","
-                "\"type_time\":\"%s\","
-                "\"reason\":\"%s\","
-                "\"volume_initial\":%.2f,"
-                "\"price_open\":%.5f,"
-                "\"price_stop_limit\":%.5f,"
-                "\"sl_price\":%.5f,"
-                "\"tp_price\":%.5f,"
-                "\"time_done\":%d,"
-                "\"expiration_time\":%d,"
-                "\"comment\":\"%s\","
-                "\"magic\":%d"
-                "}",
-                orderInfo[i].ticket,
-                orderInfo[i].symbol,
-                orderInfo[i].timeSetup,
-                EnumToString(orderInfo[i].type),
-                orderInfo[i].positionId,
-                EnumToString(orderInfo[i].state),
-                EnumToString(orderInfo[i].typeFilling),
-                EnumToString(orderInfo[i].typeTime),
-                EnumToString(orderInfo[i].reason),
-                orderInfo[i].volumeInitial,
-                orderInfo[i].priceOpen,
-                orderInfo[i].priceStopLimit,
-                orderInfo[i].slPrice,
-                orderInfo[i].tpPrice,
-                orderInfo[i].timeDone,
-                orderInfo[i].expirationTime,
-                orderInfo[i].comment,
-                orderInfo[i].magic
-            );
-            rows += row + (i < ArraySize(orderInfo) - 1 ? "," : "");
-        }
-    }
-    else if (mode == "positions") {
-        for (int i = 0; i < ArraySize(positionInfo); i++) {
-            string row = StringFormat(
-                "{"
-                "\"symbol\":\"%s\","
-                "\"open_time\":%d,"
-                "\"ticket\":%d,"
-                "\"type\":\"%s\","
-                "\"volume\":%.2f,"
-                "\"open_price\":%.5f,"
-                "\"sl_price\":%.5f,"
-                "\"sl_pips\":%.1f,"
-                "\"tp_price\":%.5f,"
-                "\"tp_pips\":%.1f,"
-                "\"close_price\":%.5f,"
-                "\"close_time\":%d,"
-                "\"duration\":%d,"
-                "\"swap\":%.2f,"
-                "\"commission\":%.2f,"
-                "\"profit\":%.2f,"
-                "\"net_profit\":%.2f,"
-                "\"pip_profit\":%.1f,"
-                "\"initiating_order_type\":\"%s\","
-                "\"initiated_by_pending_order\":%s,"
-                "\"comment\":\"%s\","
-                "\"magic\":%d"
-                "}",
-                positionInfo[i].symbol,
-                positionInfo[i].openTime,
-                positionInfo[i].ticket,
-                EnumToString(positionInfo[i].type),
-                positionInfo[i].volume,
-                positionInfo[i].openPrice,
-                positionInfo[i].slPrice,
-                positionInfo[i].slPips,
-                positionInfo[i].tpPrice,
-                positionInfo[i].tpPips,
-                positionInfo[i].closePrice,
-                positionInfo[i].closeTime,
-                positionInfo[i].duration,
-                positionInfo[i].swap,
-                positionInfo[i].commission,
-                positionInfo[i].profit,
-                positionInfo[i].netProfit,
-                positionInfo[i].pipProfit,
-                EnumToString(positionInfo[i].initiatingOrderType),
-                positionInfo[i].initiatedByPendingOrder ? "true" : "false",
-                positionInfo[i].comment,
-                positionInfo[i].magic
-            );
-            rows += row + (i < ArraySize(positionInfo) - 1 ? "," : "");
-        }
-    }
-
-    jsonData += rows + "]";
-    return SendJson(jsonData);
-}
-
-
-//+------------------------------------------------------------------+
-//| Get symbol quote                                                 |
-//+------------------------------------------------------------------+
-JsonResponse CCommandCore::GetQuote(string symbol){
-   if(!SymbolSelect(symbol, true)) {
-      return SendError(404, "Symbol not found : '" + symbol + "'");
-   }
-   
-   MqlTick tick;
-   if(!SymbolInfoTick(symbol, tick)) {
-      return SendError(500, "Failed to get tick for: '" + symbol + "'");
-   }
-   
-   datetime time = tick.time_msc / 1000;
-   int ms        = (int)(tick.time_msc % 1000);
-
-   // Format ISO 8601 datetime string: "YYYY-MM-DDTHH:MM:SS.mmmZ"
-   string isoTime = StringFormat(
-      "%sT%s.%03dZ",
-      TimeToString(time, TIME_DATE),       // "2025-06-20"
-      TimeToString(time, TIME_MINUTES | TIME_SECONDS), // "23:58:55"
-      ms
-   );
-   
-   string json = "";
-   json += "\"symbol\": \"" + symbol + "\",";
-   json += "\"ask\": " + DoubleToString(tick.ask, _Digits) + ",";
-   json += "\"bid\": " + DoubleToString(tick.bid, _Digits) + ",";
-   json += "\"flags\": " + IntegerToString((int)tick.flags) + ",";
-   json += "\"time\": \"" + isoTime + "\",";
-   json += "\"volume\": " + IntegerToString((long)tick.volume);
-   
-   return SendJson(json);
-}
-
-//+------------------------------------------------------------------+
-//| Format datetime jadi ISO-8601 UTC ("Z").                         |
-//| PENTING: MqlCalendarValue.time BUKAN pure GMT - epoch-nya di-    |
-//| shift sama seperti TimeTradeServer() (nunjukin digit jam broker |
-//| kalau di-format naif). Makanya wajib dikoreksi dulu pakai selisih|
-//| (TimeTradeServer() - TimeGMT()) sebelum dianggap UTC asli -      |
-//| lihat MQL5 Book "Universal Time": untuk mengikat event ke waktu  |
-//| server, koreksi pakai (TimeTradeServer() - TimeGMT()).           |
-//+------------------------------------------------------------------+
-string CalendarTimeToIso(datetime t) {
-   datetime trueUtc = t - (TimeTradeServer() - TimeGMT());
-   MqlDateTime dt;
-   TimeToStruct(trueUtc, dt);
-   return StringFormat("%04d-%02d-%02dT%02d:%02d:%02dZ", dt.year, dt.mon, dt.day, dt.hour, dt.min, dt.sec);
-}
-
-//+------------------------------------------------------------------+
-//| Get economic calendar events (one-shot, historical + upcoming)   |
-//+------------------------------------------------------------------+
-JsonResponse CCommandCore::GetCalendar(string countryCode, string currency, int days) {
-   datetime from, to;
-
-   if(days <= 0) {
-      // Mode default: batas KALENDER BULAN, bukan hitungan detik mentah.
-      // Kalau pakai "days*86400" dari sekarang, tanggal 15 bulan ini -
-      // 30 hari cuma nyampe tanggal 15 bulan lalu (bukan bulan lalu
-      // penuh). Di sini kita selalu ambil dari tanggal 1 bulan lalu
-      // sampai hari terakhir bulan depan, jadi selalu dapat 1 bulan
-      // penuh ke belakang + bulan berjalan + 1 bulan penuh ke depan,
-      // berapa pun tanggal hari ini.
-      MqlDateTime now;
-      // NOTE: val.time dari CalendarValueHistory ternyata SATU DOMAIN dengan
-      // TimeTradeServer() (epoch di-shift biar nunjukin digit jam broker),
-      // BUKAN pure GMT. Makanya window from/to di sini pakai TimeTradeServer()
-      // juga - biar konsisten sama domain data yang difilter. Konversi ke UTC
-      // asli (buat dikirim ke frontend) dilakukan terpisah di CalendarTimeToIso().
-      TimeToStruct(TimeTradeServer(), now);
-
-      MqlDateTime fromDt = now;
-      fromDt.mon  -= 1;
-      if(fromDt.mon < 1) { fromDt.mon = 12; fromDt.year -= 1; }
-      fromDt.day = 1;
-      fromDt.hour = 0; fromDt.min = 0; fromDt.sec = 0;
-      from = StructToTime(fromDt);
-
-      // Akhir window = hari terakhir bulan depan = (awal 2 bulan depan) - 1 detik
-      MqlDateTime toDt = now;
-      toDt.mon += 2;
-      while(toDt.mon > 12) { toDt.mon -= 12; toDt.year += 1; }
-      toDt.day = 1;
-      toDt.hour = 0; toDt.min = 0; toDt.sec = 0;
-      to = StructToTime(toDt) - 1;
-   } else {
-      // Override eksplisit: caller minta window N hari yang presisi
-      // (bukan batas kalender bulan) - dipakai kalau butuh rentang
-      // spesifik, misal cek 3 hari ke depan saja.
-      if(days > 90) days = 90;
-      from = TimeTradeServer() - (datetime)(days * 86400);
-      to   = TimeTradeServer() + (datetime)(days * 86400);
-   }
-
-   string cc  = (countryCode == "") ? NULL : countryCode;
-   string cur = (currency == "") ? NULL : currency;
-
-   MqlCalendarValue values[];
-   if(!CalendarValueHistory(values, from, to, cc, cur)) {
-      return SendError(500, "Failed to retrieve calendar data, error: " + IntegerToString(GetLastError()));
-   }
-
-   int count = ArraySize(values);
-   string json = "\"count\":" + IntegerToString(count) + ",\"events\":[";
-
-   for(int i = 0; i < count; i++) {
-      if(i > 0) StringAdd(json, ",");
-
-      MqlCalendarEvent evt;
-      CalendarEventById(values[i].event_id, evt);
-      MqlCalendarCountry country;
-      CalendarCountryById(evt.country_id, country);
-
-      string safeName = evt.name;
-      StringReplace(safeName, "\"", "'");
-
-      string importanceStr = "none";
-      if(evt.importance == CALENDAR_IMPORTANCE_HIGH) importanceStr = "high";
-      else if(evt.importance == CALENDAR_IMPORTANCE_MODERATE) importanceStr = "medium";
-      else if(evt.importance == CALENDAR_IMPORTANCE_LOW) importanceStr = "low";
-
-      string actualStr   = values[i].HasActualValue()   ? DoubleToString(values[i].GetActualValue(), 3)   : "null";
-      string forecastStr = values[i].HasForecastValue() ? DoubleToString(values[i].GetForecastValue(), 3) : "null";
-      string previousStr = values[i].HasPreviousValue() ? DoubleToString(values[i].GetPreviousValue(), 3) : "null";
-
-      StringAdd(json, "{");
-      StringAdd(json, "\"event_id\":" + IntegerToString((long)values[i].event_id) + ",");
-      StringAdd(json, "\"value_id\":" + IntegerToString((long)values[i].id) + ",");
-      StringAdd(json, "\"name\":\"" + safeName + "\",");
-      StringAdd(json, "\"country\":\"" + country.code + "\",");
-      StringAdd(json, "\"currency\":\"" + country.currency + "\",");
-      StringAdd(json, "\"importance\":\"" + importanceStr + "\",");
-      StringAdd(json, "\"time\":\"" + CalendarTimeToIso(values[i].time) + "\",");
-      StringAdd(json, "\"actual\":" + actualStr + ",");
-      StringAdd(json, "\"forecast\":" + forecastStr + ",");
-      StringAdd(json, "\"previous\":" + previousStr);
-      StringAdd(json, "}");
-   }
-   StringAdd(json, "]");
-
-   return SendJson(json);
-}
-
-//+------------------------------------------------------------------+
-//| Get symbol info and List                                         |
-//+------------------------------------------------------------------+
-void CCommandCore::BuildSymbolListCache() {
-   int total = SymbolsTotal(false);
-   string json = "\"symbols\": [";
-   bool first = true;
-
-   for(int i = 0; i < total; i++) {
-      string symbol = SymbolName(i, false);
-
-      int trade_mode = (int)SymbolInfoInteger(symbol, SYMBOL_TRADE_MODE);
-      string description = SymbolInfoString(symbol, SYMBOL_DESCRIPTION);
-      string path = SymbolInfoString(symbol, SYMBOL_PATH);
-
-      if(!first) StringAdd(json, ",");
-      first = false;
-
-      StringAdd(json, "{");
-      StringAdd(json, "\"name\": \"" + symbol + "\",");
-      StringAdd(json, "\"trade_mode\": " + IntegerToString(trade_mode) + ",");
-      StringAdd(json, "\"description\": \"" + description + "\",");
-      StringAdd(json, "\"path\": \"" + path + "\"");
-      StringAdd(json, "}");
-   }
-
-   StringAdd(json, "]");
-
-   cachedSymbolListJson = json;
-   cachedSymbolCount = total;
-
-   Print("Symbol cache built: ", cachedSymbolCount, " symbols");
-}
-
 JsonResponse CCommandCore::GetSymbolList() {
-   int total = SymbolsTotal(false);
+    int total = SymbolsTotal(false); // false = ALL broker symbols, not just Market Watch
 
-   if (total != cachedSymbolCount || cachedSymbolListJson == "") {
-      BuildSymbolListCache();
-   }
+    CJAVal jSymbols;
+    jSymbols.Clear(jtARRAY);
 
-   return SendJson(cachedSymbolListJson);
+    for(int i = 0; i < total; i++) {
+        string symbol = SymbolName(i, false);
+
+        int trade_mode = (int)SymbolInfoInteger(symbol, SYMBOL_TRADE_MODE);
+        string description = SymbolInfoString(symbol, SYMBOL_DESCRIPTION);
+        string path = SymbolInfoString(symbol, SYMBOL_PATH);
+
+        CJAVal item;
+        item["name"] = symbol;
+        item["trade_mode"] = (long)trade_mode;
+        item["description"] = description;
+        item["path"] = path;
+
+        jSymbols.Add(item);
+    }
+
+    CJAVal jRes;
+    jRes["symbols"].Set(jSymbols);
+
+    return SendJson(jRes.Serialize());
 }
 
-void CCommandCore::WarmSymbolCache() {
-   BuildSymbolListCache();
-}
-
+//+------------------------------------------------------------------+
+//| SYMBOL COUNT                                                      |
+//+------------------------------------------------------------------+
 JsonResponse CCommandCore::GetSymbolCount() {
-   int total = SymbolsTotal(false);
-   string json = "\"count\": " + IntegerToString(total);
-   return SendJson(json);
+    int total = SymbolsTotal(false); // false = ALL broker symbols, same as GetSymbolList()
+
+    CJAVal jRes;
+    jRes["count"] = (long)total;
+
+    return SendJson(jRes.Serialize());
 }
 
-//symbol INFO
-JsonResponse CCommandCore::GetSymbolInfo(string symbol) {
-   if(!SymbolSelect(symbol, true)) {
-      return SendError(404, "symbol not found: '" + symbol + "'");
-   }
-
-   datetime now = TimeCurrent();
-   string timeStr = TimeToString(now, TIME_DATE | TIME_SECONDS);
-
-   // Basic symbol info
-   int digits                = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
-   double bid = SymbolInfoDouble(symbol, SYMBOL_BID);
-   double ask = SymbolInfoDouble(symbol, SYMBOL_ASK);
-   double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
-   
-   double spread_float = (ask - bid) / point;  // spread in points (ticks)
-
-   int spread                = (int)MathRound(spread_float * MathPow(10, digits));
-   int trade_calc_mode       = (int)SymbolInfoInteger(symbol, SYMBOL_TRADE_CALC_MODE);
-   int trade_mode            = (int)SymbolInfoInteger(symbol, SYMBOL_TRADE_MODE);
-   ulong start_time          = (ulong)SymbolInfoInteger(symbol, SYMBOL_START_TIME);
-   ulong expiration_time     = (ulong)SymbolInfoInteger(symbol, SYMBOL_EXPIRATION_TIME);
-   int trade_stops_level     = (int)SymbolInfoInteger(symbol, SYMBOL_TRADE_STOPS_LEVEL);
-   int trade_freeze_level    = (int)SymbolInfoInteger(symbol, SYMBOL_TRADE_FREEZE_LEVEL);
-   int trade_exemode         = (int)SymbolInfoInteger(symbol, SYMBOL_TRADE_EXEMODE);
-   int swap_mode             = (int)SymbolInfoInteger(symbol, SYMBOL_SWAP_MODE);
-   int swap_rollover_3days   = (int)SymbolInfoInteger(symbol, SYMBOL_SWAP_ROLLOVER3DAYS);
-   double trade_tick_value   = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
-   double trade_tick_value_profit = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE_PROFIT);
-   double trade_tick_value_loss   = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE_LOSS);
-   double trade_tick_size    = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_SIZE);
-   double trade_contract_size= SymbolInfoDouble(symbol, SYMBOL_TRADE_CONTRACT_SIZE);
-   double volume_min         = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
-   double volume_max         = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
-   double volume_step        = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
-   double volume_limit       = SymbolInfoDouble(symbol, SYMBOL_VOLUME_LIMIT);
-   double swap_long          = SymbolInfoDouble(symbol, SYMBOL_SWAP_LONG);
-   double swap_short         = SymbolInfoDouble(symbol, SYMBOL_SWAP_SHORT);
-   double margin_initial     = SymbolInfoDouble(symbol, SYMBOL_MARGIN_INITIAL);
-   double margin_maintenance = SymbolInfoDouble(symbol, SYMBOL_MARGIN_MAINTENANCE);
-
-   string currency_base      = SymbolInfoString(symbol, SYMBOL_CURRENCY_BASE);
-   string currency_profit    = SymbolInfoString(symbol, SYMBOL_CURRENCY_PROFIT);
-   string currency_margin    = SymbolInfoString(symbol, SYMBOL_CURRENCY_MARGIN);
-   string description        = SymbolInfoString(symbol, SYMBOL_DESCRIPTION);
-   string path               = SymbolInfoString(symbol, SYMBOL_PATH);
-
-   // For sessions, MQL5 does not expose detailed sessions easily, so mock all days 00:00-24:00:
-   string sessions = "[{\"(?)monday\":\"00:00-24:00\"},{\"(?)tuesday\":\"00:00-24:00\"},{\"(?)wednesday\":\"00:00-24:00\"},{\"(?)thursday\":\"00:00-24:00\"},{\"(?)friday\":\"00:00-24:00\"}]";
-
-   // Manually build JSON string:
-   string json = "";
-   json += "\"name\": \"" + symbol + "\",";
-   json += "\"time\": \"" + timeStr + "\",";
-   json += "\"digits\": " + IntegerToString(digits) + ",";
-   json += "\"spread_float\": " + DoubleToString(spread_float, digits) + ",";
-   json += "\"spread\": " + IntegerToString(spread) + ",";
-   json += "\"trade_calc_mode\": " + IntegerToString(trade_calc_mode) + ",";
-   json += "\"trade_mode\": " + IntegerToString(trade_mode) + ",";
-   json += "\"start_time\": " + (string)start_time + ",";
-   json += "\"expiration_time\": " + (string)expiration_time + ",";
-   json += "\"trade_stops_level\": " + IntegerToString(trade_stops_level) + ",";
-   json += "\"trade_freeze_level\": " + IntegerToString(trade_freeze_level) + ",";
-   json += "\"trade_exemode\": " + IntegerToString(trade_exemode) + ",";
-   json += "\"swap_mode\": " + IntegerToString(swap_mode) + ",";
-   json += "\"swap_rollover3days\": " + IntegerToString(swap_rollover_3days) + ",";
-   json += "\"point\": " + DoubleToString(point, digits) + ",";
-   json += "\"trade_tick_value\": " + DoubleToString(trade_tick_value, 8) + ",";
-   json += "\"trade_tick_value_profit\": " + DoubleToString(trade_tick_value_profit, 8) + ",";
-   json += "\"trade_tick_value_loss\": " + DoubleToString(trade_tick_value_loss, 8) + ",";
-   json += "\"trade_tick_size\": " + DoubleToString(trade_tick_size, digits) + ",";
-   json += "\"trade_contract_size\": " + DoubleToString(trade_contract_size, 8) + ",";
-   json += "\"volume_min\": " + DoubleToString(volume_min, 8) + ",";
-   json += "\"volume_max\": " + DoubleToString(volume_max, 8) + ",";
-   json += "\"volume_step\": " + DoubleToString(volume_step, 8) + ",";
-   json += "\"volume_limit\": " + DoubleToString(volume_limit, 8) + ",";
-   json += "\"swap_long\": " + DoubleToString(swap_long, 8) + ",";
-   json += "\"swap_short\": " + DoubleToString(swap_short, 8) + ",";
-   json += "\"margin_initial\": " + DoubleToString(margin_initial, 8) + ",";
-   json += "\"margin_maintenance\": " + DoubleToString(margin_maintenance, 8) + ",";
-   json += "\"currency_base\": \"" + currency_base + "\",";
-   json += "\"currency_profit\": \"" + currency_profit + "\",";
-   json += "\"currency_margin\": \"" + currency_margin + "\",";
-   json += "\"description\": \"" + description + "\",";
-   json += "\"path\": \"" + path + "\",";
-   json += "\"session_quote\": " + sessions + ",";
-   json += "\"session_trade\": " + sessions;
-
-   return SendJson(json);
-}
 
 //+------------------------------------------------------------------+
-//| Set Tracking for symbols                                         |
+//| TRACKING — shared helpers                                         |
 //+------------------------------------------------------------------+
-JsonResponse CCommandCore::SetSymbols(string &symbols[])
-{
-    string validSymbols[];
-    string invalidSymbols[];
-    int count = ArraySize(symbols);
+void CCommandCore::ValidateSymbolsArray(string &symbolArray[], string &validSymbols[], string &invalidSymbols[]) {
+    int count = ArraySize(symbolArray);
 
-    for(int i = 0; i < count; i++)
-    {
-        string sym = symbols[i];
-        bool selected = SymbolSelect(sym, true);
-        if(selected)
-        {
-            int newSize = ArraySize(validSymbols);
-            ArrayResize(validSymbols, newSize + 1);
-            validSymbols[newSize] = sym;
-        }
-        else
-        {
-            int newSize = ArraySize(invalidSymbols);
-            ArrayResize(invalidSymbols, newSize + 1);
-            invalidSymbols[newSize] = sym;
+    for(int i = 0; i < count; i++) {
+        string sym = symbolArray[i];
+
+        if(SymbolSelect(sym, true)) {
+            int n = ArraySize(validSymbols);
+            ArrayResize(validSymbols, n + 1);
+            validSymbols[n] = sym;
+        } else {
+            int n = ArraySize(invalidSymbols);
+            ArrayResize(invalidSymbols, n + 1);
+            invalidSymbols[n] = sym;
         }
     }
-
-    // Set valid symbols
-    if(dataSender != NULL && ArraySize(validSymbols) >= 0)
-    {
-        dataSender.setSymbols(validSymbols);
-    }
-
-    // Build success/fail JSON
-    string validStr = "[";
-    for(int i = 0; i < ArraySize(validSymbols); i++) {
-        if(i > 0) validStr += ",";
-        validStr += "\"" + validSymbols[i] + "\"";
-    }
-    validStr += "]";
-
-    string invalidStr = "[";
-    for(int i = 0; i < ArraySize(invalidSymbols); i++) {
-        if(i > 0) invalidStr += ",";
-        invalidStr += "\"" + invalidSymbols[i] + "\"";
-    }
-    invalidStr += "]";
-
-    string jsonStr = "\"response\":\"track_prices\",\"status\":\"success\",\"accepted\":" + validStr + ",\"rejected\":" + invalidStr;
-
-    return SendJson(jsonStr);
 }
 
-//+------------------------------------------------------------------+
-//| Set Tracking for ohlc                                            |
-//+------------------------------------------------------------------+
-JsonResponse CCommandCore::SetOhlcRequests(OhlcRequest &requests[]) {
-    // Set valid OHLCs
-    if (dataSender != NULL && ArraySize(requests) > 0) {
-        dataSender.setOhlcs(requests);
-    }
+JsonResponse CCommandCore::BuildTrackResponse(string &validSymbols[], string &invalidSymbols[]) {
+    CJAVal jValid, jInvalid;
+    jValid.Clear(jtARRAY);
+    jInvalid.Clear(jtARRAY);
 
-    string validStr = "[";
-    for (int i = 0; i < ArraySize(requests); i++) {
-        if (i > 0)
-            validStr += ",";
-        Print("timeframe:" + timeframeToString(requests[i].timeframe));
-        string tfStr = timeframeToString(requests[i].timeframe);
+    for(int i = 0; i < ArraySize(validSymbols); i++) jValid.Add(validSymbols[i]);
+    for(int i = 0; i < ArraySize(invalidSymbols); i++) jInvalid.Add(invalidSymbols[i]);
 
-        validStr += "{";
-        validStr += "\"symbol\":\"" + requests[i].symbol + "\",";
-        validStr += "\"time_frame\":\"" + tfStr + "\"";
-        validStr += "}";
-    }
-    validStr += "]";
+    CJAVal jRes;
+    jRes["response"] = "track_prices";
+    jRes["status"] = "success";
+    jRes["accepted"].Set(jValid);
+    jRes["rejected"].Set(jInvalid);
 
-    string response = "\"response\":\"ohlc_update\",";
-    response += "\"accepted\":" + validStr;
-
-    return SendJson(response);
+    return SendJson(jRes.Serialize());
 }
 
-//+------------------------------------------------------------------+
-//| Set Tracking for order events                                    |
-//+------------------------------------------------------------------+
-JsonResponse CCommandCore::SetOrderEvents(bool enabled) {
-    if (dataSender != NULL) {
-        Print("setting");
-        dataSender.setOrderEvents(enabled);
-    }
-
-    string jsonStr = "\"response\":\"order_events\",\"status\":\"success\",\"enabled\":" + (enabled ? "true" : "false");
-
-    return SendJson(jsonStr);
-}
 
 //+------------------------------------------------------------------+
-//| Set Tracking for order events                                    |
+//| TRACKING — prices                                                 |
 //+------------------------------------------------------------------+
-JsonResponse CCommandCore::SetMbook(string &symbols[])
-{
-    string validSymbols[];
-    string invalidSymbols[];
-    int count = ArraySize(symbols);
+JsonResponse CCommandCore::SetSymbols(string &symbolArray[]) {
+    string validSymbols[], invalidSymbols[];
+    ValidateSymbolsArray(symbolArray, validSymbols, invalidSymbols);
 
-    for(int i = 0; i < count; i++)
-    {
-        string sym = symbols[i];
-        bool selected = SymbolSelect(sym, true);
-        if(selected)
-        {
-            int newSize = ArraySize(validSymbols);
-            ArrayResize(validSymbols, newSize + 1);
-            validSymbols[newSize] = sym;
-        }
-        else
-        {
-            int newSize = ArraySize(invalidSymbols);
-            ArrayResize(invalidSymbols, newSize + 1);
-            invalidSymbols[newSize] = sym;
-        }
-    }
-
-    // Set valid symbols
-    if(dataSender != NULL && ArraySize(validSymbols) >= 0)
-    {
-        dataSender.setMbookSymbols(validSymbols);
-    }
-
-    // Build success/fail JSON
-    string validStr = "[";
-    for(int i = 0; i < ArraySize(validSymbols); i++) {
-        if(i > 0) validStr += ",";
-        validStr += "\"" + validSymbols[i] + "\"";
-    }
-    validStr += "]";
-
-    string invalidStr = "[";
-    for(int i = 0; i < ArraySize(invalidSymbols); i++) {
-        if(i > 0) invalidStr += ",";
-        invalidStr += "\"" + invalidSymbols[i] + "\"";
-    }
-    invalidStr += "]";
-
-    string jsonStr = "\"response\":\"track_prices\",\"status\":\"success\",\"accepted\":" + validStr + ",\"rejected\":" + invalidStr;
-
-    return SendJson(jsonStr);
-}
-
-//+------------------------------------------------------------------+
-//| Set Tracking for economic calendar streaming                    |
-//+------------------------------------------------------------------+
-JsonResponse CCommandCore::SetCalendarFilter(string &countries[], string &currencies[], string minImportance)
-{
+    // Empty array is a valid, intentional way for the client to clear tracking
     if(dataSender != NULL)
-    {
-        dataSender.setCalendarFilter(countries, currencies, minImportance);
-    }
+        dataSender.SetSymbols(validSymbols);
 
-    string countryStr = "[";
-    for(int i = 0; i < ArraySize(countries); i++) {
-        if(i > 0) countryStr += ",";
-        countryStr += "\"" + countries[i] + "\"";
-    }
-    countryStr += "]";
-
-    string currStr = "[";
-    for(int i = 0; i < ArraySize(currencies); i++) {
-        if(i > 0) currStr += ",";
-        currStr += "\"" + currencies[i] + "\"";
-    }
-    currStr += "]";
-
-    string jsonStr = "\"response\":\"track_calendar\",\"status\":\"success\",\"countries\":" + countryStr +
-                      ",\"currencies\":" + currStr + ",\"min_importance\":\"" + minImportance + "\"";
-
-    return SendJson(jsonStr);
+    return BuildTrackResponse(validSymbols, invalidSymbols);
 }
 
+
 //+------------------------------------------------------------------+
-//| Send Acknowledgment Response                                     |
+//| TRACKING — market book                                            |
 //+------------------------------------------------------------------+
-JsonResponse CCommandCore::SendError(int status, string details = "") {
+JsonResponse CCommandCore::SetMbook(string &symbolArray[]) {
+    string validSymbols[], invalidSymbols[];
+    ValidateSymbolsArray(symbolArray, validSymbols, invalidSymbols);
+
+    if(dataSender != NULL)
+        dataSender.SetMbookSymbols(validSymbols);
+
+    return BuildTrackResponse(validSymbols, invalidSymbols);
+}
+
+
+//+------------------------------------------------------------------+
+//| TRACKING — OHLC                                                   |
+//+------------------------------------------------------------------+
+JsonResponse CCommandCore::SetOhlcRequests(OhlcRequest &requests[], string &rejected[]) {
+    // Always call SetOhlcRequests, even with an empty array, so this endpoint can
+    // clear tracking the same way SetSymbols/SetMbook already do.
+    if(dataSender != NULL)
+        dataSender.SetOhlcRequests(requests);
+
+    CJAVal jValid;
+    jValid.Clear(jtARRAY);
+
+    for (int i = 0; i < ArraySize(requests); i++) {
+        CJAVal item;
+        item["symbol"] = requests[i].symbol;
+        item["time_frame"] = timeframeToString(requests[i].timeframe);
+
+        jValid.Add(item);
+    }
+
+    CJAVal jInvalid;
+    jInvalid.Clear(jtARRAY);
+    for (int i = 0; i < ArraySize(rejected); i++) jInvalid.Add(rejected[i]);
+
+    CJAVal jRes;
+    jRes["response"] = "ohlc_update";
+    jRes["accepted"].Set(jValid);
+    jRes["rejected"].Set(jInvalid);
+
+    return SendJson(jRes.Serialize());
+}
+
+
+//+------------------------------------------------------------------+
+//| TRACKING — calendar                                               |
+//+------------------------------------------------------------------+
+JsonResponse CCommandCore::SetCalendarTracking(string country, string currency) {
+    if(dataSender != NULL)
+        dataSender.SetCalendarTracking(country, currency);
+
+    CJAVal jRes;
+    jRes["response"] = "calendar_tracking";
+    jRes["status"]   = "success";
+    jRes["country"]  = (country != "" ? country : "ALL");
+    jRes["currency"] = (currency != "" ? currency : "ALL");
+    jRes["enabled"]  = (country != "" || currency != "");
+
+    return SendJson(jRes.Serialize());
+}
+
+
+//+------------------------------------------------------------------+
+//| RESPONSE HELPERS                                                  |
+//+------------------------------------------------------------------+
+JsonResponse CCommandCore::SendError(int status, string details) {
     Print("Sending ACK -Status: ", status, ", details: ", details);
-    
-  
-    string jsonStr = "";
+
+    CJAVal jError;
     if(details != "")
-        jsonStr += "\"details\":\"" + details + "\"";
-        
-    return SendJson(jsonStr, status);
+        jError["details"] = details;
+
+    return SendJson(jError.Serialize(), status);
 }
 
-JsonResponse CCommandCore::SendJson(string jsonContent = "", int status = 200)
-{
+JsonResponse CCommandCore::SendJson(string jsonContent, int status) {
     JsonResponse jsonRes;
-    
-    jsonRes.jsonContent = "{" + jsonContent + "}";
+
+    if(jsonContent == "") {
+        jsonRes.jsonContent = "{}";
+    } else {
+        jsonRes.jsonContent = jsonContent;
+    }
     jsonRes.status = status;
 
     return jsonRes;
 }
-
-
-

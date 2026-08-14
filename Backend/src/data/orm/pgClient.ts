@@ -4,11 +4,17 @@ import { logger } from "@core/logging/logger.js";
 
 const { Pool } = pg;
 
+// SSL is only needed for managed/remote Postgres (e.g. Neon). Self-hosted
+// Postgres (localhost, or the `postgres` Docker Compose service) doesn't
+// have SSL configured, so detect that by hostname rather than NODE_ENV —
+// NODE_ENV is "production" inside the container, which previously forced
+// SSL on and broke local Docker Postgres connections.
+const dbHost = new URL(env.DATABASE_URL).hostname;
+const isLocalDb = dbHost === "localhost" || dbHost === "127.0.0.1" || dbHost === "postgres";
+
 export const pgClient = new Pool({
   connectionString: env.DATABASE_URL,
-  ssl: env.NODE_ENV === "development" && env.DATABASE_URL.includes("localhost")
-    ? false
-    : { rejectUnauthorized: true },
+  ssl: isLocalDb ? false : { rejectUnauthorized: true },
   max: env.DB_POOL_MAX,
   // Neon's pooler drops idle TCP connections after a few minutes.
   // Close our side first (10s) so the pool never holds a stale socket

@@ -101,11 +101,12 @@ export async function login(email: string, password: string): Promise<LoginSucce
 }
 
 // POST /api/auth/logout — cabut satu session (device ini) pakai token-nya.
+// Backend baca token dari header Authorization (sama seperti endpoint lain),
+// lewat authMiddleware — bukan dari body. Kirim body = 401 sebelum controller.
 export async function logout(sessionToken: string): Promise<{ message: string }> {
   const res = await fetch(`${BACKEND_URL}/api/v1/auth/logout`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ sessionToken }),
+    headers: { Authorization: `Bearer ${sessionToken}` },
   });
   if (!res.ok) return parseErrorAndThrow(res);
   return res.json();

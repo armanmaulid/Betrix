@@ -10,11 +10,11 @@ export interface Candle {
 }
 
 
-export async function fetchOHLC(symbol: string, timeframe: string, signal?: AbortSignal) {
+export async function fetchOHLC(symbol: string, timeframe: string, signal?: AbortSignal): Promise<{ candles: Candle[] }> {
   const url = `${BACKEND_URL}/api/v1/market/ohlc/${encodeURIComponent(symbol)}/${timeframe}`;
   const token = localStorage.getItem("eaconsole.sessionToken");
   const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-  
+
   const res = await fetch(url, { headers, signal });
   if (res.status === 401) {
     localStorage.removeItem("eaconsole.sessionToken");
@@ -25,8 +25,9 @@ export async function fetchOHLC(symbol: string, timeframe: string, signal?: Abor
     const body = await res.json().catch(() => null);
     throw new Error(body?.error || `HTTP ${res.status}`);
   }
-  
-  return await res.json();
+
+  const data = await res.json();
+  return { candles: data.candles || [] };
 }
 
 
@@ -73,7 +74,7 @@ export async function fetchEconomicCalendar(
 ): Promise<CalendarResponse> {
   const token = localStorage.getItem("eaconsole.sessionToken");
   const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-  const params = new URLSearchParams({ fromDate, toDate, limit: "500" });
+  const params = new URLSearchParams({ fromDate, toDate });
   const res = await fetch(`${BACKEND_URL}/api/v1/market/calendar?${params}`, { headers });
 
   if (res.status === 401) {

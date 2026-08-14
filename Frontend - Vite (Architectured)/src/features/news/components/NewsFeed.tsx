@@ -64,8 +64,7 @@ function stripHtml(html: string): string {
 }
 
 // Data dari backend /api/news via Vite proxy (localhost:3000).
-// Auto-polling tiap 30 detik untuk update realtime.
-// Nanti bisa diganti pakai EventSource(/api/news/stream) setelah ada login.
+// Mengambil data awal sekali saat komponen dimount, selanjutnya menerima update realtime via EventSource (SSE).
 export const NewsFeed = React.memo(function NewsFeed() {
   const [items, setItems] = useState<NewsItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);

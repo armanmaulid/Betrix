@@ -62,12 +62,7 @@ export async function streamChat(
               onDone(data);
               isDoneEvent = false;
             } else if (data.token) {
-              // Guarantee typewriter effect even if backend or proxy sends huge chunks at once
-              const chars = data.token.split('');
-              for (const char of chars) {
-                onToken(char);
-                await new Promise(r => setTimeout(r, 5)); // 5ms per char for faster terminal effect
-              }
+              onToken(data.token);
             } else if (data.error) {
               onError(data.error);
             }

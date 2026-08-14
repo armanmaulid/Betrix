@@ -48,7 +48,7 @@ export const ChatMessageItem = React.memo(({ msg }: { msg: any }) => {
 
   if (msg.isTyping) {
     return (
-      <div className="flex flex-col w-full max-w-4xl gap-3" style={{ contain: 'layout' }}>
+      <div className="flex flex-col w-full max-w-[85%] gap-3 self-start" style={{ contain: 'layout' }}>
         <div className="flex flex-col border border-[#333] bg-[#0a0a0a] rounded-sm p-5 shadow-lg">
           <div className="flex items-center gap-3 text-[#ff9900] font-bold text-[11px] animate-pulse">
             <Globe size={14} className="animate-spin" /> 
@@ -60,7 +60,7 @@ export const ChatMessageItem = React.memo(({ msg }: { msg: any }) => {
   }
 
   return (
-    <div className="flex flex-col w-full max-w-4xl gap-3" style={{ contain: 'layout' }}>
+    <div className="flex flex-col w-full max-w-[85%] gap-3 self-start" style={{ contain: 'layout' }}>
       <div className={`flex flex-col border border-[#333] bg-[#0a0a0a] rounded-sm shadow-lg ${msg.isFinishedGlow ? 'animate-ai-glow' : ''}`}>
         <div className="flex items-center justify-between px-4 py-2 border-b border-[#222]">
           <div className="flex items-center gap-2 text-[#eee] font-bold text-[11px]">

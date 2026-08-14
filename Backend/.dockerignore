@@ -2,6 +2,16 @@ node_modules
 dist
 .env
 .env.*
+!.env.example
 *.log
+*.bak
 .git
+.gitignore
 coverage
+Dockerfile*
+.dockerignore
+README.md
+*.md
+eslint.config.js
+.prettierrc*
+vitest.config.ts

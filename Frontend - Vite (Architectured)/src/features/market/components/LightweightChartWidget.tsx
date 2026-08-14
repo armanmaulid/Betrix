@@ -63,10 +63,10 @@ export function LightweightChartWidget({ symbol, timeframe }: LightweightChartWi
       setError(null);
       
       try {
-        const candle = await fetchOHLC(symbol, timeframe, abortController.signal);
+        const result = await fetchOHLC(symbol, timeframe, abortController.signal);
         if (cancelled) return;
-        
-        const candles = candle ? [candle] : [];
+
+        const candles = result?.candles ?? [];
         const data = candles
           .map((c) => ({
             time: c.time as Time,

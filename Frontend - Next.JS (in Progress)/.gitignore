@@ -24,6 +24,7 @@
 # misc
 .DS_Store
 *.pem
+Thumbs.db
 
 # debug
 npm-debug.log*
@@ -33,6 +34,7 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+.env.bak
 
 # vercel
 .vercel
@@ -40,3 +42,22 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Agent/tool directories
+.agents/
+.agent/skills
+.gemini/rules
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Cache
+.eslintcache
+.cache/
+
+# Temp files
+*.tmp
+test-*.json
