@@ -2,20 +2,20 @@ import type { Candle } from "../../features/market/api/marketClient";
 import type { NewsItem } from "../../features/news/api/newsClient";
 
 // Styling elemen Markdown supaya senada dengan tema terminal gelap Betrix
-// (aksen orange #ff9900, border #222/#333) alih-alih default browser polos.
+// (aksen orange --accent, border --border) alih-alih default browser polos.
 export const markdownComponents = {
-  h1: (props: any) => <h3 className="text-[13px] font-bold text-[#ff9900] mt-3 mb-1.5 first:mt-0" {...props} />,
-  h2: (props: any) => <h3 className="text-[13px] font-bold text-[#ff9900] mt-3 mb-1.5 first:mt-0" {...props} />,
-  h3: (props: any) => <h4 className="text-[12px] font-bold text-[#ff9900] mt-2.5 mb-1 first:mt-0" {...props} />,
-  p: (props: any) => <p className="text-[12px] leading-relaxed text-[#eee] mb-2 last:mb-0" {...props} />,
+  h1: (props: any) => <h3 className="text-[13px] font-bold text-[var(--accent)] mt-3 mb-1.5 first:mt-0" {...props} />,
+  h2: (props: any) => <h3 className="text-[13px] font-bold text-[var(--accent)] mt-3 mb-1.5 first:mt-0" {...props} />,
+  h3: (props: any) => <h4 className="text-[12px] font-bold text-[var(--accent)] mt-2.5 mb-1 first:mt-0" {...props} />,
+  p: (props: any) => <p className="text-[12px] leading-relaxed text-[var(--text-primary)] mb-2 last:mb-0" {...props} />,
   strong: (props: any) => <strong className="font-bold text-white" {...props} />,
-  em: (props: any) => <em className="italic text-[#ccc]" {...props} />,
-  ul: (props: any) => <ul className="list-disc list-outside pl-4 mb-2 space-y-0.5 text-[12px] text-[#eee]" {...props} />,
-  ol: (props: any) => <ol className="list-decimal list-outside pl-4 mb-2 space-y-0.5 text-[12px] text-[#eee]" {...props} />,
+  em: (props: any) => <em className="italic text-[var(--text-primary)]" {...props} />,
+  ul: (props: any) => <ul className="list-disc list-outside pl-4 mb-2 space-y-0.5 text-[12px] text-[var(--text-primary)]" {...props} />,
+  ol: (props: any) => <ol className="list-decimal list-outside pl-4 mb-2 space-y-0.5 text-[12px] text-[var(--text-primary)]" {...props} />,
   li: (props: any) => <li className="leading-relaxed" {...props} />,
-  hr: () => <hr className="border-t border-[#333] my-3" />,
-  code: (props: any) => <code className="bg-[#1a1a1a] border border-[#333] rounded-sm px-1 py-0.5 text-[11px] text-[#ff9900]" {...props} />,
-  blockquote: (props: any) => <blockquote className="border-l-2 border-[#ff9900] pl-3 text-[#aaa] italic my-2" {...props} />,
+  hr: () => <hr className="border-t border-[var(--border)] my-3" />,
+  code: (props: any) => <code className="bg-[var(--surface-alt)] border border-[var(--border)] px-1 py-0.5 text-[11px] text-[var(--accent)]" {...props} />,
+  blockquote: (props: any) => <blockquote className="border-l-2 border-[var(--accent)] pl-3 text-[var(--text-muted)] italic my-2" {...props} />,
 };
 
 // Command instrumen yang men-trigger fetch data realtime MT5 (lihat mt5Client.js
@@ -75,11 +75,12 @@ export function buildTradeAnalysisPrompt(instrument: ParsedInstrumentCommand, ca
   ].join("\n");
 }
 
-// Cermin dari TASK_TIER_MAP + TIER_CREDIT_COST di backend (config/models.js,
-// routes/chat.js) -- cuma dipakai buat nampilin estimasi biaya kredit di UI,
-// bukan sumber kebenaran (backend yang benar-benar motong kreditnya).
+// Cermin dari TASK_TIER_MAP + TIER_CREDIT_COST di backend (domain/services/ModelPolicy.ts)
+// -- cuma dipakai buat nampilin estimasi biaya kredit di UI, bukan sumber kebenaran
+// (backend yang benar-benar motong kreditnya). Key harus sama dengan enum backend
+// (ChatTaskType): "faq" bukan taskType valid → jangan dipakai (backend fallback ke balanced).
 export const FRONTEND_TASK_TIER_MAP: Record<string, "cheap" | "balanced" | "deep"> = {
-  faq: "cheap",
+  general: "cheap",
   classify_signal: "cheap",
   quick_summary: "balanced",
   market_insight: "balanced",
@@ -142,4 +143,3 @@ export const CHAT_TEMPLATES = [
     desc: "Evaluate the Fed's rate cut trajectory, bond supply dynamics, and fixed income positioning"
   }
 ];
-

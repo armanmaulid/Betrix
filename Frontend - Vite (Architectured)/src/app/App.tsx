@@ -19,7 +19,7 @@ import { TerminalShellLayout } from "./layout/TerminalShellLayout";
 // chunk route lain masih di-download.
 function RouteFallback() {
   return (
-    <div className="flex h-screen w-full items-center justify-center bg-[#050505] text-[10px] font-bold uppercase tracking-widest text-[#666]">
+    <div className="flex h-screen w-full items-center justify-center bg-[var(--bg)] text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">
       Loading...
     </div>
   );

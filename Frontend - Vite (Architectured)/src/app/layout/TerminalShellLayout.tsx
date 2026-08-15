@@ -19,7 +19,7 @@ export function TerminalShellLayout() {
   return (
     <TerminalShell onSearchSymbol={onSearch} rightPanel={rightPanel}>
       <Suspense fallback={
-        <div className="flex h-full w-full items-center justify-center text-[10px] font-bold uppercase tracking-widest text-[#666]">
+        <div className="flex h-full w-full items-center justify-center text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">
           Loading...
         </div>
       }>

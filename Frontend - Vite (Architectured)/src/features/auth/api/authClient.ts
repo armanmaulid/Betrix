@@ -191,13 +191,16 @@ export async function changeEmail(sessionToken: string, currentPassword: string,
   return { pendingEmail: data.pendingEmail };
 }
 
+// GET /api/auth/sessions — daftar device yang masih aktif.
+// Backend (GetSessionsUseCase) mengembalikan `{ sessions: DeviceSession[] }`;
+// tiap entri berisi `fingerprint` + `lastSeenAt`.
 export async function getSessions(sessionToken: string): Promise<DeviceSession[]> {
   const res = await fetch(`${BACKEND_URL}/api/v1/auth/sessions`, {
     headers: { Authorization: `Bearer ${sessionToken}` },
   });
   if (!res.ok) return parseErrorAndThrow(res);
   const data = await res.json();
-  return data.devices;
+  return data.sessions;
 }
 
 export async function revokeSession(sessionToken: string, fingerprint: string): Promise<void> {

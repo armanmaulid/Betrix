@@ -16,31 +16,13 @@ const ASSET_LABEL: Record<string, string> = {
 };
 
 const ASSET_COLOR: Record<string, string> = {
-  usd: "bg-blue-500/20 text-blue-400",
-  metal: "bg-yellow-500/20 text-yellow-400",
-  oil: "bg-orange-500/20 text-orange-400",
-  btc: "bg-purple-500/20 text-purple-400",
-  crypto: "bg-purple-500/20 text-purple-400",
-  eco: "bg-teal-500/20 text-teal-400",
-  global: "bg-slate-500/20 text-slate-400",
-};
-
-const SOURCE_COLOR: Record<string, string> = {
-  // Forex & Global
-  "FXStreet": "bg-indigo-500/20 text-indigo-300",
-  "ActionForex": "bg-emerald-500/20 text-emerald-300",
-  "Investing Eco": "bg-amber-500/20 text-amber-300",
-  "Investing Comms": "bg-amber-500/20 text-amber-300",
-  "BabyPips": "bg-pink-500/20 text-pink-300",
-  "ForexCrunch": "bg-lime-500/20 text-lime-300",
-  "WSJ Markets": "bg-slate-300/20 text-slate-100 border border-slate-500/30",
-
-  // Crypto
-  "FXStreet Crypto": "bg-indigo-500/20 text-indigo-300",
-  "CoinTelegraph": "bg-yellow-500/20 text-yellow-300",
-  "Decrypt": "bg-violet-500/20 text-violet-300",
-  "DailyHodl": "bg-fuchsia-500/20 text-fuchsia-300",
-  "Crypto Briefing": "bg-sky-500/20 text-sky-300",
+  usd: "bg-[var(--info-soft)] text-[var(--info)]",
+  metal: "bg-[var(--caution-soft)] text-[var(--caution)]",
+  oil: "bg-[var(--accent-soft)] text-[var(--accent)]",
+  btc: "bg-[var(--info-soft)] text-[var(--info)]",
+  crypto: "bg-[var(--info-soft)] text-[var(--info)]",
+  eco: "bg-[var(--success-soft)] text-[var(--success)]",
+  global: "bg-[var(--surface-alt)] text-[var(--text-muted)]",
 };
 
 function formatRelativeTime(iso: string): string {
@@ -185,12 +167,7 @@ export const NewsFeed = React.memo(function NewsFeed() {
                     Baru
                   </span>
                 )}
-                <span
-                  className={
-                    "rounded px-1 py-0.5 text-[9px] font-bold uppercase " +
-                    (SOURCE_COLOR[item.source] || "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30")
-                  }
-                >
+                <span className="bg-[var(--surface-alt)] text-[var(--text-muted)] px-1 py-0.5 text-[9px] font-bold uppercase">
                   {item.source}
                 </span>
                 {item.assetTags.map((tag) => (

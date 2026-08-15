@@ -241,9 +241,9 @@ export function SettingsPage() {
       <>
         {/* Status Panels */}
         <div className="flex flex-col md:flex-row gap-0 border border-[var(--border)] mt-4">
-          <div className="bx-stat-card flex-1 border-l-2 border-green-500">
+          <div className="bx-stat-card flex-1 border-l-2 border-[var(--success)]">
             <div className="bx-stat-card-title">VERIFICATION</div>
-            <div className="flex items-center gap-1.5 text-green-500 font-bold text-[14px]">
+            <div className="flex items-center gap-1.5 text-[var(--success)] font-bold text-[14px]">
               <CheckCircle2 size={14} /> {user?.emailVerified ? "VERIFIED" : "UNVERIFIED"}
             </div>
           </div>
@@ -297,7 +297,7 @@ export function SettingsPage() {
             <div className="bx-stat-card-title">
               <Calendar size={12} className="text-[var(--text-muted)]" /> MEMBER SINCE
             </div>
-            <div className="bx-stat-card-value text-green-500">
+            <div className="bx-stat-card-value text-[var(--success)]">
               {formatDate(user?.createdAt || new Date().toISOString())}
             </div>
           </div>
@@ -610,7 +610,7 @@ export function SettingsPage() {
         {message && !isEditingProfile && activeTab !== "SECURITY" && (
           <div className={`p-3 mb-4 text-[12px] flex items-center gap-2 border ${
             message.type === "success" 
-              ? "bg-green-500/10 border-green-500/20 text-green-500" 
+              ? "bg-green-500/10 border-[var(--success)]/20 text-[var(--success)]" 
               : "bg-red-500/10 border-red-500/20 text-red-500"
           }`}>
             <AlertCircle size={15} />

@@ -106,7 +106,7 @@ function ImpactBars({ importance }: { importance: CalendarEvent["importance"] })
   return (
     <span className="flex items-center justify-center gap-[2px]" title={`Impact: ${importance}`}>
       {[0, 1, 2].map((i) => (
-        <span key={i} className={"inline-block w-[12px] text-center text-[12px] leading-none " + (i < level ? "text-yellow-500" : "text-[var(--border)]")}>
+        <span key={i} className={"inline-block w-[12px] text-center text-[12px] leading-none " + (i < level ? "text-[var(--caution)]" : "text-[var(--border)]")}>
           {i < level ? "★" : "☆"}
         </span>
       ))}

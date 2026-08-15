@@ -82,28 +82,28 @@ export function ChatHistoryList() {
   };
 
   if (recentSessions.length === 0) {
-    return <div className="text-[#555] text-[11px] italic page-container py-2">No recent sessions found.</div>;
+    return <div className="text-[var(--text-muted)] text-[11px] italic page-container py-2">Belum ada sesi terbaru.</div>;
   }
 
   return (
     <>
       {recentSessions.map((session: any) => (
-        <div key={session.sessionId} className="flex items-center justify-between border border-[#222] bg-[#0a0a0a] page-container py-2 group hover:border-[#444] transition-colors shadow-sm mt-1">
-          <div className="flex items-center gap-2 text-[#ccc] w-full max-w-[80%]">
-            <MessageSquare size={14} className="text-[#ff9900] shrink-0" />
-            <span onClick={() => loadSession(session)} className="text-[11px] truncate hover:text-white cursor-pointer transition-colors w-full">
+        <div key={session.sessionId} className="bx-box-interactive flex items-center justify-between page-container py-3 group">
+          <div className="flex items-center gap-2 text-[var(--text-primary)] w-full max-w-[80%]">
+            <MessageSquare size={14} className="text-[var(--accent)] shrink-0" />
+            <span onClick={() => loadSession(session)} className="text-[11px] truncate hover:opacity-80 cursor-pointer transition-opacity w-full">
               {session.title || (session.turns && session.turns[0]?.message)}
             </span>
           </div>
-          <div className="flex items-center gap-4 text-[#555] text-[10px]">
+          <div className="flex items-center gap-4 text-[var(--text-muted)] text-[10px]">
             <div className="flex items-center gap-1.5 shrink-0">
-              <span className="text-[#ff9900] font-bold">Q</span>
+              <span className="text-[var(--accent)] font-bold">Q</span>
               <span>{timeAgo(session.createdAt)}</span>
             </div>
             <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <button
                 onClick={(e) => handleDeleteSession(e, session.sessionId)}
-                className="hover:text-[#ff4444] transition-colors"
+                className="hover:text-[var(--danger)] transition-colors"
               >
                 <Trash2 size={12} />
               </button>

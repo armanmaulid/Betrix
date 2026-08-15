@@ -56,7 +56,9 @@ export function useChatStream() {
       image: m.image
     }));
 
-    let taskType = symbol ? "market_insight" : "faq";
+    // "general" — bukan "faq": enum backend (ChatTaskType) tidak punya "faq",
+    // sehingga dulu jatuh ke tier fallback balanced (3 CRD) padahal estimasi FE cheap.
+    let taskType = symbol ? "market_insight" : "general";
     let messageToSend = text;
 
     const instrument = parseInstrumentCommand(text);

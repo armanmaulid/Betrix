@@ -35,16 +35,16 @@ export const StatusBar = React.memo(function StatusBar() {
   const pingColor = 
     ping === null ? "text-[var(--text-muted)]" :
     ping < 100 ? "text-[var(--success)]" :
-    ping < 300 ? "text-yellow-500" : "text-[var(--danger)]";
+    ping < 300 ? "text-[var(--caution)]" : "text-[var(--danger)]";
 
   return (
-    <div className="flex flex-shrink-0 items-center justify-between border-t border-[var(--border)] bg-[var(--surface-alt)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[#b5a679]">
+    <div className="flex flex-shrink-0 items-center justify-between border-t border-[var(--border)] bg-[var(--surface-alt)] px-2 py-0.5 text-[9px] font-bold uppercase tracking-widest text-[var(--text-label)]">
       <div className="flex items-center">
         {/* EXECUTION ENGINE */}
         <div className="flex items-center gap-1.5 border-r border-[var(--border)] pr-3">
-          <Server size={10} className={isConnected ? "text-[var(--success)]" : "text-yellow-500"} />
+          <Server size={10} className={isConnected ? "text-[var(--success)]" : "text-[var(--caution)]"} />
           <span>ENGINE:</span>
-          <span className={isConnected ? "text-[var(--success)]" : "text-yellow-500"}>
+          <span className={isConnected ? "text-[var(--success)]" : "text-[var(--caution)]"}>
             {isConnected ? "CONNECTED" : "RECONNECTING"}
           </span>
         </div>
@@ -60,16 +60,16 @@ export const StatusBar = React.memo(function StatusBar() {
 
         {/* DATA TRAFFIC (DUMMY) */}
         <div className="flex items-center gap-1.5 border-r border-[var(--border)] px-3">
-          <Database size={10} className="text-[#b5a679]" />
+          <Database size={10} className="text-[var(--text-label)]" />
           <span>DATA:</span>
           <span className="text-[var(--text-primary)]">142 KB / 12 KB</span>
         </div>
 
         {/* MARKET STATUS (DUMMY) */}
         <div className="flex items-center gap-1.5 border-r border-[var(--border)] px-3">
-          <Clock size={10} className="text-yellow-500" />
+          <Clock size={10} className="text-[var(--caution)]" />
           <span>MARKET:</span>
-          <span className="text-yellow-500">OPEN (NY)</span>
+          <span className="text-[var(--caution)]">OPEN (NY)</span>
         </div>
       </div>
 
@@ -81,7 +81,7 @@ export const StatusBar = React.memo(function StatusBar() {
 
         {/* ACCOUNT INFO */}
         <div className="flex items-center gap-1.5 border-l border-[var(--border)] px-3 text-[var(--text-primary)]">
-          <User size={10} className="text-[#b5a679]" />
+          <User size={10} className="text-[var(--text-label)]" />
           {user?.email || "NOT LOGGED IN"}
         </div>
       </div>

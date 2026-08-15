@@ -179,18 +179,18 @@ export function NewsPage() {
 
   return (
     <>
-      <div className="flex h-full flex-col bg-[#050505]">
+      <div className="flex h-full flex-col bg-[var(--bg)]">
         {/* HEADER */}
-        <div className="flex flex-wrap items-center justify-between border-b border-[#222] py-2 page-container">
+        <div className="flex flex-wrap items-center justify-between border-b border-[var(--border)] py-2 page-container">
           <div className="flex items-center gap-3">
             <span className="bx-section-tag">
               News
             </span>
-            <span className="flex items-center gap-1.5 text-[11px] font-bold text-[#00ff00]">
-              <div className="h-1.5 w-1.5 animate-pulse bg-[#00ff00]"></div>
+            <span className="flex items-center gap-1.5 text-[11px] font-bold text-[var(--success)]">
+              <div className="h-1.5 w-1.5 animate-pulse bg-[var(--success)]"></div>
               LIVE
             </span>
-            <span className="font-mono text-[11px] text-[#888]">{items.length} stories</span>
+            <span className="font-mono text-[11px] text-[var(--text-muted)]">{items.length} stories</span>
           </div>
           <div className="flex flex-wrap items-center gap-1">
             {TABS.map((t) => (
@@ -199,8 +199,8 @@ export function NewsPage() {
                 onClick={() => setActiveAsset(t.id)}
                 className={`px-3 py-1 text-[10px] font-bold uppercase transition-colors ${
                   activeAsset === t.id
-                    ? "bg-[#ff6600] text-black"
-                    : "text-[#888] hover:text-[#fff]"
+                    ? "bg-[var(--accent)] text-black"
+                    : "text-[var(--text-muted)] hover:text-[var(--text-primary)]"
                 }`}
               >
                 {t.label}
@@ -208,7 +208,7 @@ export function NewsPage() {
             ))}
             <button
               onClick={() => fetchInitial(activeAsset)}
-              className="ml-2 flex items-center gap-1 border border-[#333] px-3 py-1 text-[10px] font-bold uppercase text-[#888] transition-colors hover:border-[#555] hover:text-[#fff]"
+              className="ml-2 flex items-center gap-1 border border-[var(--border)] px-3 py-1 text-[10px] font-bold uppercase text-[var(--text-muted)] transition-colors hover:border-[var(--text-muted)] hover:text-[var(--text-primary)]"
             >
               <RefreshCw size={10} className={isLoading ? "animate-spin" : ""} /> REFRESH
             </button>
@@ -219,17 +219,17 @@ export function NewsPage() {
           {/* MAIN FEED */}
           <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: "thin" }}>
             {isLoading && items.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center gap-3 text-[#555]">
-                <Loader2 size={24} className="animate-spin text-[#ff6600]" />
-                <p className="text-[12px]">Aggregating live feeds...</p>
+              <div className="flex h-full flex-col items-center justify-center gap-3 text-[var(--text-muted)]">
+                <Loader2 size={24} className="animate-spin text-[var(--accent)]" />
+                <p className="text-[12px]">Mengagregasi feed langsung...</p>
               </div>
             ) : error ? (
-              <div className="my-4 border border-red-500/30 bg-red-500/10 p-4 text-[12px] text-red-500">
+              <div className="bx-alert bx-alert-error my-4 p-4">
                 {error}
               </div>
             ) : items.length === 0 ? (
-              <div className="flex h-full flex-col items-center justify-center text-[#555]">
-                <p className="text-[12px]">No intelligence gathered for this sector.</p>
+              <div className="flex h-full flex-col items-center justify-center text-[var(--text-muted)]">
+                <p className="text-[12px]">Belum ada intelijen untuk sektor ini.</p>
               </div>
             ) : (
               <div className="flex flex-col">
@@ -243,24 +243,24 @@ export function NewsPage() {
                       href={item.url}
                       target="_blank"
                       rel="noreferrer"
-                      className={`block border-b border-[#222] py-4 transition-colors hover:bg-[#111] ${
-                        newIds.has(item.id) ? "news-highlight border-[#ff6600]/50" : ""
+                      className={`block border-b border-[var(--border)] py-4 transition-colors hover:bg-[var(--surface-alt)] ${
+                        newIds.has(item.id) ? "news-highlight border-[var(--accent)]/50" : ""
                       }`}
                     >
                       <div className="mb-2 flex items-center justify-between">
                         <div className="flex items-center gap-2 text-[10px] font-bold tracking-wider">
-                          <span className="text-[#ff9900] uppercase">{categoryLabel}</span>
-                          <span className="text-[#00ffff] uppercase">{item.source}</span>
+                          <span className="text-[var(--accent)] uppercase">{categoryLabel}</span>
+                          <span className="text-[var(--info)] uppercase">{item.source}</span>
                         </div>
-                        <span className="font-mono text-[10px] text-[#666]">
+                        <span className="font-mono text-[10px] text-[var(--text-muted)]">
                           {formatRelativeTime(item.publishedAt)}
                         </span>
                       </div>
-                      <h2 className="mb-1.5 text-[14px] font-bold leading-snug text-[#f5f5f5]" title={item.title}>
+                      <h2 className="mb-1.5 text-[14px] font-bold leading-snug text-[var(--text-primary)]" title={item.title}>
                         {stripHtml(item.title)}
                       </h2>
                       {item.summary && (
-                        <p className="line-clamp-2 text-[12px] leading-relaxed text-[#999] opacity-80" title={stripHtml(item.summary)}>
+                        <p className="line-clamp-2 text-[12px] leading-relaxed text-[var(--text-muted)] opacity-80" title={stripHtml(item.summary)}>
                           {stripHtml(item.summary)}
                         </p>
                       )}
@@ -271,7 +271,7 @@ export function NewsPage() {
                   <button
                     onClick={loadMore}
                     disabled={isLoadingMore}
-                    className="flex w-full items-center justify-center gap-2 border-b border-[#222] bg-[#0a0a0a] py-4 text-[11px] font-bold uppercase tracking-wider text-[#888] transition-colors hover:bg-[#111] hover:text-[#ff9900]"
+                    className="flex w-full items-center justify-center gap-2 border-b border-[var(--border)] bg-[var(--surface)] py-4 text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] transition-colors hover:bg-[var(--surface-alt)] hover:text-[var(--accent)]"
                   >
                     {isLoadingMore ? (
                       <>
@@ -287,29 +287,29 @@ export function NewsPage() {
           </div>
 
           {/* RIGHT SIDEBAR */}
-          <div className="bx-right-sidebar bg-[#050505]">
+          <div className="bx-right-sidebar bg-[var(--bg)]">
             {/* FEED STATUS */}
-            <div className="flex max-h-[280px] shrink-0 flex-col border-b border-[#222]">
-              <div className="flex shrink-0 items-center justify-between border-b border-[#222] page-container py-2 text-[10px] font-bold uppercase tracking-widest text-[#ff9900]">
+            <div className="flex max-h-[280px] shrink-0 flex-col border-b border-[var(--border)]">
+              <div className="flex shrink-0 items-center justify-between border-b border-[var(--border)] page-container py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--accent)]">
                 <span className="flex items-center gap-1.5">
-                  <div className="h-1.5 w-1.5 bg-[#ff9900]"></div>
+                  <div className="h-1.5 w-1.5 bg-[var(--accent)]"></div>
                   FEED STATUS
                 </span>
-                <span className="text-[#666]">{feedStats.sorted.length} SOURCES</span>
+                <span className="text-[var(--text-muted)]">{feedStats.sorted.length} SOURCES</span>
               </div>
               <div className="flex flex-col gap-2.5 overflow-y-auto p-4" style={{ scrollbarWidth: "none" }}>
                 {feedStats.sorted.map(([source, count], idx) => (
                   <div key={source} className="flex items-center justify-between font-mono text-[10px]">
-                    <span className="w-28 truncate text-[#ccc]" title={source}>
+                    <span className="w-28 truncate text-[var(--text-primary)]" title={source}>
                       {source}
                     </span>
-                    <div className="mx-3 h-[3px] flex-1 overflow-hidden bg-[#222]">
+                    <div className="mx-3 h-[3px] flex-1 overflow-hidden bg-[var(--border)]">
                       <div
-                        className={`h-full ${idx < 3 ? "bg-[#ff6600]" : "bg-[#00ffff]"}`}
+                        className={`h-full ${idx < 3 ? "bg-[var(--accent)]" : "bg-[var(--info)]"}`}
                         style={{ width: `${(count / feedStats.max) * 100}%` }}
                       ></div>
                     </div>
-                    <span className="w-6 text-right text-[#888]">{count}</span>
+                    <span className="w-6 text-right text-[var(--text-muted)]">{count}</span>
                   </div>
                 ))}
               </div>
@@ -317,27 +317,27 @@ export function NewsPage() {
 
             {/* NEWSWIRE */}
             <div className="flex flex-1 flex-col overflow-hidden">
-              <div className="flex items-center justify-between border-b border-[#222] page-container py-2 text-[10px] font-bold uppercase tracking-widest text-[#00ff00]">
+              <div className="flex items-center justify-between border-b border-[var(--border)] page-container py-2 text-[10px] font-bold uppercase tracking-widest text-[var(--success)]">
                 <span className="flex items-center gap-1.5">
-                  <div className="h-1.5 w-1.5 bg-[#00ff00]"></div>
+                  <div className="h-1.5 w-1.5 bg-[var(--success)]"></div>
                   NEWSWIRE
                 </span>
-                <span className="text-[#666]">{wireItems.length}</span>
+                <span className="text-[var(--text-muted)]">{wireItems.length}</span>
               </div>
-              <div className="flex flex-1 flex-col gap-[1px] overflow-y-auto p-1 bg-[#111]">
+              <div className="flex flex-1 flex-col gap-[1px] overflow-y-auto p-1 bg-[var(--surface-alt)]">
                 {wireItems.map((item) => (
                   <a
                     key={item.id + "_wire"}
                     href={item.url}
                     target="_blank"
                     rel="noreferrer"
-                    className="flex items-start gap-2 bg-[#050505] px-2 py-2 transition-colors hover:bg-[#1a1a1a]"
+                    className="flex items-start gap-2 bg-[var(--bg)] px-2 py-2 transition-colors hover:bg-[var(--surface-alt)]"
                   >
-                    <span className="w-8 pt-[2px] font-mono text-[9px] text-[#666]">
+                    <span className="w-8 pt-[2px] font-mono text-[9px] text-[var(--text-muted)]">
                       {formatTime(item.publishedAt)}
                     </span>
-                    <div className="mt-[7px] h-1 w-1 flex-shrink-0 bg-[#00ff00]"></div>
-                    <span className="line-clamp-2 flex-1 text-[11px] leading-snug text-[#ccc] hover:text-white" title={stripHtml(item.title)}>
+                    <div className="mt-[7px] h-1 w-1 flex-shrink-0 bg-[var(--success)]"></div>
+                    <span className="line-clamp-2 flex-1 text-[11px] leading-snug text-[var(--text-primary)] hover:text-[var(--text-primary)]" title={stripHtml(item.title)}>
                       {stripHtml(item.title)}
                     </span>
                   </a>

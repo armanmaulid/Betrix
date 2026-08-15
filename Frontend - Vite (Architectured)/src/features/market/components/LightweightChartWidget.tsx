@@ -23,7 +23,7 @@ export function LightweightChartWidget({ symbol, timeframe }: LightweightChartWi
     const chart = createChart(containerRef.current, {
       layout: {
         background: { type: ColorType.Solid, color: "#000000" }, // matches var(--bg) or surface
-        textColor: "#b5a679", // matches var(--text-muted) or accent
+        textColor: "var(--text-label)", // matches var(--text-muted) or accent
         fontFamily: "'Inter', sans-serif",
       },
       grid: {

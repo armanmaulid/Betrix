@@ -2,9 +2,9 @@ import { useRef, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { useShellContext } from "../../../app/layout/TerminalShellLayout";
 import { useAuth } from "../../auth/context/AuthContext";
-import { 
-  Bot, 
-  CircleUser, 
+import {
+  Bot,
+  CircleUser,
   ChevronDown,
   Lock,
   Star,
@@ -25,9 +25,9 @@ export function AnalyzePage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const symbol = searchParams.get('symbol');
-  
+
   const { view, setView, messages, setMessages, setCurrentSessionId } = useChatStore();
-  
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -36,11 +36,11 @@ export function AnalyzePage() {
 
   const handleExport = () => {
     if (messages.length === 0) return;
-    
+
     let content = "# Betrix AI Agent - Analysis Session\n\n";
     content += `Date: ${new Date().toLocaleString()}\n`;
     content += `Symbol Context: ${symbol || 'N/A'}\n\n---\n\n`;
-    
+
     messages.forEach((msg) => {
       if (msg.role === 'user') {
         content += `### You:\n${msg.content}\n\n`;
@@ -82,18 +82,18 @@ export function AnalyzePage() {
 
   return (
     <>
-      <div className="flex flex-col flex-1 bg-[#050505] overflow-hidden font-mono text-[13px] text-[#ccc]">
-        
+      <div className="flex flex-col flex-1 bg-[var(--bg)] overflow-hidden font-mono text-[13px] text-[var(--text-primary)]">
+
         {view === 'landing' ? (
           <div className="w-full py-4 flex flex-col gap-5 overflow-y-auto">
             {/* SHORTCUTS */}
             <div className="flex flex-col gap-2">
-              <h2 className="text-[#00ffff] font-bold tracking-widest text-[11px]">SHORTCUTS {'>'}</h2>
+              <h2 className="text-[var(--info)] font-bold tracking-widest text-[11px]">PERINTAH {'>'}</h2>
               <div className="grid grid-cols-3 gap-y-1 gap-x-2">
                 {CHAT_SHORTCUTS.map(s => (
                   <div key={s.cmd} className="flex items-center gap-1.5 text-[12px]">
-                    <span className="text-[#ff9900] font-bold">{s.cmd}</span>
-                    <span className="text-[#777]">{s.desc}</span>
+                    <span className="text-[var(--accent)] font-bold">{s.cmd}</span>
+                    <span className="text-[var(--text-muted)]">{s.desc}</span>
                   </div>
                 ))}
               </div>
@@ -103,14 +103,14 @@ export function AnalyzePage() {
             <div className="flex flex-col gap-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <Bot className="text-[#eee]" size={28} />
-                  <h1 className="text-lg text-[#eee] font-medium tracking-wide">
-                    Hey {user?.name?.split(' ')[0] || "Ammarcyber"}, let's review today's moves{symbol ? ` for ${symbol}` : ''}.
+                  <Bot className="text-[var(--text-primary)]" size={28} />
+                  <h1 className="text-lg text-[var(--text-primary)] font-medium tracking-wide">
+                    Hai {user?.name?.split(' ')[0] || "Ammarcyber"}, yuk tinjau pergerakan market hari ini{symbol ? ` untuk ${symbol}` : ''}.
                   </h1>
                 </div>
-                <button className="flex items-center gap-2 px-3 py-1 border border-[#333] rounded hover:border-[#ff9900] transition-colors">
-                  <CircleUser size={14} className="text-[#ff9900]" />
-                  <span className="text-[#ff9900] text-[10px] font-bold uppercase">{user?.name || "Manks"}</span>
+                <button className="flex items-center gap-2 px-3 py-1 border border-[var(--border)] hover:border-[var(--accent)] transition-colors">
+                  <CircleUser size={14} className="text-[var(--accent)]" />
+                  <span className="text-[var(--accent)] text-[10px] font-bold uppercase">{user?.name || "Manks"}</span>
                 </button>
               </div>
 
@@ -119,18 +119,18 @@ export function AnalyzePage() {
 
             {/* WORKFLOW */}
             <div className="flex flex-col gap-2 mt-1">
-              <h2 className="text-[#00ffff] font-bold tracking-widest text-[11px]">WORKFLOW {'>'}</h2>
-              <button className="flex items-center gap-1 text-[11px] font-bold text-[#eee] w-fit hover:text-white transition-colors">
-                Suggested Templates <ChevronDown size={12} />
+              <h2 className="text-[var(--info)] font-bold tracking-widest text-[11px]">ALUR KERJA {'>'}</h2>
+              <button className="flex items-center gap-1 text-[11px] font-bold text-[var(--text-primary)] w-fit hover:opacity-80 transition-opacity">
+                Template Disarankan <ChevronDown size={12} />
               </button>
               <div className="grid grid-cols-4 gap-2 mt-1">
                 {CHAT_TEMPLATES.map((t, idx) => (
-                  <div key={idx} className="border border-[#222] bg-[#0a0a0a] p-3 flex flex-col gap-1.5 hover:border-[#444] transition-colors cursor-pointer shadow-sm">
-                    <div className="flex items-start gap-1.5 text-[#ff9900] font-bold text-[11px]">
-                      <Star size={12} className="mt-[1px] shrink-0 fill-[#ff9900]" />
+                  <div key={idx} className="bx-box-interactive p-3 flex flex-col gap-1.5 cursor-pointer">
+                    <div className="flex items-start gap-1.5 text-[var(--accent)] font-bold text-[11px]">
+                      <Star size={12} className="mt-[1px] shrink-0 fill-[var(--accent)]" />
                       <span className="leading-tight">{t.title}</span>
                     </div>
-                    <p className="text-[10px] text-[#777] leading-snug">
+                    <p className="text-[10px] text-[var(--text-muted)] leading-snug">
                       {t.desc}
                     </p>
                   </div>
@@ -140,39 +140,39 @@ export function AnalyzePage() {
 
             {/* PRIVATE DATAROOM */}
             <div className="flex flex-col gap-2 mt-1">
-              <h2 className="text-[#00ffff] font-bold tracking-widest text-[11px]">PRIVATE DATAROOM {'>'}</h2>
-              <div className="flex items-center justify-between border border-[#222] bg-[#0a0a0a] page-container py-3 cursor-pointer hover:border-[#444] transition-colors shadow-sm">
-                <div className="flex items-center gap-2 text-[#555]">
-                  <Lock size={14} className="text-[#ff9900]" />
-                  <span className="text-[11px]">No documents uploaded. Click to open dataroom.</span>
+              <h2 className="text-[var(--info)] font-bold tracking-widest text-[11px]">RUANG DATA {'>'}</h2>
+              <div className="bx-box-interactive flex items-center justify-between page-container py-3 cursor-pointer">
+                <div className="flex items-center gap-2 text-[var(--text-muted)]">
+                  <Lock size={14} className="text-[var(--accent)]" />
+                  <span className="text-[11px]">Belum ada dokumen diunggah. Klik untuk buka ruang data.</span>
                 </div>
-                <span className="text-[#ff9900] text-[10px] font-bold tracking-widest">OPEN {'>'}</span>
+                <span className="text-[var(--accent)] text-[10px] font-bold tracking-widest">BUKA {'>'}</span>
               </div>
             </div>
 
             {/* RECENT SESSIONS */}
             <div className="flex flex-col gap-2 mt-1 mb-6">
-              <h2 className="text-[#00ffff] font-bold tracking-widest text-[11px]">RECENT SESSIONS {'>'}</h2>
+              <h2 className="text-[var(--info)] font-bold tracking-widest text-[11px]">SESI TERBARU {'>'}</h2>
               <ChatHistoryList />
             </div>
           </div>
         ) : (
           /* ACTIVE CHAT VIEW */
           <div className="flex flex-col flex-1 overflow-hidden relative animate-slide-up-fade">
-            
+
             {/* TOP BAR */}
-            <div className="flex items-center justify-between border-b border-[#222] bg-[#0a0a0a] py-2 shrink-0">
+            <div className="flex items-center justify-between border-b border-[var(--border)] bg-[var(--surface)] py-2 shrink-0">
               <div className="flex items-center gap-4">
-                <button onClick={() => {setMessages([]); setView('landing'); setCurrentSessionId(null);}} className="flex items-center gap-1.5 text-[9px] font-bold text-[#888] hover:text-white transition-colors border border-[#333] px-2 py-1 rounded-sm">
+                <button onClick={() => {setMessages([]); setView('landing'); setCurrentSessionId(null);}} className="flex items-center gap-1.5 text-[9px] font-bold text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors border border-[var(--border)] px-2 py-1">
                   <ArrowLeft size={10} /> BACK
                 </button>
                 <div className="flex items-center">
-                  <span className="bg-[#ff9900] text-black text-[9px] font-bold px-2 py-1 rounded-sm">CHAT</span>
-                  <span className="text-[#555] text-[10px] font-bold ml-3">{messages.length} msgs</span>
+                  <span className="bg-[var(--accent)] text-black text-[9px] font-bold px-2 py-1">CHAT</span>
+                  <span className="text-[var(--text-muted)] text-[10px] font-bold ml-3">{messages.length} msgs</span>
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <button onClick={handleExport} className="flex items-center gap-1.5 text-[9px] font-bold text-[#888] hover:text-[#00ffff] transition-colors border border-[#333] px-2 py-1 rounded-sm">
+                <button onClick={handleExport} className="flex items-center gap-1.5 text-[9px] font-bold text-[var(--text-muted)] hover:text-[var(--info)] transition-colors border border-[var(--border)] px-2 py-1">
                   <Download size={10} /> EXPORT
                 </button>
               </div>

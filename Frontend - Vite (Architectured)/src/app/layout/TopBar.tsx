@@ -88,22 +88,22 @@ export const TopBar = React.memo(function TopBar({ onSearchSymbol }: TopBarProps
         className="flex flex-shrink-0 cursor-pointer items-center gap-1.5 border-l border-[var(--border)] px-3 text-[10px] transition-colors hover:bg-[var(--surface-alt)]"
         title="Sisa AI Credits"
       >
-        <Zap size={12} className={user?.credits && user.credits > 0 ? "text-yellow-500" : "text-[var(--danger)]"} />
-        <span className="text-[#b5a679]">CREDITS: <span className="font-bold text-[var(--text-primary)]">{user?.credits !== undefined ? user.credits : "--"}</span></span>
+        <Zap size={12} className={user?.credits && user.credits > 0 ? "text-[var(--caution)]" : "text-[var(--danger)]"} />
+        <span className="text-[var(--text-label)]">CREDITS: <span className="font-bold text-[var(--text-primary)]">{user?.credits !== undefined ? user.credits : "--"}</span></span>
       </div>
 
       <div className="flex flex-shrink-0 items-center gap-1.5 border-l border-[var(--border)] px-3 text-[10px]">
-        <span className="text-[#b5a679]">API: <span className={`font-bold ${import.meta.env.DEV ? "text-yellow-500" : "text-[var(--success)]"}`}>{import.meta.env.DEV ? "DEVELOPMENT" : "OPERATIONAL"}</span> <span className="text-[var(--text-muted)]">v0.1</span></span>
+        <span className="text-[var(--text-label)]">API: <span className={`font-bold ${import.meta.env.DEV ? "text-[var(--caution)]" : "text-[var(--success)]"}`}>{import.meta.env.DEV ? "DEVELOPMENT" : "OPERATIONAL"}</span> <span className="text-[var(--text-muted)]">v0.1</span></span>
       </div>
 
       <div className="flex flex-shrink-0 items-center gap-1.5 border-l border-[var(--border)] px-3 text-[10px]">
-        <span className="text-[#b5a679]">CONN:</span>
-        <span className={`flex items-center gap-1.5 font-bold ${isConnected ? "text-[var(--success)]" : "text-yellow-500"}`}>
+        <span className="text-[var(--text-label)]">CONN:</span>
+        <span className={`flex items-center gap-1.5 font-bold ${isConnected ? "text-[var(--success)]" : "text-[var(--caution)]"}`}>
           <span className="relative flex h-1.5 w-1.5">
             {isConnected && (
               <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[var(--success)] opacity-75" />
             )}
-            <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${isConnected ? "bg-[var(--success)]" : "bg-yellow-500"}`} />
+            <span className={`relative inline-flex h-1.5 w-1.5 rounded-full ${isConnected ? "bg-[var(--success)]" : "bg-[var(--caution)]"}`} />
           </span>
           {isConnected ? "LIVE" : "RECONNECTING"}
         </span>
@@ -117,7 +117,7 @@ export const TopBar = React.memo(function TopBar({ onSearchSymbol }: TopBarProps
         <Maximize2 size={13} />
       </button>
 
-      <div className="flex flex-shrink-0 items-center border-l border-[var(--border)] px-3 text-[11px] font-bold text-orange-500">
+      <div className="flex flex-shrink-0 items-center border-l border-[var(--border)] px-3 text-[11px] font-bold text-[var(--accent)]">
         <span className="tabular">
           {now.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}{" "}
           {(() => {

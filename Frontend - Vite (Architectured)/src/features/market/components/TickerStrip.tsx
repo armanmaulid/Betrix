@@ -66,7 +66,7 @@ export const TickerStrip = React.memo(function TickerStrip({ symbols = MARKET_SY
             (flash === "up" ? "flash-up" : flash === "down" ? "flash-down" : "")
           }
         >
-          <span className="text-[11px] font-medium text-orange-500">{s.label}</span>
+          <span className="text-[11px] font-medium text-[var(--accent)]">{s.label}</span>
           <span className="tabular text-sm font-bold text-[var(--text-primary)]">
             {d ? d.price.toFixed(s.decimals) : "—"}
           </span>
