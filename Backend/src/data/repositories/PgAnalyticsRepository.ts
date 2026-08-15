@@ -2,6 +2,7 @@ import { injectable } from "tsyringe";
 import { pgClient } from "../orm/pgClient.js";
 import { redisClient } from "../orm/redisClient.js";
 import { AnalyticsRepository, SystemMetrics, DbStats, UserDetailStats, RecentActivity, AnalyticsQuery } from "@domain/repositories/AnalyticsRepository.js";
+import type { DashboardMetrics, SystemDatabaseStats } from "@domain/repositories/AnalyticsRepository.js";
 
 @injectable()
 export class PgAnalyticsRepository implements AnalyticsRepository {
@@ -44,7 +45,7 @@ export class PgAnalyticsRepository implements AnalyticsRepository {
     };
   }
 
-  async getDashboardMetrics(): Promise<import("@domain/repositories/AnalyticsRepository.js").DashboardMetrics> {
+  async getDashboardMetrics(): Promise<DashboardMetrics> {
     const { rows: metrics } = await pgClient.query(`
       SELECT
         (SELECT COUNT(*) FROM users) as total_users,
@@ -66,7 +67,7 @@ export class PgAnalyticsRepository implements AnalyticsRepository {
     };
   }
 
-  async getSystemDatabaseStats(): Promise<import("@domain/repositories/AnalyticsRepository.js").SystemDatabaseStats> {
+  async getSystemDatabaseStats(): Promise<SystemDatabaseStats> {
     const { rows: dbStats } = await pgClient.query(`
       SELECT
         (SELECT COUNT(*) FROM users) as users_count,

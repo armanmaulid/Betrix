@@ -1,4 +1,5 @@
 import { createHash } from "crypto";
+import { UAParser } from "ua-parser-js";
 
 export class Email {
   constructor(public readonly value: string) {
@@ -33,19 +34,42 @@ export class Password {
 export class DeviceFingerprint {
   constructor(public readonly value: string) {}
 
+  /**
+   * Satu-satunya sumber fingerprint device di seluruh aplikasi.
+   *
+   * Menerima bentuk request apapun yang memiliki `ip` dan `headers`
+   * (RequestInput dari core, request controller, atau test). Komponen yang
+   * di-hash: IP ternormalisasi + browser (nama & major version) + OS +
+   * tipe device — diurai dari user-agent. Ini lebih stabil daripada hash
+   * user-agent mentah (perubahan minor version / header casing tidak
+   * mengubah fingerprint).
+   */
   static create(request: { ip?: string; headers: { "user-agent"?: string } }): DeviceFingerprint {
+    const ua = new UAParser(request.headers["user-agent"] || "unknown").getResult();
     const components = [
-      request.ip || "unknown",
-      request.headers["user-agent"] || "unknown"
+      normalizeIP(request.ip || "unknown"),
+      ua.browser.name || "unknown",
+      ua.browser.version?.split(".")[0] || "unknown",
+      ua.os.name || "unknown",
+      ua.device.type || "desktop",
     ];
-    const raw = components.join("|");
-    const hash = createHash("sha256").update(raw).digest("base64");
+    const hash = createHash("sha256").update(components.join("|")).digest("hex");
     return new DeviceFingerprint(hash);
   }
 
   equals(other: DeviceFingerprint): boolean {
     return this.value === other.value;
   }
+}
+
+function normalizeIP(ip: string): string {
+  if (ip.startsWith("::ffff:")) {
+    return ip.substring(7);
+  }
+  if (ip === "::1") {
+    return "127.0.0.1";
+  }
+  return ip;
 }
 
 export class SessionToken {

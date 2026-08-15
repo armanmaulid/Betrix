@@ -10,29 +10,7 @@ function truncate(str: string, maxLen = 500): string {
   return str.substring(0, maxLen) + chalk.gray(`... [truncated ${str.length - maxLen} chars]`);
 }
 
-function prettyPrint(obj: unknown, indent = 2): string {
-  try {
-    return JSON.stringify(obj, (_, v) => {
-      if (typeof v === "string" && v.length > 1000) {
-        return truncate(v, 200);
-      }
-      return v;
-    }, indent);
-  } catch {
-    return String(obj);
-  }
-}
-
-function formatStack(stack?: string): string {
-  if (!stack) return "";
-  const lines = stack.split("\n").slice(0, 10);
-  return "\n" + lines.map(l => chalk.red(l)).join("\n");
-}
-
 const consoleFormatter = printf(({ level, message, timestamp, context, ...meta }) => {
-  const appName = chalk.bold.green("[Betrix]");
-  const pid = process.pid;
-  
   const dateObj = new Date(timestamp as string);
   const dateStr = dateObj.toLocaleDateString("en-US", { month: "2-digit", day: "2-digit", year: "numeric" });
   const timeStr = dateObj.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
@@ -94,12 +72,6 @@ const consoleFormatter = printf(({ level, message, timestamp, context, ...meta }
 
   return msg;
 });
-
-const fileFormat = combine(
-  timestamp({ format: "YYYY-MM-DD HH:mm:ss.SSS" }),
-  errors({ stack: true }),
-  json()
-);
 
 export const logger = winston.createLogger({
   level: env.LOG_LEVEL === "silent" ? "error" : (env.LOG_LEVEL || "info"),
@@ -163,7 +135,7 @@ export function logRequest(req: { method: string; url: string; ip?: string; head
 
 export function logResponse(req: { method: string; url: string }, res: { statusCode: number }, requestId: string, durationMs: number) {
   const level = res.statusCode >= 500 ? "error" : res.statusCode >= 400 ? "warn" : "info";
-  logger.log("info", "HTTP Response", {
+  logger.log(level, "HTTP Response", {
     context: "HTTP",
     requestId,
     method: req.method,

@@ -1,10 +1,22 @@
 import { injectable } from "tsyringe";
-import { pgClient } from "../orm/pgClient.js";
-import { NewsRepository } from "@domain/repositories/NewsRepository.js";
-import { NewsArticle } from "@domain/entities/NewsArticle.js";
+import { pgClient } from "@data/orm/pgClient.js";
+import { NewsRepository } from "@contexts/news/domain/NewsRepository.js";
+import { NewsContextPort } from "@contexts/news/domain/NewsContextPort.js";
+import { NewsArticle } from "@contexts/news/domain/NewsArticle.js";
+
+interface NewsArticleRow {
+  id: string;
+  source: string;
+  title: string;
+  url: string;
+  summary: string | null;
+  asset_tags: string[];
+  published_at: Date | null;
+  created_at: Date;
+}
 
 @injectable()
-export class PgNewsRepository implements NewsRepository {
+export class PgNewsRepository implements NewsRepository, NewsContextPort {
   async save(article: NewsArticle): Promise<NewsArticle> {
     const { rows } = await pgClient.query(
       `INSERT INTO news_articles (id, source, title, url, summary, asset_tags, published_at, created_at)
@@ -29,7 +41,7 @@ export class PgNewsRepository implements NewsRepository {
       await client.query("BEGIN");
 
       const placeholders: string[] = [];
-      const params: any[] = [];
+      const params: unknown[] = [];
       let paramIndex = 1;
 
       for (const article of articles) {
@@ -92,7 +104,7 @@ export class PgNewsRepository implements NewsRepository {
     return rowCount || 0;
   }
 
-  private mapRow(row: any): NewsArticle {
+  private mapRow(row: NewsArticleRow): NewsArticle {
     return new NewsArticle(
       row.id, row.source, row.title, row.url, row.summary,
       row.asset_tags, row.published_at, row.created_at

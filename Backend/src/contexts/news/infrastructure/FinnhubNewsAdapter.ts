@@ -1,6 +1,14 @@
-import { INewsProvider, RawNewsArticle } from "@application/ports/INewsProvider.js";
+import { INewsProvider, RawNewsArticle } from "@contexts/news/domain/INewsProvider.js";
 import { env } from "@config/env.js";
 import { injectable } from "tsyringe";
+
+interface FinnhubArticle {
+  source: string;
+  headline: string;
+  url: string;
+  summary: string;
+  datetime: number;
+}
 
 @injectable()
 export class FinnhubNewsAdapter implements INewsProvider {
@@ -23,11 +31,11 @@ export class FinnhubNewsAdapter implements INewsProvider {
       throw new Error(`Finnhub API Error: Status ${response.status}`);
     }
     
-    const data = await response.json() as any[];
+    const data = await response.json() as FinnhubArticle[];
     return data
-      .filter((item: any) => item.summary && item.summary.trim() !== '')
+      .filter((item: FinnhubArticle) => item.summary && item.summary.trim() !== '')
       .slice(0, 20)
-      .map((item: any) => ({
+      .map((item: FinnhubArticle) => ({
         source: item.source || 'Finnhub',
         headline: item.headline,
         url: item.url,

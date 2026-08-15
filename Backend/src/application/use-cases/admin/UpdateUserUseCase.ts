@@ -1,9 +1,9 @@
 import { inject, injectable } from "tsyringe";
 import { UserRepository } from "@domain/repositories/UserRepository.js";
 import { SessionRepository } from "@domain/repositories/SessionRepository.js";
-import { User, UserStatus } from "@domain/entities/User.js";
+import { UserStatus } from "@domain/entities/User.js";
 import { NotFoundError, ValidationError } from "@core/errors/index.js";
-import { INotifier } from "@application/ports/INotifier.js";
+import { INotifier } from "@domain/ports/INotifier.js";
 
 interface UpdateUserInput {
   adminId: string;

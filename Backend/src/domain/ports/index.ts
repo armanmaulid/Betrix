@@ -1,4 +1,5 @@
 export interface EmailPort {
+  sendEmail(input: { to: string; subject: string; text?: string; html?: string }): Promise<{ success: boolean; error?: string }>;
   sendVerificationEmail(email: string, token: string): Promise<{ success: boolean; error?: string }>;
   sendEmailChangeVerification(email: string, token: string): Promise<{ success: boolean; error?: string }>;
   sendEmailChangeNotification(oldEmail: string, newEmail: string): Promise<void>;

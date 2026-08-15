@@ -11,6 +11,6 @@ export function ipNormalizer(req: Request, res: Response, next: NextFunction) {
     ip = ip.substring(7);
   }
 
-  (req as any).normalizedIP = ip;
+  req.normalizedIP = ip;
   next();
 }

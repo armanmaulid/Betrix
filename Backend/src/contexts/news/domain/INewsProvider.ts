@@ -1,5 +1,3 @@
-import { NewsArticle } from "@domain/entities/NewsArticle.js";
-
 export interface RawNewsArticle {
   source: string;
   headline: string;

@@ -1,6 +1,6 @@
 import { inject, injectable } from "tsyringe";
-import { NewsRepository } from "@domain/repositories/NewsRepository.js";
-import { NewsArticle } from "@domain/entities/NewsArticle.js";
+import { NewsRepository } from "@contexts/news/domain/NewsRepository.js";
+import { NewsArticle } from "@contexts/news/domain/NewsArticle.js";
 
 @injectable()
 export class GetNewsUseCase {

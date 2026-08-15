@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { logger } from "../logging/logger.js";
-import { AppError, isAppError } from "../errors/index.js";
+import { isAppError } from "../errors/index.js";
 import { env } from "@config/env";
 
 export function errorHandler(err: Error, req: Request, res: Response, _next: NextFunction) {

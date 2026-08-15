@@ -1,11 +1,9 @@
 import { inject, injectable } from "tsyringe";
 import { MarketDataRepository } from "@domain/repositories/MarketDataRepository.js";
 import { SymbolRepository } from "@domain/repositories/SymbolRepository.js";
-import { BrokerSymbol } from "@domain/entities/BrokerSymbol.js";
-import { logger } from "@core/logging/logger.js";
-import { env } from "@config/env.js";
-import { INotifier } from "@application/ports/INotifier.js";
-import { IBrokerProvider } from "@application/ports/IBrokerProvider.js";
+import type { AppSettings } from "@core/settings/AppSettings.js";
+import { INotifier } from "@domain/ports/INotifier.js";
+import { IBrokerProvider, OHLCUpdate, MarketBookUpdate } from "@domain/ports/IBrokerProvider.js";
 
 interface PriceData {
   symbol: string;
@@ -48,7 +46,8 @@ export class MarketDataService {
     @inject("MarketDataRepository") private marketDataRepo: MarketDataRepository,
     @inject("SymbolRepository") private symbolRepo: SymbolRepository,
     @inject("INotifier") private notifier: INotifier,
-    @inject("IBrokerProvider") private brokerClient: IBrokerProvider
+    @inject("IBrokerProvider") private brokerClient: IBrokerProvider,
+    @inject("AppSettings") private settings: AppSettings
   ) {}
 
   // Minutes per bar per timeframe. Used to compute a date range wide enough
@@ -143,16 +142,16 @@ export class MarketDataService {
     return this.marketDataRepo.getAllPrices();
   }
 
-  async getAllOHLC(timeframe: string): Promise<any[]> {
+  async getAllOHLC(timeframe: string): Promise<OHLCUpdate[]> {
     return this.marketDataRepo.getAllOHLC(`mt5:ohlc:*:${timeframe}`);
   }
 
-  async getAllMarketBooks(): Promise<any[]> {
+  async getAllMarketBooks(): Promise<MarketBookUpdate[]> {
     return this.marketDataRepo.getAllMarketBooks();
   }
 
   async handlePriceTick(tick: { symbol: string; bid: number; ask: number; spread: number; digits: number; volume: number; timestamp: number }): Promise<void> {
-    if (env.MT5_TRACK_PRICES && env.MT5_TRACKING_SYMBOLS.includes(tick.symbol)) {
+    if (this.settings.trackPrices && this.settings.trackingSymbols.includes(tick.symbol)) {
       this.notifier.broadcastGlobal("price_update", tick);
     }
   }
@@ -163,7 +162,7 @@ export class MarketDataService {
       prev_close: update.prev_close ?? update.open
     };
 
-    if (env.MT5_TRACK_OHLC && env.MT5_TRACKING_SYMBOLS.includes(update.symbol)) {
+    if (this.settings.trackOhlc && this.settings.trackingSymbols.includes(update.symbol)) {
       if (update.timeframe === "D1") {
         await this.marketDataRepo.cacheOHLC(ohlcUpdate);
       }
@@ -172,7 +171,7 @@ export class MarketDataService {
   }
 
   async handleMarketBookUpdate(update: { symbol: string; bids: Array<{ price: number; volume: number }>; asks: Array<{ price: number; volume: number }> }): Promise<void> {
-    if (env.MT5_TRACK_MBOOK && env.MT5_TRACKING_SYMBOLS.includes(update.symbol)) {
+    if (this.settings.trackMbook && this.settings.trackingSymbols.includes(update.symbol)) {
       this.notifier.broadcastGlobal("mbook_update", update);
     }
   }

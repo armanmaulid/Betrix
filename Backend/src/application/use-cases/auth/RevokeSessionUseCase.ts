@@ -3,9 +3,8 @@ import { UserRepository } from "@domain/repositories/UserRepository.js";
 import { SessionRepository } from "@domain/repositories/SessionRepository.js";
 import { DeviceRepository } from "@domain/repositories/DeviceRepository.js";
 import { DeviceSessionRepository } from "@domain/repositories/DeviceSessionRepository.js";
-import { User } from "@domain/entities/User.js";
 import { DeviceFingerprint } from "@domain/value-objects";
-import { NotFoundError, AuthenticationError } from "@core/errors/index.js";
+import { AuthenticationError } from "@core/errors/index.js";
 import { ActivityLogRepository } from "@domain/repositories/ActivityLogRepository.js";
 import { RequestInput } from "@core/utils/request.js";
 

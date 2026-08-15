@@ -4,6 +4,14 @@ import { DeviceRepository } from "@domain/repositories/DeviceRepository.js";
 import { Device } from "@domain/entities/Device.js";
 import { DeviceFingerprint } from "@domain/value-objects";
 
+interface DeviceRow {
+  id: string;
+  user_id: string;
+  device_fingerprint: string;
+  created_at: Date;
+  last_seen_at: Date;
+}
+
 @injectable()
 export class PgDeviceRepository implements DeviceRepository {
   async findByFingerprint(fingerprint: DeviceFingerprint): Promise<Device | null> {
@@ -54,7 +62,7 @@ export class PgDeviceRepository implements DeviceRepository {
     );
   }
 
-  private mapRow(row: any): Device {
+  private mapRow(row: DeviceRow): Device {
     return new Device(
       row.id, row.user_id, row.device_fingerprint, row.created_at, row.last_seen_at
     );

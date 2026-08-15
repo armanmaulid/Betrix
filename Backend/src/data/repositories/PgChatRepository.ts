@@ -1,7 +1,21 @@
 import { injectable } from "tsyringe";
 import { pgClient } from "../orm/pgClient.js";
-import { ChatRepository } from "@domain/repositories/ChatRepository.js";
+import { ChatRepository, ChatSessionTurn } from "@domain/repositories/ChatRepository.js";
 import { ChatMessage, ChatTaskType } from "@domain/entities/ChatMessage.js";
+
+interface ChatLogRow {
+  id: string;
+  user_id: string;
+  session_id: string | null;
+  task_type: string;
+  model_used: string | null;
+  message: string;
+  reply: string | null;
+  latency_ms: number | null;
+  input_tokens: number;
+  output_tokens: number;
+  created_at: Date;
+}
 
 @injectable()
 export class PgChatRepository implements ChatRepository {
@@ -67,7 +81,7 @@ export class PgChatRepository implements ChatRepository {
     taskType?: ChatTaskType;
     startDate?: Date;
     endDate?: Date;
-  }): Promise<{ sessions: Array<{ sessionId: string; start: Date; end: Date; title: string; turns: any[] }>; total: number }> {
+  }): Promise<{ sessions: Array<{ sessionId: string; start: Date; end: Date; title: string; turns: ChatSessionTurn[] }>; total: number }> {
     const conditions = ["user_id = $1"];
     const values: unknown[] = [userId];
     let paramIndex = 2;
@@ -167,10 +181,10 @@ export class PgChatRepository implements ChatRepository {
     return rows.map(this.mapRow);
   }
 
-  private mapRow(row: any): ChatMessage {
+  private mapRow(row: ChatLogRow): ChatMessage {
     return new ChatMessage(
-      row.id, row.user_id, row.session_id, row.task_type,
-      row.model_used, row.message, row.reply, row.latency_ms,
+      row.id, row.user_id, row.session_id, row.task_type as ChatTaskType,
+      row.model_used as string, row.message, row.reply as string, row.latency_ms,
       row.input_tokens, row.output_tokens, row.created_at
     );
   }

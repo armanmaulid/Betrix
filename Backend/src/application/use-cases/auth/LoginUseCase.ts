@@ -6,14 +6,11 @@ import { LoginAttemptRepository } from "@domain/repositories/LoginAttemptReposit
 import { DeviceSessionRepository } from "@domain/repositories/DeviceSessionRepository.js";
 import { User, UserStatus } from "@domain/entities/User.js";
 import { Email } from "@domain/value-objects";
-import { DeviceFingerprint } from "@domain/value-objects";
-import { Session } from "@domain/entities/Session.js";
-import { AuthenticationError, ValidationError, ConflictError, InternalError } from "@core/errors/index.js";
-import { verifyPassword, hashPassword, generateSecureToken, getDeviceFingerprint } from "@core/utils/index.js";
-import { isDeviceEnforcementEnabled } from "@config/deviceEnforcement.js";
-import { AuthDomainService } from "@domain/services/AuthDomainServiceImpl.js";
+import { AuthenticationError } from "@core/errors/index.js";
+import { verifyPassword } from "@core/utils/index.js";
+import type { AppSettings } from "@core/settings/AppSettings.js";
+import { AuthService } from "@application/services/AuthService.js";
 import { ActivityLogRepository } from "@domain/repositories/ActivityLogRepository.js";
-import { LIMITS } from "@core/constants/index.js";
 import { RequestInput } from "@core/utils/request.js";
 
 interface LoginInput {
@@ -36,7 +33,8 @@ export class LoginUseCase {
     @inject("DeviceRepository") private deviceRepo: DeviceRepository,
     @inject("LoginAttemptRepository") private loginAttemptRepo: LoginAttemptRepository,
     @inject("DeviceSessionRepository") private deviceSessionRepo: DeviceSessionRepository,
-    @inject("AuthDomainService") private authDomainService: AuthDomainService
+    @inject("AuthService") private authService: AuthService,
+    @inject("AppSettings") private settings: AppSettings
   ) {}
 
   async execute(input: LoginInput): Promise<LoginOutput> {
@@ -71,7 +69,7 @@ export class LoginUseCase {
       throw new AuthenticationError(`Account is ${user.status === UserStatus.BANNED ? "banned" : "suspended"}. Contact admin.`);
     }
 
-    const requireVerification = process.env.REQUIRE_EMAIL_VERIFICATION === "true";
+    const requireVerification = this.settings.requireEmailVerification;
     if (requireVerification && !user.emailVerified) {
       throw new AuthenticationError("Email not verified. Check your inbox.");
     }
@@ -81,7 +79,7 @@ export class LoginUseCase {
       headers: { "user-agent": input.request.headers["user-agent"] as string },
     };
 
-    const result = await this.authDomainService.establishAuthenticatedSession(user, requestForAuth);
+    const result = await this.authService.establishAuthenticatedSession(user, requestForAuth, this.settings.deviceEnforcementEnabled);
     if (!result.ok) {
       throw new AuthenticationError(result.error, { 
         ...(result.hasActiveSession ? { hasActiveSession: true } : {}) 

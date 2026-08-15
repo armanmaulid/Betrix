@@ -1,12 +1,10 @@
 import { inject, injectable } from "tsyringe";
 import { UserRepository } from "@domain/repositories/UserRepository.js";
 import { VerificationRepository } from "@domain/repositories/VerificationRepository.js";
-import { EmailPort } from "@application/ports";
-import { User } from "@domain/entities/User.js";
+import { EmailPort } from "@domain/ports";
 import { Email } from "@domain/value-objects";
-import { ValidationError, NotFoundError } from "@core/errors/index.js";
+import { ValidationError } from "@core/errors/index.js";
 import { generateOTP } from "@core/utils/index.js";
-import { LIMITS } from "@core/constants/index.js";
 
 interface ResendVerificationInput {
   email: string;

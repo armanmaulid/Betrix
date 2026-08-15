@@ -5,6 +5,5 @@ export * from "./CreditTransaction.js";
 export * from "./Device.js";
 export * from "./AdminAction.js";
 export * from "./Message.js";
-export * from "./NewsArticle.js";
 export * from "./BrokerSymbol.js";
 export * from "./CalendarEvent.js";

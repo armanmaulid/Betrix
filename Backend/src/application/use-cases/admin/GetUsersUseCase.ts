@@ -1,6 +1,6 @@
 import { inject, injectable } from "tsyringe";
 import { UserRepository } from "@domain/repositories/UserRepository.js";
-import { User, UserStatus } from "@domain/entities/User.js";
+import { UserStatus } from "@domain/entities/User.js";
 
 interface GetUsersInput {
   page: number;

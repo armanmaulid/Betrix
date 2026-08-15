@@ -28,12 +28,12 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
 
   const loggedPath = redactSensitiveQuery(req.originalUrl || req.path);
 
-  logger.info("Incoming request", {
+  logger.debug("Incoming request", {
     context: "HTTP",
     method: req.method,
     path: loggedPath,
-    userId: (req as any).user?.userId,
-    ip: (req as any).normalizedIP || req.ip,
+    userId: req.user?.userId,
+    ip: req.normalizedIP || req.ip,
     requestId: req.id,
   });
 
@@ -45,7 +45,7 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
         context: "HTTP",
         method: req.method,
         path: loggedPath,
-        userId: (req as any).user?.userId,
+        userId: req.user?.userId,
         statusCode: res.statusCode,
         duration,
         requestId: req.id,
@@ -55,17 +55,17 @@ export function requestLogger(req: Request, res: Response, next: NextFunction) {
         context: "HTTP",
         method: req.method,
         path: loggedPath,
-        userId: (req as any).user?.userId,
+        userId: req.user?.userId,
         statusCode: res.statusCode,
         duration,
         requestId: req.id,
       });
     } else {
-      logger.info("Request completed", {
+      logger.debug("Request completed", {
         context: "HTTP",
         method: req.method,
         path: loggedPath,
-        userId: (req as any).user?.userId,
+        userId: req.user?.userId,
         statusCode: res.statusCode,
         duration,
         requestId: req.id,

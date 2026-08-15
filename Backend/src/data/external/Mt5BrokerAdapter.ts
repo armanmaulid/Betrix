@@ -1,5 +1,5 @@
 import { inject, injectable, singleton } from "tsyringe";
-import { IBrokerProvider, BrokerCallbacks, OHLCBar } from "@application/ports/IBrokerProvider.js";
+import { IBrokerProvider, BrokerCallbacks, OHLCBar, Mt5CalendarEvent } from "@domain/ports/IBrokerProvider.js";
 import { BrokerSymbol } from "@domain/entities/BrokerSymbol.js";
 import { Mt5HttpClient } from "./Mt5HttpClient.js";
 import { Mt5WebsocketClient } from "./Mt5WebsocketClient.js";
@@ -48,7 +48,7 @@ export class Mt5BrokerAdapter implements IBrokerProvider {
     return this.httpClient.fetchSymbols();
   }
 
-  async fetchCalendar(period?: string): Promise<any[]> {
+  async fetchCalendar(period?: string): Promise<Mt5CalendarEvent[]> {
     return this.httpClient.fetchCalendar(period);
   }
 

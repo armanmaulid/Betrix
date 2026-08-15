@@ -1,8 +1,7 @@
 import { inject, injectable } from "tsyringe";
 import { UserRepository } from "@domain/repositories/UserRepository.js";
 import { MessageRepository } from "@domain/repositories/MessageRepository.js";
-import { sendEmail } from "@domain/services/emailService.js";
-import { User } from "@domain/entities/User.js";
+import type { EmailPort } from "@domain/ports/index.js";
 import { Message } from "@domain/entities/Message.js";
 import { randomUUID } from "crypto";
 import { Email } from "@domain/value-objects/index.js";
@@ -24,7 +23,8 @@ interface SendMessageOutput {
 export class SendMessageUseCase {
   constructor(
     @inject("UserRepository") private userRepo: UserRepository,
-    @inject("MessageRepository") private messageRepo: MessageRepository
+    @inject("MessageRepository") private messageRepo: MessageRepository,
+    @inject("EmailPort") private emailPort: EmailPort
   ) {}
 
   async execute(input: SendMessageInput): Promise<SendMessageOutput> {
@@ -74,7 +74,7 @@ export class SendMessageUseCase {
     // Send email notification if enabled
     const emailEnabled = await this.messageRepo.getNotificationPreference(recipient.id);
     if (emailEnabled) {
-      await sendEmail({
+      await this.emailPort.sendEmail({
         to: recipient.email,
         subject: `New Message: ${input.subject}`,
         text: `You have a new message from ${input.fromUserId}.\n\n${input.body}`,

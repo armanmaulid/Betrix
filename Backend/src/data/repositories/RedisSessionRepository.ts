@@ -2,7 +2,6 @@ import { injectable } from "tsyringe";
 import { redisClient } from "../orm/redisClient.js";
 import { SessionRepository } from "@domain/repositories/SessionRepository.js";
 import { Session } from "@domain/entities/Session.js";
-import { logger } from "@core/logging/logger.js";
 import { hashToken } from "@core/utils/crypto.js";
 
 const SESSION_LOOKUP_TIMEOUT_MS = 5000;
@@ -40,26 +39,18 @@ export class RedisSessionRepository implements SessionRepository {
       return cached.session;
     }
 
-    const userId = await withTimeout(
-      redisClient.get(`session:${hashedToken}`),
+    const stored = await withTimeout(
+      redisClient.get<string | Record<string, unknown>>(`session:${hashedToken}`),
       SESSION_LOOKUP_TIMEOUT_MS,
       "Redis session lookup"
     );
 
-    if (!userId) return null;
+    if (!stored) return null;
 
-    // Fetch real TTL from Redis
     const ttl = await redisClient.ttl(`session:${hashedToken}`);
     const expiresAt = ttl > 0 ? new Date(Date.now() + ttl * 1000) : new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-    const session = new Session(
-      token,
-      userId as string,
-      token,
-      new Date(),
-      expiresAt,
-      null, null, null
-    );
+    const session = this.reconstructSession(stored, token, expiresAt);
 
     sessionMemoryCache.set(hashedToken, { session, timestamp: Date.now() });
     return session;
@@ -76,18 +67,16 @@ export class RedisSessionRepository implements SessionRepository {
         continue;
       }
 
-      const uid = await redisClient.get(`session:${hashedToken}`);
-      if (!uid) continue;
+      const stored = await redisClient.get<string | Record<string, unknown>>(`session:${hashedToken}`);
+      if (!stored) continue;
 
       const ttl = await redisClient.ttl(`session:${hashedToken}`);
       const expiresAt = ttl > 0 ? new Date(Date.now() + ttl * 1000) : new Date(Date.now() + 24 * 60 * 60 * 1000);
 
       // Note: raw token is not recoverable from the hash — this session object's
-      // `token` field will be the hashed value, not the original. Callers that
-      // need the raw token (e.g. to display or re-auth) cannot get it from here;
-      // that's a pre-existing one-way-hash constraint, not something this fix changes.
-      const session = new Session(hashedToken, uid as string, hashedToken, new Date(), expiresAt, null, null, null);
-      sessions.push(session);
+      // `token` field will be the hashed value, not the original (pre-existing
+      // one-way-hash constraint).
+      sessions.push(this.reconstructSession(stored, hashedToken, expiresAt));
     }
 
     return sessions;
@@ -95,7 +84,17 @@ export class RedisSessionRepository implements SessionRepository {
 
   async save(session: Session): Promise<Session> {
     const hashedToken = hashSessionToken(session.token);
-    await redisClient.setex(`session:${hashedToken}`, 24 * 60 * 60, session.userId);
+    // Simpan metadata session lengkap (userId, ip, userAgent, deviceFingerprint)
+    // agar bisa ditampilkan di /auth/sessions. Format lama (plain userId) tetap
+    // dibaca lewat fallback di reconstructSession.
+    const payload = JSON.stringify({
+      v: 2,
+      userId: session.userId,
+      ip: session.ip,
+      userAgent: session.userAgent,
+      deviceFingerprint: session.deviceFingerprint,
+    });
+    await redisClient.setex(`session:${hashedToken}`, 24 * 60 * 60, payload);
     await redisClient.sadd(`user_sessions:${session.userId}`, hashedToken);
     await redisClient.expire(`user_sessions:${session.userId}`, 24 * 60 * 60);
     sessionMemoryCache.set(hashedToken, { session, timestamp: Date.now() });
@@ -104,13 +103,16 @@ export class RedisSessionRepository implements SessionRepository {
 
   async delete(token: string): Promise<string | null> {
     const hashedToken = hashSessionToken(token);
-    const userId = await redisClient.get(`session:${hashedToken}`);
+    const stored = await redisClient.get<string | Record<string, unknown>>(`session:${hashedToken}`);
+    // Nilai Redis kini JSON v2 (object setelah auto-parse) atau plain userId
+    // (format lama) — ekstrak userId saja, jangan kembalikan seluruh nilai.
+    const userId = this.extractUserId(stored);
     if (userId) {
       await redisClient.srem(`user_sessions:${userId}`, hashedToken);
     }
     await redisClient.del(`session:${hashedToken}`);
     sessionMemoryCache.delete(hashedToken);
-    return userId as string | null;
+    return userId;
   }
 
   async deleteByUserId(userId: string, exceptToken?: string): Promise<number> {
@@ -137,5 +139,57 @@ export class RedisSessionRepository implements SessionRepository {
     // This method is kept for interface compatibility but does nothing
     // since Redis handles TTL-based expiration automatically
     return 0;
+  }
+
+  private extractUserId(stored: string | Record<string, unknown> | null): string | null {
+    if (!stored) return null;
+    if (typeof stored === "object" && stored !== null) {
+      return (stored.userId as string) || null;
+    }
+    if (typeof stored === "string" && stored.startsWith("{")) {
+      try {
+        const parsed = JSON.parse(stored) as { userId?: string };
+        return parsed.userId || null;
+      } catch {
+        return stored; // format lama: plain userId
+      }
+    }
+    return stored;
+  }
+
+  /**
+   * Rekonstruksi Session dari nilai Redis. Client Upstash meng-parse JSON
+   * secara otomatis, jadi nilai bisa berupa string (plain userId format lama
+   * ATAU JSON string) atau object (JSON ter-parse). Format baru (v2): object
+   * `{ userId, ip, userAgent, deviceFingerprint }`. Format lama: plain
+   * userId (string) — tetap didukung supaya session yang dibuat sebelum
+   * perubahan ini tidak invalid.
+   */
+  private reconstructSession(stored: string | Record<string, unknown>, token: string, expiresAt: Date): Session {
+    let userId = typeof stored === "string" ? stored : "";
+    let ip: string | null = null;
+    let userAgent: string | null = null;
+    let deviceFingerprint: string | null = null;
+
+    if (typeof stored === "object" && stored !== null) {
+      userId = (stored.userId as string) || "";
+      ip = (stored.ip as string | null) ?? null;
+      userAgent = (stored.userAgent as string | null) ?? null;
+      deviceFingerprint = (stored.deviceFingerprint as string | null) ?? null;
+    } else if (typeof stored === "string") {
+      const extracted = this.extractUserId(stored);
+      if (extracted) userId = extracted;
+    }
+
+    return new Session(
+      token,
+      userId,
+      token,
+      new Date(),
+      expiresAt,
+      deviceFingerprint,
+      ip,
+      userAgent
+    );
   }
 }

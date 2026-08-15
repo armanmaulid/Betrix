@@ -1,26 +1,24 @@
 import type { Request, Response, NextFunction } from "express";
-import { container } from "tsyringe";
-import { GetNewsUseCase } from "@application/use-cases/news/GetNewsUseCase.js";
-import { INotifier } from "@application/ports/INotifier.js";
+import { inject, injectable } from "tsyringe";
+import { GetNewsUseCase } from "@contexts/news/application/use-cases/GetNewsUseCase.js";
+import { INotifier } from "@domain/ports/INotifier.js";
 import type { AuthenticatedRequest } from "@presentation/middleware/auth.middleware.js";
 
 const VALID_ASSETS = ["usd", "eur", "gbp", "jpy", "metal", "oil", "btc", "eco", "global", "crypto"];
 
+@injectable()
 export class NewsController {
-  private getGetNewsUseCase() {
-    return container.resolve(GetNewsUseCase);
-  }
-
-  private getSseNotifier(): INotifier {
-    return container.resolve<INotifier>("INotifier");
-  }
+  constructor(
+    @inject("GetNewsUseCase") private getNewsUseCase: GetNewsUseCase,
+    @inject("INotifier") private sseNotifier: INotifier
+  ) {}
 
   async stream(req: Request, res: Response, next: NextFunction) {
     try {
       const userReq = req as AuthenticatedRequest;
       const { userId, token } = userReq.user;
 
-      this.getSseNotifier().addClient(userId, token, res);
+      this.sseNotifier.addClient(userId, token, res);
       // Keep connection alive, handled by addClient which writes headers and manages cleanup.
     } catch (err) {
       next(err);
@@ -40,7 +38,7 @@ export class NewsController {
         });
       }
 
-      const articles = await this.getGetNewsUseCase().execute({
+      const articles = await this.getNewsUseCase.execute({
         limit,
         offset,
         asset: asset as string | undefined

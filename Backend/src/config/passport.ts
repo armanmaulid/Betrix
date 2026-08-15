@@ -4,7 +4,8 @@ import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { container } from "tsyringe";
 import type { UserRepository } from "@domain/repositories/UserRepository.js";
 import { env } from "@config/env";
-import { User, UserStatus } from "@domain/entities/User.js";
+import { User } from "@domain/entities/User.js";
+import { Email } from "@domain/value-objects";
 
 const googleOAuthConfigured = Boolean(env.GOOGLE_CLIENT_ID) && Boolean(env.GOOGLE_CLIENT_SECRET) && Boolean(env.GOOGLE_CALLBACK_URL);
 
@@ -23,7 +24,7 @@ if (googleOAuthConfigured) {
         }
 
         const userRepo = container.resolve("UserRepository") as UserRepository;
-        let user = await userRepo.findByEmail({ value: email } as any);
+        let user = await userRepo.findByEmail(new Email(email));
 
         if (!user) {
           try {
@@ -36,9 +37,12 @@ if (googleOAuthConfigured) {
               googleId: profile.id,
             });
             user = await userRepo.save(newUser);
-          } catch (createErr: any) {
-            if (createErr.code === '23505') {
-              user = await userRepo.findByEmail({ value: email } as any);
+          } catch (createErr: unknown) {
+            const dbCode = createErr && typeof createErr === "object" && "code" in createErr
+              ? String((createErr as { code?: unknown }).code)
+              : undefined;
+            if (dbCode === '23505') {
+              user = await userRepo.findByEmail(new Email(email));
               if (!user) throw createErr;
             } else {
               throw createErr;
@@ -56,7 +60,7 @@ if (googleOAuthConfigured) {
   console.warn("[passport] Google OAuth not configured - skipping strategy registration");
 }
 
-passport.serializeUser((user: any, done) => done(null, user.id));
+passport.serializeUser((user: Express.User, done) => done(null, user.id));
 passport.deserializeUser(async (id: string, done) => {
   try {
     const userRepo = container.resolve("UserRepository") as UserRepository;

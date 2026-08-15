@@ -1,8 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { container } from "tsyringe";
 import type { UserRepository } from "@domain/repositories/UserRepository.js";
-import { User } from "@domain/entities/User.js";
-import { AuthorizationError, AuthenticationError } from "@core/errors/index.js";
 
 export async function adminMiddleware(req: Request, res: Response, next: NextFunction) {
   if (!req.user || !("userId" in req.user)) {
@@ -11,7 +9,7 @@ export async function adminMiddleware(req: Request, res: Response, next: NextFun
 
   try {
     const userRepo = container.resolve("UserRepository") as UserRepository;
-    const userId = (req.user as any).userId;
+    const userId = req.user.userId!;
     const user = await userRepo.findById(userId);
 
     if (!user) {

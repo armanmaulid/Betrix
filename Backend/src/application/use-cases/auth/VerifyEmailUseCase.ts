@@ -1,13 +1,9 @@
 import { inject, injectable } from "tsyringe";
 import { UserRepository } from "@domain/repositories/UserRepository.js";
-import { SessionRepository } from "@domain/repositories/SessionRepository.js";
 import { VerificationRepository } from "@domain/repositories/VerificationRepository.js";
-import { EmailPort } from "@application/ports";
-import { User, UserStatus } from "@domain/entities/User.js";
-import { Email } from "@domain/value-objects";
-import { ValidationError, NotFoundError, InternalError } from "@core/errors/index.js";
-import { verifyPassword, hashPassword, generateSecureToken } from "@core/utils/index.js";
-import { LIMITS } from "@core/constants/index.js";
+import { EmailPort } from "@domain/ports";
+import { User } from "@domain/entities/User.js";
+import { ValidationError, NotFoundError } from "@core/errors/index.js";
 
 interface VerifyEmailInput {
   token: string;

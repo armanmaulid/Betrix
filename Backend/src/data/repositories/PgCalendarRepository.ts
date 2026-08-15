@@ -3,6 +3,21 @@ import { pgClient } from "../orm/pgClient.js";
 import { CalendarRepository, CalendarQuery } from "@domain/repositories/CalendarRepository.js";
 import { CalendarEvent, CalendarImportance } from "@domain/entities/CalendarEvent.js";
 
+interface CalendarEventRow {
+  value_id: number;
+  event_id: number;
+  event_time: Date;
+  country: string;
+  currency: string;
+  event_name: string;
+  importance: string;
+  actual: string | null;
+  forecast: string | null;
+  previous: string | null;
+  created_at: Date;
+  updated_at: Date;
+}
+
 @injectable()
 export class PgCalendarRepository implements CalendarRepository {
   async save(event: CalendarEvent): Promise<CalendarEvent> {
@@ -10,9 +25,9 @@ export class PgCalendarRepository implements CalendarRepository {
       `INSERT INTO calendar_events (value_id, event_id, event_time, country, currency, event_name, importance, actual, forecast, previous, created_at, updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
        ON CONFLICT (value_id) DO UPDATE SET
-         actual = EXCLUDED.actual,
-         forecast = EXCLUDED.forecast,
-         previous = EXCLUDED.previous,
+         actual = COALESCE(EXCLUDED.actual, calendar_events.actual),
+         forecast = COALESCE(EXCLUDED.forecast, calendar_events.forecast),
+         previous = COALESCE(EXCLUDED.previous, calendar_events.previous),
          updated_at = EXCLUDED.updated_at
        RETURNING *`,
       [
@@ -50,7 +65,7 @@ export class PgCalendarRepository implements CalendarRepository {
         const chunk = uniqueEvents.slice(i, i + chunkSize);
         
         const placeholders: string[] = [];
-        const params: any[] = [];
+        const params: unknown[] = [];
         let paramIndex = 1;
         
         for (const event of chunk) {
@@ -67,9 +82,9 @@ export class PgCalendarRepository implements CalendarRepository {
           INSERT INTO calendar_events (value_id, event_id, event_time, country, currency, event_name, importance, actual, forecast, previous, created_at, updated_at)
           VALUES ${placeholders.join(",")}
           ON CONFLICT (value_id) DO UPDATE SET
-            actual = EXCLUDED.actual,
-            forecast = EXCLUDED.forecast,
-            previous = EXCLUDED.previous,
+            actual = COALESCE(EXCLUDED.actual, calendar_events.actual),
+            forecast = COALESCE(EXCLUDED.forecast, calendar_events.forecast),
+            previous = COALESCE(EXCLUDED.previous, calendar_events.previous),
             updated_at = EXCLUDED.updated_at
         `;
         
@@ -145,7 +160,7 @@ export class PgCalendarRepository implements CalendarRepository {
 
   async findByQuery(query: CalendarQuery): Promise<CalendarEvent[]> {
     const conditions: string[] = [];
-    const params: any[] = [];
+    const params: unknown[] = [];
     let paramIndex = 1;
 
     if (query.startDate) {
@@ -211,7 +226,7 @@ export class PgCalendarRepository implements CalendarRepository {
     return rows.length > 0 ? this.mapRow(rows[0]) : null;
   }
 
-  private mapRow(row: any): CalendarEvent {
+  private mapRow(row: CalendarEventRow): CalendarEvent {
     return new CalendarEvent(
       row.value_id, row.event_id, row.event_time, row.country,
       row.currency, row.event_name, row.importance as CalendarImportance,

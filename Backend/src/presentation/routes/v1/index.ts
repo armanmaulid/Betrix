@@ -1,20 +1,27 @@
 import { Router } from "express";
-import authRoutes from "./auth.routes.js";
-import chatRoutes from "./chat.routes.js";
-import adminRoutes from "./admin.routes.js";
-import userRoutes from "./user.routes.js";
-import marketRoutes from "./market.routes.js";
+import { createAuthRouter } from "./auth.routes.js";
+import { createChatRouter } from "./chat.routes.js";
+import { createAdminRouter } from "./admin.routes.js";
+import { createUserRouter } from "./user.routes.js";
+import { createMarketRouter } from "./market.routes.js";
 import healthRoutes from "./health.routes.js";
-import newsRoutes from "./news.routes.js";
+import { createNewsRouter } from "./news.routes.js";
 
-const router = Router();
+// Routers dibangun saat registerRoutes(app) dipanggil — SETELAH
+// registerDependencies() — sehingga container.resolve(Controller)
+// di dalam factory tidak pernah kena container kosong (ESM hoisting).
+export function createV1Router(): Router {
+  const router = Router();
 
-router.use("/auth", authRoutes);
-router.use("/chat", chatRoutes);
-router.use("/admin", adminRoutes);
-router.use("/me", userRoutes);
-router.use("/market", marketRoutes);
-router.use("/news", newsRoutes);
-router.use("/", healthRoutes);
+  router.use("/auth", createAuthRouter());
+  router.use("/chat", createChatRouter());
+  router.use("/admin", createAdminRouter());
+  router.use("/me", createUserRouter());
+  router.use("/market", createMarketRouter());
+  router.use("/news", createNewsRouter());
+  router.use("/", healthRoutes);
 
-export default router;
+  return router;
+}
+
+export default createV1Router;

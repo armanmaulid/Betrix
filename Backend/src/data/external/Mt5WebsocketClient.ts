@@ -2,7 +2,43 @@ import { injectable, singleton } from "tsyringe";
 import { WebSocket } from "ws";
 import { env } from "@config/env.js";
 import { logger } from "@core/logging/logger.js";
-import { BrokerCallbacks } from "@application/ports/IBrokerProvider.js";
+import { BrokerCallbacks } from "@domain/ports/IBrokerProvider.js";
+
+interface Mt5RawMessage {
+  type?: string;
+  symbol: string;
+  bid: number;
+  ask: number;
+  spread: number;
+  digits: number;
+  volume: number;
+  timestamp?: number;
+  timeframe: string;
+  bars: Array<{
+    time: number;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+    volume: number;
+  }>;
+  market_book: Array<{ type: string; price: number; volume: number }>;
+  events: Array<{
+    value_id: number;
+    event_id: number;
+    actual: string | null;
+    forecast: string | null;
+    previous: string | null;
+    time?: string;
+    name?: string;
+    currency?: string;
+  }>;
+  price?: boolean;
+  ohlc?: boolean;
+  mbook?: boolean;
+  calendar?: boolean;
+  uptime_sec?: number;
+}
 
 @injectable()
 @singleton()
@@ -101,7 +137,7 @@ export class Mt5WebsocketClient {
 
   private handleMessage(data: string): void {
     try {
-      const msg = JSON.parse(data);
+      const msg = JSON.parse(data) as Mt5RawMessage;
       
       switch (msg.type) {
         case "price_update":
@@ -125,7 +161,7 @@ export class Mt5WebsocketClient {
     }
   }
 
-  private handlePriceTick(msg: any): void {
+  private handlePriceTick(msg: Mt5RawMessage): void {
     const tick = {
       symbol: msg.symbol,
       bid: msg.bid,
@@ -140,7 +176,7 @@ export class Mt5WebsocketClient {
     }
   }
 
-  private handleOHLCUpdate(msg: any): void {
+  private handleOHLCUpdate(msg: Mt5RawMessage): void {
     if (!msg.bars || !Array.isArray(msg.bars) || msg.bars.length === 0) return;
     
     const latestBar = msg.bars[msg.bars.length - 1];
@@ -163,7 +199,7 @@ export class Mt5WebsocketClient {
     }
   }
 
-  private handleMarketBookUpdate(msg: any): void {
+  private handleMarketBookUpdate(msg: Mt5RawMessage): void {
     const bids: Array<{price: number, volume: number}> = [];
     const asks: Array<{price: number, volume: number}> = [];
 
@@ -188,7 +224,7 @@ export class Mt5WebsocketClient {
     }
   }
 
-  private handleTrackingStatus(msg: any): void {
+  private handleTrackingStatus(msg: Mt5RawMessage): void {
     this.lastTrackingStatusAt = Date.now();
 
     if (this.callbacks.onTrackingStatus) {
@@ -202,7 +238,7 @@ export class Mt5WebsocketClient {
     }
   }
 
-  private handleCalendarUpdate(msg: any): void {
+  private handleCalendarUpdate(msg: Mt5RawMessage): void {
     if (!msg.events || !Array.isArray(msg.events)) return;
 
     for (const event of msg.events) {
@@ -211,7 +247,10 @@ export class Mt5WebsocketClient {
         event_id: event.event_id,
         actual: event.actual,
         forecast: event.forecast,
-        previous: event.previous
+        previous: event.previous,
+        time: event.time,
+        name: event.name,
+        currency: event.currency,
       };
 
       if (this.callbacks.onCalendarUpdate) {

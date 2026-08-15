@@ -1,6 +1,6 @@
 import { inject, injectable } from "tsyringe";
 import { AdminActionRepository } from "@domain/repositories/AdminActionRepository.js";
-import { AdminAction, AdminActionType } from "@domain/entities/AdminAction.js";
+import { AdminActionType } from "@domain/entities/AdminAction.js";
 import { escapeCsvField } from "@core/utils/csv.js";
 
 interface ExportAuditLogsInput {

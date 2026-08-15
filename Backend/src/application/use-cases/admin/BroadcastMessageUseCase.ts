@@ -2,7 +2,8 @@ import { inject, injectable } from "tsyringe";
 import { UserRepository } from "@domain/repositories/UserRepository.js";
 import { MessageRepository } from "@domain/repositories/MessageRepository.js";
 import { Message } from "@domain/entities/Message.js";
-import { sendEmail } from "@domain/services/emailService.js";
+import { UserStatus } from "@domain/entities/User.js";
+import type { EmailPort } from "@domain/ports/index.js";
 import { ActivityLogRepository } from "@domain/repositories/ActivityLogRepository.js";
 import { randomUUID } from "crypto";
 
@@ -25,7 +26,8 @@ export class BroadcastMessageUseCase {
   constructor(
     @inject("ActivityLogRepository") private activityLogRepo: ActivityLogRepository,
     @inject("UserRepository") private userRepo: UserRepository,
-    @inject("MessageRepository") private messageRepo: MessageRepository
+    @inject("MessageRepository") private messageRepo: MessageRepository,
+    @inject("EmailPort") private emailPort: EmailPort
   ) {}
 
   async execute(input: BroadcastMessageInput): Promise<BroadcastMessageOutput> {
@@ -33,7 +35,7 @@ export class BroadcastMessageUseCase {
 
     if (input.recipients === "all") {
       const { users } = await this.userRepo.findAll({
-        page: 1, limit: 10000, status: "active" as any, sortBy: "created_at", order: "DESC"
+        page: 1, limit: 10000, status: UserStatus.ACTIVE, sortBy: "created_at", order: "DESC"
       });
       targetUserIds = users.map(u => u.id);
     } else {
@@ -71,7 +73,7 @@ export class BroadcastMessageUseCase {
       const emailEnabled = await this.messageRepo.getNotificationPreference(userId);
       if (emailEnabled && user.email) {
         try {
-          await sendEmail({
+          await this.emailPort.sendEmail({
             to: user.email,
             subject: `Admin Announcement: ${input.subject}`,
             text: `${input.body}\n\nThis is an admin broadcast message.`,

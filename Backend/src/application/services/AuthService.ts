@@ -3,17 +3,14 @@ import { UserRepository } from "@domain/repositories/UserRepository.js";
 import { SessionRepository } from "@domain/repositories/SessionRepository.js";
 import { DeviceRepository } from "@domain/repositories/DeviceRepository.js";
 import { DeviceSessionRepository } from "@domain/repositories/DeviceSessionRepository.js";
-import { User, UserStatus } from "@domain/entities/User.js";
+import { User } from "@domain/entities/User.js";
 import { Session } from "@domain/entities/Session.js";
 import { Device } from "@domain/entities/Device.js";
-import { DeviceFingerprint } from "@domain/value-objects/index.js";
-import { AuthenticationError, ConflictError, InternalError } from "@core/errors/index.js";
-import { generateSecureToken } from "@core/utils/index.js";
-import { isDeviceEnforcementEnabled } from "@config/deviceEnforcement.js";
-import { LIMITS } from "@core/constants/index.js";
+import { DeviceFingerprint, SessionToken } from "@domain/value-objects/index.js";
+
 
 @injectable()
-export class AuthDomainService {
+export class AuthService {
   constructor(
     @inject("UserRepository") private userRepo: UserRepository,
     @inject("SessionRepository") private sessionRepo: SessionRepository,
@@ -21,7 +18,7 @@ export class AuthDomainService {
     @inject("DeviceSessionRepository") private deviceSessionRepo: DeviceSessionRepository
   ) {}
 
-  async establishAuthenticatedSession(user: User, request: { ip: string; headers: { "user-agent": string } }): Promise<{
+  async establishAuthenticatedSession(user: User, request: { ip: string; headers: { "user-agent": string } }, enforceDevice: boolean): Promise<{
     ok: boolean;
     status?: number;
     error?: string;
@@ -29,10 +26,10 @@ export class AuthDomainService {
     user?: User;
     sessionToken?: string;
   }> {
-    const sessionToken = generateSecureToken(LIMITS.SESSION_TOKEN_BYTES);
+    const sessionToken = (await SessionToken.generate()).value;
     let fingerprint: DeviceFingerprint | undefined;
 
-    if (isDeviceEnforcementEnabled()) {
+    if (enforceDevice) {
       fingerprint = DeviceFingerprint.create(request);
       const result = await this.deviceSessionRepo.setSessionForDeviceAtomic(user.id, fingerprint.value, sessionToken);
       if (!result.success) {

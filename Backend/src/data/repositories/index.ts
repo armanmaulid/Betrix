@@ -5,7 +5,6 @@ export * from "./PgCreditRepository.js";
 export * from "./PgDeviceRepository.js";
 export * from "./PgAdminActionRepository.js";
 export * from "./PgMessageRepository.js";
-export * from "./PgNewsRepository.js";
 export * from "./PgSymbolRepository.js";
 export * from "./PgCalendarRepository.js";
 export * from "./PgLoginAttemptRepository.js";

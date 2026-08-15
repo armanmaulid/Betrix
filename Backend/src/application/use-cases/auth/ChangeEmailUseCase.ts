@@ -1,12 +1,11 @@
 import { inject, injectable } from "tsyringe";
 import { UserRepository } from "@domain/repositories/UserRepository.js";
 import { VerificationRepository } from "@domain/repositories/VerificationRepository.js";
-import { EmailPort } from "@application/ports";
+import { EmailPort } from "@domain/ports";
 import { User } from "@domain/entities/User.js";
 import { Email } from "@domain/value-objects";
 import { ValidationError, AuthenticationError, NotFoundError, ConflictError } from "@core/errors/index.js";
 import { verifyPassword, generateOTP } from "@core/utils/index.js";
-import { LIMITS } from "@core/constants/index.js";
 import { RequestInput } from "@core/utils/request.js";
 
 interface ChangeEmailInput {

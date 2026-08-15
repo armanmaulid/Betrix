@@ -4,6 +4,26 @@ import { UserRepository } from "@domain/repositories/UserRepository.js";
 import { User, UserStatus } from "@domain/entities/User.js";
 import { Email } from "@domain/value-objects";
 
+interface UserRow {
+  id: string;
+  email: string;
+  password_hash: string | null;
+  name: string;
+  is_admin: boolean;
+  status: string;
+  email_verified: boolean;
+  credits: number;
+  created_at: Date;
+  last_active: Date | null;
+  google_id: string | null;
+  phone: string | null;
+  address: string | null;
+  birthdate: Date | null;
+  gender: string | null;
+  bio: string | null;
+  verified_at: Date | null;
+}
+
 @injectable()
 export class PgUserRepository implements UserRepository {
   async findById(id: string): Promise<User | null> {
@@ -157,7 +177,7 @@ export class PgUserRepository implements UserRepository {
     return { users: rows.map(this.mapRow), total };
   }
 
-  private mapRow(row: any): User {
+  private mapRow(row: UserRow): User {
     return new User(
       row.id, row.email, row.password_hash, row.name,
       row.is_admin, row.status as UserStatus, row.email_verified, row.credits,

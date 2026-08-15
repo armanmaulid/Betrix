@@ -3,6 +3,18 @@ import { pgClient } from "../orm/pgClient.js";
 import { AdminActionRepository } from "@domain/repositories/AdminActionRepository.js";
 import { AdminAction, AdminActionType } from "@domain/entities/AdminAction.js";
 
+interface AdminActionRow {
+  id: string;
+  admin_id: string;
+  action: string;
+  target_type: string | null;
+  target_id: string | null;
+  details: Record<string, unknown> | null;
+  ip: string | null;
+  user_agent: string | null;
+  created_at: Date;
+}
+
 @injectable()
 export class PgAdminActionRepository implements AdminActionRepository {
   async save(action: AdminAction): Promise<AdminAction> {
@@ -115,7 +127,7 @@ export class PgAdminActionRepository implements AdminActionRepository {
     return rows.map(r => r.action);
   }
 
-  private mapRow(row: any): AdminAction {
+  private mapRow(row: AdminActionRow): AdminAction {
     return new AdminAction(
       row.id, row.admin_id, row.action as AdminActionType,
       row.target_type, row.target_id, row.details,

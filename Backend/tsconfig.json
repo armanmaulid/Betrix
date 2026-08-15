@@ -20,6 +20,7 @@
       "@config/*": ["src/config/*"],
       "@core/*": ["src/core/*"],
       "@domain/*": ["src/domain/*"],
+      "@contexts/*": ["src/contexts/*"],
       "@data/*": ["src/data/*"],
       "@application/*": ["src/application/*"],
       "@presentation/*": ["src/presentation/*"],

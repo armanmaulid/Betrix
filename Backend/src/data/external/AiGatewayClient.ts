@@ -1,7 +1,7 @@
 import { stripThinkingTags, createThinkingStreamFilter } from "@domain/services/thinkingFilter.js";
 import { logger } from "@core/logging/logger.js";
 import { env } from "@config/env";
-import type { AiMessage } from "@application/ports/index.js";
+import type { AiMessage } from "@domain/ports/index.js";
 
 interface AiResponse {
   choices?: Array<{
@@ -112,9 +112,10 @@ export class AiGatewayClient {
           ? { inputTokens: data.usage.prompt_tokens, outputTokens: data.usage.completion_tokens }
           : undefined,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       clearTimeout(timeoutId);
-      if (err.name === "AbortError" || err.name === "TimeoutError") {
+      const errName = err instanceof Error ? err.name : undefined;
+      if (errName === "AbortError" || errName === "TimeoutError") {
         throw new Error(`AI provider timeout after ${REQUEST_TIMEOUT_MS}ms`);
       }
       throw err;
@@ -171,7 +172,7 @@ export class AiGatewayClient {
       const decoder = new TextDecoder();
       let buffer = "";
       let fullText = "";
-      let usage: any = null;
+      let usage: { prompt_tokens: number; completion_tokens: number } | null = null;
 
       const thinkingFilter = createThinkingStreamFilter((clean) => {
         fullText += clean;
@@ -212,9 +213,10 @@ export class AiGatewayClient {
           ? { inputTokens: usage.prompt_tokens, outputTokens: usage.completion_tokens }
           : undefined,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       clearTimeout(timeoutId);
-      if (err.name === "AbortError") {
+      const errName = err instanceof Error ? err.name : undefined;
+      if (errName === "AbortError") {
         throw new Error(`AI provider timeout after ${STREAM_TIMEOUT_MS}ms`);
       }
       throw err;

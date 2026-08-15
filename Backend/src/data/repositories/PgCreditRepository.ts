@@ -2,9 +2,16 @@ import { injectable } from "tsyringe";
 import { pgClient } from "../orm/pgClient.js";
 import { CreditRepository } from "@domain/repositories/CreditRepository.js";
 import { CreditTransaction, CreditAction } from "@domain/entities/CreditTransaction.js";
-import { logger } from "@core/logging/logger.js";
 import { inject } from "tsyringe";
-import { INotifier } from "@application/ports/INotifier.js";
+import { INotifier } from "@domain/ports/INotifier.js";
+
+interface CreditTransactionRow {
+  id: string;
+  user_id: string;
+  amount: number;
+  action: string;
+  created_at: Date;
+}
 
 @injectable()
 export class PgCreditRepository implements CreditRepository {
@@ -92,7 +99,7 @@ export class PgCreditRepository implements CreditRepository {
     return { transactions: rows.map(this.mapRow), total };
   }
 
-  private mapRow(row: any): CreditTransaction {
+  private mapRow(row: CreditTransactionRow): CreditTransaction {
     return new CreditTransaction(
       row.id, row.user_id, row.amount, row.action as CreditAction, row.created_at
     );

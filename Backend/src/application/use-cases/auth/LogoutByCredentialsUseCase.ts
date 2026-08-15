@@ -5,8 +5,8 @@ import { DeviceSessionRepository } from "@domain/repositories/DeviceSessionRepos
 import { EventDispatcher } from "@domain/events/index.js";
 import { AuthenticationError } from "@core/errors/index.js";
 import { verifyPassword } from "@core/utils/crypto.js";
-import { DeviceFingerprint } from "@domain/value-objects/index.js";
-import { isDeviceEnforcementEnabled } from "@config/deviceEnforcement.js";
+import { DeviceFingerprint, Email } from "@domain/value-objects/index.js";
+import type { AppSettings } from "@core/settings/AppSettings.js";
 
 interface LogoutByCredentialsRequest {
   email: string;
@@ -21,11 +21,12 @@ export class LogoutByCredentialsUseCase {
     @inject("UserRepository") private userRepo: UserRepository,
     @inject("SessionRepository") private sessionRepo: SessionRepository,
     @inject("DeviceSessionRepository") private deviceSessionRepo: DeviceSessionRepository,
-    @inject("EventDispatcher") private eventDispatcher: EventDispatcher
+    @inject("EventDispatcher") private eventDispatcher: EventDispatcher,
+    @inject("AppSettings") private settings: AppSettings
   ) {}
 
   async execute(req: LogoutByCredentialsRequest): Promise<void> {
-    const user = await this.userRepo.findByEmail({ value: req.email } as any); 
+    const user = await this.userRepo.findByEmail(new Email(req.email)); 
     
     if (!user) {
       throw new AuthenticationError("Email atau password salah");
@@ -41,8 +42,8 @@ export class LogoutByCredentialsUseCase {
     }
 
     let fingerprintStr: string | null = null;
-    if (isDeviceEnforcementEnabled()) {
-      const fingerprint = DeviceFingerprint.create({ ip: req.ip, headers: req.headers as any });
+    if (this.settings.deviceEnforcementEnabled) {
+      const fingerprint = DeviceFingerprint.create({ ip: req.ip, headers: req.headers });
       fingerprintStr = fingerprint.value;
       const sessionToken = await this.deviceSessionRepo.getSessionByDevice(user.id, fingerprintStr);
       
@@ -55,7 +56,7 @@ export class LogoutByCredentialsUseCase {
       // But typically we should just revoke the session token passed in headers.
       // Wait, LogoutByCredentials doesn't pass sessionToken, it passes email+password. 
       // It relies on DeviceFingerprint to find the session.
-      const fingerprint = DeviceFingerprint.create({ ip: req.ip, headers: req.headers as any });
+      const fingerprint = DeviceFingerprint.create({ ip: req.ip, headers: req.headers });
       fingerprintStr = fingerprint.value;
       const sessionToken = await this.deviceSessionRepo.getSessionByDevice(user.id, fingerprintStr);
       

@@ -2,13 +2,12 @@ import { inject, injectable } from "tsyringe";
 import { UserRepository } from "@domain/repositories/UserRepository.js";
 import { ChatRepository } from "@domain/repositories/ChatRepository.js";
 import { CreditRepository } from "@domain/repositories/CreditRepository.js";
-import { AiPort } from "@application/ports";
-import { CachePort } from "@application/ports";
-import { ChatMessage, ChatTaskType, ModelTier } from "@domain/entities/ChatMessage.js";
+import { AiPort } from "@domain/ports";
+import { CachePort } from "@domain/ports";
+import { ChatTaskType, ModelTier } from "@domain/entities/ChatMessage.js";
 import { CreditAction } from "@domain/entities/CreditTransaction.js";
-import { User } from "@domain/entities/User.js";
-import { ValidationError, InsufficientCreditsError, InternalError } from "@core/errors/index.js";
-import { resolveModel, TIER_CREDIT_COST, TASK_TIER_MAP } from "@config/models.js";
+import { InsufficientCreditsError, InternalError } from "@core/errors/index.js";
+import { ModelPolicy } from "@domain/services/ModelPolicy.js";
 import { LIMITS } from "@core/constants/index.js";
 import { sanitizeHistory } from "@core/utils/chat.js";
 import { EventDispatcher, ChatCompleted } from "@domain/events/index.js";
@@ -41,7 +40,8 @@ export class SendMessageUseCase {
     @inject("AiPort") private aiPort: AiPort,
     @inject("CachePort") private cachePort: CachePort,
     @inject("EventDispatcher") private eventDispatcher: EventDispatcher,
-    @inject("AiPromptRegistry") private promptRegistry: AiPromptRegistry
+    @inject("AiPromptRegistry") private promptRegistry: AiPromptRegistry,
+    @inject("ModelPolicy") private modelPolicy: ModelPolicy
   ) {}
 
   async execute(input: SendMessageInput): Promise<SendMessageOutput> {
@@ -50,9 +50,9 @@ export class SendMessageUseCase {
       throw new InternalError("User not found");
     }
 
-    const tier = input.tier || TASK_TIER_MAP[input.taskType] || "balanced";
-    const model = resolveModel(input.taskType, tier);
-    const cost = TIER_CREDIT_COST[tier];
+    const tier = this.modelPolicy.resolveTier(input.taskType, input.tier);
+    const model = this.modelPolicy.resolveModel(input.taskType, tier);
+    const cost = ModelPolicy.TIER_CREDIT_COST[tier];
 
     const cleanHistory = sanitizeHistory(input.history);
     const messages = [...cleanHistory, { role: "user" as const, content: input.message.substring(0, LIMITS.MESSAGE_MAX_LENGTH) }];
@@ -125,7 +125,7 @@ export class SendMessageUseCase {
         latencyMs: 0,
         usage: result.usage ?? null,
       };
-    } catch (err) {
+    } catch {
       // Only refund if AI call itself failed
       if (creditsDeducted) {
         await this.creditRepo.add(user.id, cost, `refund_chat_${tier}` as CreditAction);

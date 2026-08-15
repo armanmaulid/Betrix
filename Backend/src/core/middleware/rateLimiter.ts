@@ -22,7 +22,7 @@ export function createRateLimiter(options: {
     legacyHeaders: false,
     keyGenerator: options.keyGenerator || createIpKeyGenerator(),
     handler: (req: Request, res: Response) => {
-      const ip = (req as any).normalizedIP || req.ip || "unknown";
+      const ip = req.normalizedIP || req.ip || "unknown";
       logger.warn(`Rate limit exceeded`, {
         context: "RateLimit",
         limiter: options.name || "global",
@@ -64,7 +64,7 @@ export const perUserLimiter = createRateLimiter({
   max: env.RATE_LIMIT_PER_USER_PER_MINUTE,
   message: "Terlalu banyak request untuk akun ini, coba lagi sebentar lagi",
   keyGenerator: (req) => {
-    const userId = (req as any).user?.userId;
+    const userId = req.user?.userId;
     return userId ? `user:${userId}` : ipKeyGenerator(req.ip || "unknown");
   },
 });
@@ -79,7 +79,7 @@ export const sensitiveLimiter = createRateLimiter({
   max: 3,
   message: "Terlalu banyak percobaan operasi sensitif, coba lagi dalam 1 jam",
   keyGenerator: (req) => {
-    const userId = (req as any).user?.userId;
+    const userId = req.user?.userId;
     return userId ? `sensitive:${userId}` : ipKeyGenerator(req.ip || "unknown");
   },
 });

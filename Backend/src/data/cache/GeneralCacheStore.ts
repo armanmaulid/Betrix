@@ -1,7 +1,13 @@
-export class GeneralCacheStore {
-  private cache = new Map<string, { data: any; expires: number }>();
+interface CachedAiResponse {
+  text: string;
+  modelUsed: string;
+  usage?: { inputTokens: number; outputTokens: number };
+}
 
-  get(taskType: string, key: string): { text: string; modelUsed: string; usage?: { inputTokens: number; outputTokens: number } } | null {
+export class GeneralCacheStore {
+  private cache = new Map<string, { data: CachedAiResponse; expires: number }>();
+
+  get(taskType: string, key: string): CachedAiResponse | null {
     const cacheKey = `${taskType}:${key}`;
     const entry = this.cache.get(cacheKey);
     if (!entry) return null;
@@ -12,7 +18,7 @@ export class GeneralCacheStore {
     return entry.data;
   }
 
-  set(taskType: string, key: string, value: { text: string; modelUsed: string; usage?: { inputTokens: number; outputTokens: number } }, ttlMs = 3600000): void {
+  set(taskType: string, key: string, value: CachedAiResponse, ttlMs = 3600000): void {
     const cacheKey = `${taskType}:${key}`;
     this.cache.set(cacheKey, { data: value, expires: Date.now() + ttlMs });
   }

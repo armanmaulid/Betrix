@@ -2,9 +2,16 @@ import type { Request, Response, NextFunction } from "express";
 import crypto from "crypto";
 
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-namespace -- Express namespace augmentation is required by @types/express
   namespace Express {
+    interface User {
+      id?: string;
+      userId?: string;
+      token?: string;
+    }
     interface Request {
       id?: string;
+      normalizedIP?: string;
     }
   }
 }

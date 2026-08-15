@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { container } from "tsyringe";
-import { AnalyticsRepository } from "@domain/repositories/AnalyticsRepository.js";
+import type { AnalyticsRepository } from "@domain/repositories/AnalyticsRepository.js";
 
 const router = Router();
 
@@ -10,7 +10,7 @@ router.get("/health", async (req, res) => {
     status: "healthy",
     timestamp: new Date().toISOString(),
     uptime: process.uptime(),
-    services: {} as Record<string, any>,
+    services: {} as Record<string, { status: string; responseTime?: number; error?: string }>,
   };
 
   try {

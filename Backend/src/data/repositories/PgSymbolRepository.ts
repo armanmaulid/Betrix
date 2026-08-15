@@ -3,6 +3,16 @@ import { pgClient } from "../orm/pgClient.js";
 import { SymbolRepository } from "@domain/repositories/SymbolRepository.js";
 import { BrokerSymbol } from "@domain/entities/BrokerSymbol.js";
 
+interface BrokerSymbolRow {
+  symbol: string;
+  description: string | null;
+  path: string | null;
+  category: string | null;
+  is_active: boolean;
+  created_at: Date;
+  updated_at: Date;
+}
+
 @injectable()
 export class PgSymbolRepository implements SymbolRepository {
   async save(symbol: BrokerSymbol): Promise<BrokerSymbol> {
@@ -35,7 +45,7 @@ export class PgSymbolRepository implements SymbolRepository {
       
       for (let i = 0; i < symbols.length; i += chunkSize) {
         const chunk = symbols.slice(i, i + chunkSize);
-        const values: any[] = [];
+        const values: (string | number | boolean | Date | null)[] = [];
         const placeholders: string[] = [];
         let pIndex = 1;
         
@@ -113,7 +123,7 @@ export class PgSymbolRepository implements SymbolRepository {
     );
   }
 
-  private mapRow(row: any): BrokerSymbol {
+  private mapRow(row: BrokerSymbolRow): BrokerSymbol {
     return new BrokerSymbol(
       row.symbol, row.description, row.path, row.category,
       row.is_active, row.created_at, row.updated_at

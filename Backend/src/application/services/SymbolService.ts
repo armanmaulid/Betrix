@@ -1,7 +1,7 @@
 import { inject, injectable } from "tsyringe";
 import { SymbolRepository } from "@domain/repositories/SymbolRepository.js";
-import { BrokerSymbol } from "@domain/entities/BrokerSymbol.js";
-import { IBrokerProvider } from "@application/ports/IBrokerProvider.js";
+import { IBrokerProvider } from "@domain/ports/IBrokerProvider.js";
+import type { BrokerSymbol } from "@domain/entities/BrokerSymbol.js";
 import { logger } from "@core/logging/logger.js";
 
 @injectable()
@@ -30,7 +30,7 @@ export class SymbolService {
     }
   }
 
-  async getActiveSymbols(): Promise<any[]> {
+  async getActiveSymbols(): Promise<BrokerSymbol[]> {
     return this.symbolRepo.findActive();
   }
 }

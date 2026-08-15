@@ -1,4 +1,4 @@
-import { PriceTick, OHLCUpdate, MarketBookUpdate } from "@application/ports/IBrokerProvider.js";
+import type { PriceTick, OHLCUpdate, MarketBookUpdate } from "@domain/ports/IBrokerProvider.js";
 
 export interface MarketDataRepository {
   // Write (cache operations)

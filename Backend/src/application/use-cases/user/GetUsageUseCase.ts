@@ -35,23 +35,23 @@ export class GetUsageUseCase {
     return {
       period: `Last ${input.days} days`,
       summary: {
-        requestCount: parseInt(s.request_count),
-        totalInputTokens: parseInt(s.total_input_tokens),
-        totalOutputTokens: parseInt(s.total_output_tokens),
-        totalTokens: parseInt(s.total_tokens),
-        avgLatencyMs: s.avg_latency_ms,
-        firstRequest: s.first_request,
-        lastRequest: s.last_request,
+        requestCount: Number(s.request_count),
+        totalInputTokens: Number(s.total_input_tokens),
+        totalOutputTokens: Number(s.total_output_tokens),
+        totalTokens: Number(s.total_tokens),
+        avgLatencyMs: Number(s.avg_latency_ms ?? 0),
+        firstRequest: s.first_request instanceof Date ? s.first_request : s.first_request ? new Date(s.first_request) : null,
+        lastRequest: s.last_request instanceof Date ? s.last_request : s.last_request ? new Date(s.last_request) : null,
       },
       byTaskType: byTaskType.map(t => ({
         taskType: t.task_type,
-        requestCount: parseInt(t.request_count),
-        totalTokens: parseInt(t.total_tokens),
+        requestCount: Number(t.request_count),
+        totalTokens: Number(t.total_tokens ?? 0),
       })),
       dailyUsage: dailyUsage.map(d => ({
-        date: d.date,
-        requestCount: parseInt(d.request_count),
-        totalTokens: parseInt(d.total_tokens),
+        date: d.date instanceof Date ? d.date.toISOString().slice(0, 10) : String(d.date),
+        requestCount: Number(d.request_count),
+        totalTokens: Number(d.total_tokens ?? 0),
       })),
     };
   }

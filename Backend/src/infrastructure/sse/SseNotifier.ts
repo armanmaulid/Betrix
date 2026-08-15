@@ -1,11 +1,12 @@
 import { injectable, singleton } from "tsyringe";
+import type { ServerResponse } from "node:http";
 import { logger } from "@core/logging/logger.js";
-import { INotifier } from "@application/ports/INotifier.js";
+import { INotifier } from "@domain/ports/INotifier.js";
 
 interface SSEClient {
   userId: string;
   sessionToken: string;
-  response: any; // ServerResponse
+  response: ServerResponse;
 }
 
 @injectable()
@@ -14,7 +15,7 @@ export class SseNotifier implements INotifier {
   private readonly MAX_SSE_CONNECTIONS_PER_USER = 5;
   private clients = new Map<string, SSEClient[]>(); // userId -> clients[]
 
-  addClient(userId: string, sessionToken: string, response: any): void {
+  addClient(userId: string, sessionToken: string, response: ServerResponse): void {
     if (!this.clients.has(userId)) {
       this.clients.set(userId, []);
     }
@@ -46,7 +47,7 @@ export class SseNotifier implements INotifier {
     response.on("close", () => this.removeClientByResponse(userId, response));
   }
 
-  removeClientByResponse(userId: string, response: any): void {
+  removeClientByResponse(userId: string, response: ServerResponse): void {
     const userClients = this.clients.get(userId);
     if (userClients) {
       const idx = userClients.findIndex(c => c.response === response);
@@ -61,7 +62,7 @@ export class SseNotifier implements INotifier {
 
     const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
     
-    const deadClients: any[] = [];
+    const deadClients: ServerResponse[] = [];
     for (const client of userClients) {
       try {
         client.response.write(message);
@@ -80,7 +81,7 @@ export class SseNotifier implements INotifier {
 
   sendHeartbeat(): void {
     for (const [userId, userClients] of this.clients) {
-      const deadClients: any[] = [];
+      const deadClients: ServerResponse[] = [];
       for (const client of userClients) {
         try {
           client.response.write(": heartbeat\n\n");
@@ -99,7 +100,7 @@ export class SseNotifier implements INotifier {
   broadcastGlobal(event: string, data: unknown): void {
     const message = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
     for (const [userId, userClients] of this.clients) {
-      const deadClients: any[] = [];
+      const deadClients: ServerResponse[] = [];
       for (const client of userClients) {
         try {
           client.response.write(message);

@@ -1,6 +1,8 @@
 import type { Application } from "express";
-import v1Routes from "@presentation/routes/v1/index.js";
+import { createV1Router } from "@presentation/routes/v1/index.js";
 
 export function registerRoutes(app: Application) {
-  app.use("/api/v1", v1Routes);
+  // createV1Router() dipanggil saat runtime — setelah registerDependencies() —
+  // sehingga container.resolve() di dalam factory route tidak kena container kosong.
+  app.use("/api/v1", createV1Router());
 }

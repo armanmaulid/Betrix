@@ -1,4 +1,4 @@
-import { BrokerSymbol } from "@domain/entities/BrokerSymbol.js";
+import type { BrokerSymbol } from "@domain/entities/BrokerSymbol.js";
 
 export interface PriceTick {
   symbol: string;
@@ -37,12 +37,28 @@ export interface MarketBookUpdate {
   asks: Array<{ price: number; volume: number }>;
 }
 
+export interface Mt5CalendarEvent {
+  value_id?: number;
+  event_id: number;
+  name: string;
+  country_code: string;
+  currency: string;
+  importance: number;
+  time: string;
+  actual?: number;
+  forecast?: number;
+  previous?: number;
+}
+
 export interface CalendarUpdate {
   value_id: number;
   event_id: number;
   actual: string | null;
   forecast: string | null;
   previous: string | null;
+  time?: string;
+  name?: string;
+  currency?: string;
 }
 
 export interface TrackingStatus {
@@ -74,6 +90,6 @@ export interface IBrokerProvider {
   
   fetchSymbolCount(): Promise<number>;
   fetchSymbols(): Promise<BrokerSymbol[]>;
-  fetchCalendar(period?: string): Promise<any[]>;
+  fetchCalendar(period?: string): Promise<Mt5CalendarEvent[]>;
   fetchHistory(symbol: string, timeframe: string, fromDate: string, toDate: string): Promise<OHLCBar[]>;
 }

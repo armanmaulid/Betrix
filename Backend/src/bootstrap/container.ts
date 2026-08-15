@@ -1,7 +1,5 @@
 import "reflect-metadata";
 import { container, Lifecycle } from "tsyringe";
-import { pgClient } from "@data/orm/pgClient.js";
-import { redisClient } from "@data/orm/redisClient.js";
 
 // Repositories
 import { PgUserRepository } from "@data/repositories/PgUserRepository.js";
@@ -11,7 +9,7 @@ import { PgCreditRepository } from "@data/repositories/PgCreditRepository.js";
 import { PgDeviceRepository } from "@data/repositories/PgDeviceRepository.js";
 import { PgAdminActionRepository } from "@data/repositories/PgAdminActionRepository.js";
 import { PgMessageRepository } from "@data/repositories/PgMessageRepository.js";
-import { PgNewsRepository } from "@data/repositories/PgNewsRepository.js";
+import { PgNewsRepository } from "@contexts/news/infrastructure/PgNewsRepository.js";
 import { PgUserActivityRepository } from "@data/repositories/PgUserActivityRepository.js";
 import { PgSymbolRepository } from "@data/repositories/PgSymbolRepository.js";
 import { PgCalendarRepository } from "@data/repositories/PgCalendarRepository.js";
@@ -31,8 +29,12 @@ import { Mt5BrokerAdapter } from "@data/external/Mt5BrokerAdapter.js";
 import { Mt5HttpClient } from "@data/external/Mt5HttpClient.js";
 import { Mt5WebsocketClient } from "@data/external/Mt5WebsocketClient.js";
 import { GeneralCacheStore } from "@data/cache/GeneralCacheStore.js";
-import { FinnhubNewsAdapter } from "@data/external/FinnhubNewsAdapter.js";
+import { FinnhubNewsAdapter } from "@contexts/news/infrastructure/FinnhubNewsAdapter.js";
 import { SseNotifier } from "@infrastructure/sse/SseNotifier.js";
+import { env } from "@config/env.js";
+import { isDeviceEnforcementEnabled } from "@config/deviceEnforcement.js";
+import { AppSettings } from "@core/settings/AppSettings.js";
+import { ModelPolicy } from "@domain/services/ModelPolicy.js";
 
 // Use cases
 import { RegisterUseCase } from "@application/use-cases/auth/RegisterUseCase.js";
@@ -83,9 +85,9 @@ import { DeleteMessageUseCase as UserDeleteMessageUseCase } from "@application/u
 import { GetSymbolsUseCase } from "@application/use-cases/market/GetSymbolsUseCase.js";
 import { GetCalendarUseCase } from "@application/use-cases/market/GetCalendarUseCase.js";
 
-import { FetchNewsUseCase } from "@application/use-cases/news/FetchNewsUseCase.js";
-import { StoreNewsUseCase } from "@application/use-cases/news/StoreNewsUseCase.js";
-import { GetNewsUseCase } from "@application/use-cases/news/GetNewsUseCase.js";
+import { FetchNewsUseCase } from "@contexts/news/application/use-cases/FetchNewsUseCase.js";
+import { StoreNewsUseCase } from "@contexts/news/application/use-cases/StoreNewsUseCase.js";
+import { GetNewsUseCase } from "@contexts/news/application/use-cases/GetNewsUseCase.js";
 
 // Controllers
 import { AuthController } from "@presentation/controllers/AuthController.js";
@@ -94,9 +96,10 @@ import { AdminController } from "@presentation/controllers/AdminController.js";
 import { UserController } from "@presentation/controllers/UserController.js";
 import { MarketController } from "@presentation/controllers/MarketController.js";
 import { NewsController } from "@presentation/controllers/NewsController.js";
-import { MarketDataService } from "@domain/services/MarketDataService.js";
-import { AuthDomainService } from "@domain/services/AuthDomainServiceImpl.js";
-import { NewsService } from "@domain/services/NewsService.js";
+import { MarketDataService } from "@application/services/MarketDataService.js";
+import { CalendarService } from "@application/services/CalendarService.js";
+import { AuthService } from "@application/services/AuthService.js";
+import { NewsService } from "@contexts/news/application/NewsService.js";
 
 // Events & Handlers
 import { EventDispatcher } from "@domain/events/index.js";
@@ -122,6 +125,7 @@ export function registerDependencies() {
   container.register("UsageRepository", { useClass: PgUsageRepository });
   container.register("ActivityLogRepository", { useClass: PgActivityLogRepository });
   container.register("NewsRepository", { useClass: PgNewsRepository });
+  container.register("NewsContextPort", { useClass: PgNewsRepository });
   container.register("MarketDataRepository", { useClass: RedisMarketDataRepository });
 
   // External services
@@ -189,9 +193,32 @@ export function registerDependencies() {
   container.register("StoreNewsUseCase", { useClass: StoreNewsUseCase });
   container.register("GetNewsUseCase", { useClass: GetNewsUseCase });
 
+  // Settings & policies — env dibaca HANYA di sini (Phase 5),
+  // application/domain tidak lagi menyentuh @config/* atau process.env.
+  container.register("AppSettings", {
+    useValue: new AppSettings(
+      process.env.REQUIRE_EMAIL_VERIFICATION === "true",
+      isDeviceEnforcementEnabled(),
+      env.MT5_TRACK_CALENDAR,
+      env.MT5_TRACK_PRICES,
+      env.MT5_TRACK_OHLC,
+      env.MT5_TRACK_MBOOK,
+      env.MT5_TRACKING_SYMBOLS,
+      env.MT5_BROKER_UTC_OFFSET
+    ),
+  });
+  container.register("ModelPolicy", {
+    useFactory: () => new ModelPolicy({
+      cheap: { id: env.MODEL_CHEAP, label: "Model murah (General, kategorisasi)", maxTokens: env.MODEL_CHEAP_MAX_TOKENS },
+      balanced: { id: env.MODEL_BALANCED, label: "Model seimbang (ringkasan, insight)", maxTokens: env.MODEL_BALANCED_MAX_TOKENS },
+      deep: { id: env.MODEL_DEEP, label: "Model dalam (analisis, narasi risiko)", maxTokens: env.MODEL_DEEP_MAX_TOKENS },
+    }),
+  });
+
   // Services
   container.register("MarketDataService", { useClass: MarketDataService });
-  container.register("AuthDomainService", { useClass: AuthDomainService });
+  container.register("CalendarService", { useClass: CalendarService });
+  container.register("AuthService", { useClass: AuthService });
   container.register("NewsService", { useClass: NewsService });
   container.register("AiPromptRegistry", { useClass: AiPromptRegistry });
 

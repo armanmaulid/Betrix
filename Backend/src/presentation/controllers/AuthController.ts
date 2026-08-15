@@ -1,9 +1,8 @@
 import type { Request, Response, NextFunction } from "express";
-import { container } from "tsyringe";
+import { inject, injectable } from "tsyringe";
 import { RegisterUseCase } from "@application/use-cases/auth/RegisterUseCase.js";
 import { LoginUseCase } from "@application/use-cases/auth/LoginUseCase.js";
 import { LogoutUseCase } from "@application/use-cases/auth/LogoutUseCase.js";
-import { User } from "@domain/entities/User.js";
 import { VerifyEmailUseCase } from "@application/use-cases/auth/VerifyEmailUseCase.js";
 import { ResendVerificationUseCase } from "@application/use-cases/auth/ResendVerificationUseCase.js";
 import { ChangePasswordUseCase } from "@application/use-cases/auth/ChangePasswordUseCase.js";
@@ -12,31 +11,59 @@ import { GetProfileUseCase } from "@application/use-cases/auth/GetProfileUseCase
 import { UpdateProfileUseCase } from "@application/use-cases/auth/UpdateProfileUseCase.js";
 import { GetSessionsUseCase } from "@application/use-cases/auth/GetSessionsUseCase.js";
 import { RevokeSessionUseCase } from "@application/use-cases/auth/RevokeSessionUseCase.js";
+import { LogoutByCredentialsUseCase } from "@application/use-cases/auth/LogoutByCredentialsUseCase.js";
+import { LogoutAllUseCase } from "@application/use-cases/auth/LogoutAllUseCase.js";
+import { AuthService } from "@application/services/AuthService.js";
+import { User } from "@domain/entities/User.js";
+import type { AppSettings } from "@core/settings/AppSettings.js";
 import type { RequestInput } from "@core/utils/request.js";
+import { toUserResponseDto } from "@application/mappers/user.mapper.js";
 
+@injectable()
 export class AuthController {
+  constructor(
+    @inject("RegisterUseCase") private registerUseCase: RegisterUseCase,
+    @inject("LoginUseCase") private loginUseCase: LoginUseCase,
+    @inject("LogoutUseCase") private logoutUseCase: LogoutUseCase,
+    @inject("LogoutByCredentialsUseCase") private logoutByCredentialsUseCase: LogoutByCredentialsUseCase,
+    @inject("LogoutAllUseCase") private logoutAllUseCase: LogoutAllUseCase,
+    @inject("AuthService") private authService: AuthService,
+    @inject("VerifyEmailUseCase") private verifyEmailUseCase: VerifyEmailUseCase,
+    @inject("ResendVerificationUseCase") private resendVerificationUseCase: ResendVerificationUseCase,
+    @inject("ChangePasswordUseCase") private changePasswordUseCase: ChangePasswordUseCase,
+    @inject("ChangeEmailUseCase") private changeEmailUseCase: ChangeEmailUseCase,
+    @inject("GetProfileUseCase") private getProfileUseCase: GetProfileUseCase,
+    @inject("UpdateProfileUseCase") private updateProfileUseCase: UpdateProfileUseCase,
+    @inject("GetSessionsUseCase") private getSessionsUseCase: GetSessionsUseCase,
+    @inject("RevokeSessionUseCase") private revokeSessionUseCase: RevokeSessionUseCase,
+    @inject("AppSettings") private settings: AppSettings
+  ) {}
+
   private getRequestInput(req: Request): RequestInput {
     return {
-      ip: req.ip!,
+      ip: req.normalizedIP || req.ip || "",
       userAgent: req.headers["user-agent"] ?? "",
       headers: req.headers,
     };
   }
 
+  private getSessionToken(req: Request): string {
+    return req.headers.authorization?.replace("Bearer ", "") ?? "";
+  }
+
   async register(req: Request, res: Response, next: NextFunction) {
     try {
-      const useCase = container.resolve(RegisterUseCase);
-      const result = await useCase.execute({
+      const result = await this.registerUseCase.execute({
         email: req.body.email,
         password: req.body.password,
         name: req.body.name,
         request: this.getRequestInput(req),
       });
-      
+
       res.status(201).json({
         message: "Registration processed. Please check your email.",
         sessionToken: result.sessionToken,
-        user: result.sessionToken ? this.serializeUser(result.user) : undefined,
+        user: result.sessionToken ? toUserResponseDto(result.user) : undefined,
       });
     } catch (err) {
       next(err);
@@ -45,16 +72,15 @@ export class AuthController {
 
   async login(req: Request, res: Response, next: NextFunction) {
     try {
-      const useCase = container.resolve(LoginUseCase);
-      const result = await useCase.execute({
+      const result = await this.loginUseCase.execute({
         email: req.body.email,
         password: req.body.password,
         request: this.getRequestInput(req),
       });
-      
+
       res.json({
         sessionToken: result.sessionToken,
-        user: this.serializeUser(result.user),
+        user: toUserResponseDto(result.user),
       });
     } catch (err) {
       next(err);
@@ -63,13 +89,12 @@ export class AuthController {
 
   async logout(req: Request, res: Response, next: NextFunction) {
     try {
-      const useCase = container.resolve(LogoutUseCase);
       const sessionToken = req.headers.authorization?.replace("Bearer ", "");
       if (!sessionToken) {
         return res.status(401).json({ error: "Session token required" });
       }
 
-      await useCase.execute({
+      await this.logoutUseCase.execute({
         sessionToken,
         request: this.getRequestInput(req),
       });
@@ -82,12 +107,11 @@ export class AuthController {
 
   async logoutByCredentials(req: Request, res: Response, next: NextFunction) {
     try {
-      const useCase = container.resolve("LogoutByCredentialsUseCase") as any;
-      await useCase.execute({
+      await this.logoutByCredentialsUseCase.execute({
         email: req.body.email,
         passwordRaw: req.body.password,
-        ip: req.ip,
-        headers: req.headers,
+        ip: req.normalizedIP || req.ip || "",
+        headers: { "user-agent": req.headers["user-agent"] },
       });
       res.json({ message: "Logout berhasil" });
     } catch (err) {
@@ -97,11 +121,9 @@ export class AuthController {
 
   async logoutAll(req: Request, res: Response, next: NextFunction) {
     try {
-      const useCase = container.resolve("LogoutAllUseCase") as any;
-      const user = req.user as User;
-      const count = await useCase.execute({
-        userId: user.userId || user.id,
-        ip: req.ip,
+      const count = await this.logoutAllUseCase.execute({
+        userId: (req.user as User).userId,
+        ip: req.normalizedIP || req.ip || "",
         userAgent: req.headers["user-agent"],
       });
       res.json({ message: `Logout dari ${count} device berhasil` });
@@ -112,17 +134,17 @@ export class AuthController {
 
   async googleCallback(req: Request, res: Response, next: NextFunction) {
     try {
-      // The user object comes from passport
-      const user = req.user as any;
+      // The user object comes from passport (deserializeUser returns User entity)
+      const user = req.user as User | undefined;
       if (!user) {
         return res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/login?error=auth_failed`);
       }
 
-      const authService = container.resolve("AuthDomainService") as any;
-      const result = await authService.establishAuthenticatedSession(user, {
-        ip: req.ip,
-        headers: req.headers as any
-      });
+      const result = await this.authService.establishAuthenticatedSession(
+        user,
+        { ip: req.normalizedIP || req.ip || "", headers: { "user-agent": req.headers["user-agent"] ?? "" } },
+        this.settings.deviceEnforcementEnabled
+      );
 
       if (!result.ok) {
         return res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/login?error=session_failed`);
@@ -136,9 +158,8 @@ export class AuthController {
 
   async verifyEmail(req: Request, res: Response, next: NextFunction) {
     try {
-      const useCase = container.resolve(VerifyEmailUseCase);
       const token = (req.body.token || req.query.token) as string;
-      await useCase.execute({ token });
+      await this.verifyEmailUseCase.execute({ token });
       res.json({ message: "Email verified successfully" });
     } catch (err) {
       next(err);
@@ -147,8 +168,7 @@ export class AuthController {
 
   async resendVerification(req: Request, res: Response, next: NextFunction) {
     try {
-      const useCase = container.resolve(ResendVerificationUseCase);
-      await useCase.execute({ email: req.body.email });
+      await this.resendVerificationUseCase.execute({ email: req.body.email });
       res.json({ message: "Verification email sent" });
     } catch (err) {
       next(err);
@@ -157,10 +177,9 @@ export class AuthController {
 
   async changePassword(req: Request, res: Response, next: NextFunction) {
     try {
-      const useCase = container.resolve(ChangePasswordUseCase);
-      await useCase.execute({
-        userId: (req.user as any).userId,
-        sessionToken: req.headers.authorization?.replace("Bearer ", "")!,
+      await this.changePasswordUseCase.execute({
+        userId: (req.user as User).userId,
+        sessionToken: this.getSessionToken(req),
         currentPassword: req.body.currentPassword,
         newPassword: req.body.newPassword,
         request: this.getRequestInput(req),
@@ -173,9 +192,8 @@ export class AuthController {
 
   async changeEmail(req: Request, res: Response, next: NextFunction) {
     try {
-      const useCase = container.resolve(ChangeEmailUseCase);
-      const result = await useCase.execute({
-        userId: (req.user as any).userId,
+      const result = await this.changeEmailUseCase.execute({
+        userId: (req.user as User).userId,
         currentPassword: req.body.currentPassword,
         newEmail: req.body.newEmail,
         request: this.getRequestInput(req),
@@ -188,9 +206,8 @@ export class AuthController {
 
   async getProfile(req: Request, res: Response, next: NextFunction) {
     try {
-      const useCase = container.resolve(GetProfileUseCase);
-      const result = await useCase.execute({ sessionToken: req.headers.authorization?.replace("Bearer ", "")! });
-      res.json({ user: this.serializeUser(result.user) });
+      const result = await this.getProfileUseCase.execute({ sessionToken: this.getSessionToken(req) });
+      res.json({ user: toUserResponseDto(result.user) });
     } catch (err) {
       next(err);
     }
@@ -198,9 +215,8 @@ export class AuthController {
 
   async updateProfile(req: Request, res: Response, next: NextFunction) {
     try {
-      const useCase = container.resolve(UpdateProfileUseCase);
-      const result = await useCase.execute({
-        sessionToken: req.headers.authorization?.replace("Bearer ", "")!,
+      const result = await this.updateProfileUseCase.execute({
+        sessionToken: this.getSessionToken(req),
         name: req.body.name,
         phone: req.body.phone,
         address: req.body.address,
@@ -208,7 +224,7 @@ export class AuthController {
         gender: req.body.gender,
         bio: req.body.bio,
       });
-      res.json({ user: this.serializeUser(result.user) });
+      res.json({ user: toUserResponseDto(result.user) });
     } catch (err) {
       next(err);
     }
@@ -216,8 +232,7 @@ export class AuthController {
 
   async getSessions(req: Request, res: Response, next: NextFunction) {
     try {
-      const useCase = container.resolve(GetSessionsUseCase);
-      const result = await useCase.execute({ sessionToken: req.headers.authorization?.replace("Bearer ", "")! });
+      const result = await this.getSessionsUseCase.execute({ sessionToken: this.getSessionToken(req) });
       res.json({ sessions: result.sessions });
     } catch (err) {
       next(err);
@@ -226,9 +241,8 @@ export class AuthController {
 
   async revokeSession(req: Request, res: Response, next: NextFunction) {
     try {
-      const useCase = container.resolve(RevokeSessionUseCase);
-      await useCase.execute({
-        sessionToken: req.headers.authorization?.replace("Bearer ", "")!,
+      await this.revokeSessionUseCase.execute({
+        sessionToken: this.getSessionToken(req),
         fingerprint: req.params.fingerprint,
         request: this.getRequestInput(req),
       });
@@ -236,27 +250,5 @@ export class AuthController {
     } catch (err) {
       next(err);
     }
-  }
-
-  private serializeUser(user: any) {
-    return {
-      id: user.id,
-      userId: user.id,
-      email: user.email,
-      name: user.name,
-      isAdmin: user.isAdmin,
-      status: user.status,
-      emailVerified: user.emailVerified,
-      credits: user.credits,
-      createdAt: user.createdAt,
-      lastActive: user.lastActive,
-      phone: user.phone,
-      address: user.address,
-      birthdate: user.birthdate,
-      gender: user.gender,
-      bio: user.bio,
-      googleId: user.googleId,
-      verifiedAt: user.verifiedAt,
-    };
   }
 }

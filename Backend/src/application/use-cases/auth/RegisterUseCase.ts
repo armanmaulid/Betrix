@@ -3,15 +3,14 @@ import { UserRepository } from "@domain/repositories/UserRepository.js";
 import { SessionRepository } from "@domain/repositories/SessionRepository.js";
 import { DeviceRepository } from "@domain/repositories/DeviceRepository.js";
 import { VerificationRepository } from "@domain/repositories/VerificationRepository.js";
-import { EmailPort } from "@application/ports";
-import { User, UserStatus } from "@domain/entities/User.js";
+import { EmailPort } from "@domain/ports";
+import { User } from "@domain/entities/User.js";
 import { Session } from "@domain/entities/Session.js";
 import { Device } from "@domain/entities/Device.js";
-import { Email } from "@domain/value-objects";
-import { DeviceFingerprint } from "@domain/value-objects";
-import { ValidationError, ConflictError, InternalError } from "@core/errors/index.js";
-import { hashPassword, generateOTP, getDeviceFingerprint, generateSecureToken } from "@core/utils/index.js";
-import { isDeviceEnforcementEnabled } from "@config/deviceEnforcement.js";
+import { Email, DeviceFingerprint } from "@domain/value-objects";
+import { ValidationError, ConflictError } from "@core/errors/index.js";
+import { hashPassword, generateOTP, generateSecureToken } from "@core/utils/index.js";
+import type { AppSettings } from "@core/settings/AppSettings.js";
 import { LIMITS } from "@core/constants/index.js";
 import { RequestInput } from "@core/utils/request.js";
 
@@ -34,7 +33,8 @@ export class RegisterUseCase {
     @inject("SessionRepository") private sessionRepo: SessionRepository,
     @inject("DeviceRepository") private deviceRepo: DeviceRepository,
     @inject("VerificationRepository") private verificationRepo: VerificationRepository,
-    @inject("EmailPort") private emailPort: EmailPort
+    @inject("EmailPort") private emailPort: EmailPort,
+    @inject("AppSettings") private settings: AppSettings
   ) {}
 
   async execute(input: RegisterInput): Promise<RegisterOutput> {
@@ -44,8 +44,8 @@ export class RegisterUseCase {
       throw new ValidationError("Password must be at least 8 characters");
     }
 
-    if (isDeviceEnforcementEnabled()) {
-      const fingerprint = new DeviceFingerprint(getDeviceFingerprint(input.request));
+    if (this.settings.deviceEnforcementEnabled) {
+      const fingerprint = DeviceFingerprint.create(input.request);
       const existingUserId = await this.deviceRepo.findUserByFingerprint(fingerprint);
       if (existingUserId) {
         throw new ConflictError("This device is already registered to another account");
@@ -68,8 +68,8 @@ export class RegisterUseCase {
 
     await this.userRepo.save(user);
 
-    if (isDeviceEnforcementEnabled()) {
-      const fingerprint = new DeviceFingerprint(getDeviceFingerprint(input.request));
+    if (this.settings.deviceEnforcementEnabled) {
+      const fingerprint = DeviceFingerprint.create(input.request);
       await this.deviceRepo.bind(Device.create({ userId: user.id, fingerprint: fingerprint.value }));
     }
 
@@ -81,7 +81,7 @@ export class RegisterUseCase {
     await this.sessionRepo.save(Session.create({
       userId: user.id,
       token: sessionToken,
-      deviceFingerprint: isDeviceEnforcementEnabled() ? getDeviceFingerprint(input.request) : null,
+      deviceFingerprint: this.settings.deviceEnforcementEnabled ? DeviceFingerprint.create(input.request).value : null,
       ip: input.request.ip,
       userAgent: input.request.userAgent,
     }));

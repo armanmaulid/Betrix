@@ -29,7 +29,7 @@ interface GetMetricsOutput {
 export class GetMetricsUseCase {
   constructor(@inject("AnalyticsRepository") private analyticsRepo: AnalyticsRepository) {}
 
-  async execute(input: GetMetricsInput): Promise<GetMetricsOutput> {
+  async execute(_input: GetMetricsInput): Promise<GetMetricsOutput> {
     return this.analyticsRepo.getDashboardMetrics();
   }
 }

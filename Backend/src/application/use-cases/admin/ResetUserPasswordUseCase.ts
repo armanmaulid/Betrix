@@ -1,10 +1,9 @@
 import { inject, injectable } from "tsyringe";
 import { UserRepository } from "@domain/repositories/UserRepository.js";
 import { SessionRepository } from "@domain/repositories/SessionRepository.js";
-import { User } from "@domain/entities/User.js";
 import { NotFoundError, ValidationError } from "@core/errors/index.js";
-import { INotifier } from "@application/ports/INotifier.js";
-import { sendEmail } from "@domain/services/emailService.js";
+import { INotifier } from "@domain/ports/INotifier.js";
+import type { EmailPort } from "@domain/ports/index.js";
 import { hashPassword, generateSecureToken } from "@core/utils/index.js";
 import { ActivityLogRepository } from "@domain/repositories/ActivityLogRepository.js";
 
@@ -28,7 +27,8 @@ export class ResetUserPasswordUseCase {
     @inject("ActivityLogRepository") private activityLogRepo: ActivityLogRepository,
     @inject("UserRepository") private userRepo: UserRepository,
     @inject("SessionRepository") private sessionRepo: SessionRepository,
-    @inject("INotifier") private notifier: INotifier
+    @inject("INotifier") private notifier: INotifier,
+    @inject("EmailPort") private emailPort: EmailPort
   ) {}
 
   async execute(input: ResetUserPasswordInput): Promise<ResetUserPasswordOutput> {
@@ -52,7 +52,7 @@ export class ResetUserPasswordUseCase {
     let emailSent = false;
     if (input.sendEmail) {
       try {
-        await sendEmail({
+        await this.emailPort.sendEmail({
           to: user.email,
           subject: "Your Password Has Been Reset",
           text: `Hello ${user.name || user.email},\n\nAn administrator has reset your password. Your temporary password is:\n\n${tempPassword}\n\nPlease log in and change your password immediately.\n\nIf you did not request this, contact support immediately.`,

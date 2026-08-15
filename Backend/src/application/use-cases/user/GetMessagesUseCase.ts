@@ -44,11 +44,7 @@ export class GetMessagesUseCase {
         readAt: r.readAt,
         createdAt: r.createdAt,
         threadId: r.threadId,
-        from: (r as any).fromEmail ? {
-          id: r.fromUserId,
-          email: (r as any).fromEmail,
-          name: (r as any).fromName
-        } : { id: r.fromUserId, email: r.fromUserId ? "unknown" : "system", name: r.fromUserId ? "Unknown" : "System Administrator" },
+        from: { id: r.fromUserId, email: r.fromUserId ? "unknown" : "system", name: r.fromUserId ? "Unknown" : "System Administrator" },
         to: { id: input.userId, email: "", name: "" },
       })),
       unreadCount,

@@ -1,5 +1,5 @@
 import { inject, injectable } from "tsyringe";
-import { ChatRepository } from "@domain/repositories/ChatRepository.js";
+import { ChatRepository, ChatSessionTurn } from "@domain/repositories/ChatRepository.js";
 import { ChatTaskType } from "@domain/entities/ChatMessage.js";
 
 interface GetChatHistoryInput {
@@ -17,12 +17,7 @@ interface ChatHistoryOutput {
     sessionStart: Date;
     createdAt: Date;
     title: string;
-    turns: Array<{
-      message: string;
-      reply: string;
-      modelUsed: string;
-      latencyMs: number | null;
-    }>;
+    turns: ChatSessionTurn[];
   }>;
   pagination: {
     total: number;

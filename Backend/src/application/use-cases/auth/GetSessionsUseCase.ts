@@ -2,8 +2,7 @@ import { inject, injectable } from "tsyringe";
 import { UserRepository } from "@domain/repositories/UserRepository.js";
 import { SessionRepository } from "@domain/repositories/SessionRepository.js";
 import { DeviceRepository } from "@domain/repositories/DeviceRepository.js";
-import { User } from "@domain/entities/User.js";
-import { NotFoundError, AuthenticationError } from "@core/errors/index.js";
+import { AuthenticationError } from "@core/errors/index.js";
 
 interface GetSessionsInput {
   sessionToken: string;
@@ -37,18 +36,43 @@ export class GetSessionsUseCase {
     }
 
     const devices = await this.deviceRepo.findByUserId(session.userId);
-    const sessions = await this.sessionRepo.findByUserId(session.userId);
 
-    const sessionTokens = new Set(sessions.map(s => s.token));
+    // Ambil semua session user untuk melengkapi ip/userAgent per device.
+    // (Satu query — metadata session disimpan di Redis sejak format v2.)
+    const userSessions = await this.sessionRepo.findByUserId(session.userId);
 
-    const sessionInfos: SessionInfo[] = devices.map(device => ({
-      fingerprint: device.fingerprint,
-      createdAt: device.createdAt,
-      lastSeenAt: device.lastSeenAt,
-      ip: null,
-      userAgent: null,
-      current: sessionTokens.has(device.fingerprint), // Simplified
-    }));
+    // Session yang di-resolve dari token request = device yang sedang dipakai
+    // sekarang. Bandingkan fingerprint-nya, BUKAN token vs fingerprint
+    // (set session token yang lama keliru — tak pernah match).
+    const currentFingerprint = session.deviceFingerprint;
+
+    // Device aktif tidak selalu punya baris device sendiri (enforcement OFF),
+    // jadi fallback ke metadata session request itu sendiri.
+    const currentIp = session.ip;
+    const currentUserAgent = session.userAgent;
+
+    // Fingerprint → ip/userAgent session terbaru (untuk device yang ter-bind).
+    const sessionMetaByFingerprint = new Map<string, { ip: string | null; userAgent: string | null }>();
+    for (const s of userSessions) {
+      if (s.deviceFingerprint && !sessionMetaByFingerprint.has(s.deviceFingerprint)) {
+        sessionMetaByFingerprint.set(s.deviceFingerprint, { ip: s.ip, userAgent: s.userAgent });
+      }
+    }
+
+    const sessionInfos: SessionInfo[] = devices.map(device => {
+      const meta = sessionMetaByFingerprint.get(device.fingerprint);
+      const isCurrent = currentFingerprint !== null && device.fingerprint === currentFingerprint;
+      return {
+        fingerprint: device.fingerprint,
+        createdAt: device.createdAt,
+        lastSeenAt: device.lastSeenAt,
+        // Device aktif: metadata dari session request. Device lain: metadata
+        // dari session yang fingerprint-nya cocok (fallback null).
+        ip: isCurrent ? currentIp : (meta?.ip ?? null),
+        userAgent: isCurrent ? currentUserAgent : (meta?.userAgent ?? null),
+        current: isCurrent,
+      };
+    });
 
     return { sessions: sessionInfos };
   }

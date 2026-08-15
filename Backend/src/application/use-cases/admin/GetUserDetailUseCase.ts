@@ -1,7 +1,7 @@
 import { inject, injectable } from "tsyringe";
 import { UserRepository } from "@domain/repositories/UserRepository.js";
 import { ChatRepository } from "@domain/repositories/ChatRepository.js";
-import { User, UserStatus } from "@domain/entities/User.js";
+import { UserStatus } from "@domain/entities/User.js";
 import { NotFoundError } from "@core/errors/index.js";
 import { AnalyticsRepository } from "@domain/repositories/AnalyticsRepository.js";
 

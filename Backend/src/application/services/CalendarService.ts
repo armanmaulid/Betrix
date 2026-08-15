@@ -1,32 +1,20 @@
 import { inject, injectable } from "tsyringe";
-import { IBrokerProvider } from "@application/ports/IBrokerProvider.js";
+import { IBrokerProvider } from "@domain/ports/IBrokerProvider.js";
 import { CalendarRepository } from "@domain/repositories/CalendarRepository.js";
 import { CalendarEvent, CalendarImportance } from "@domain/entities/CalendarEvent.js";
 import { logger } from "@core/logging/logger.js";
 import { CalendarQuery } from "@domain/repositories/CalendarRepository.js";
-import { env } from "@config/env.js";
-import { INotifier } from "@application/ports/INotifier.js";
-import { CalendarUpdate } from "@application/ports/IBrokerProvider.js";
-
-interface Mt5CalendarEvent {
-  value_id?: number;
-  event_id: number;
-  name: string;
-  country_code: string;
-  currency: string;
-  importance: number;
-  time: string;
-  actual?: number;
-  forecast?: number;
-  previous?: number;
-}
+import type { AppSettings } from "@core/settings/AppSettings.js";
+import { INotifier } from "@domain/ports/INotifier.js";
+import { CalendarUpdate, Mt5CalendarEvent } from "@domain/ports/IBrokerProvider.js";
 
 @injectable()
 export class CalendarService {
   constructor(
     @inject("CalendarRepository") private calendarRepo: CalendarRepository,
     @inject("IBrokerProvider") private brokerClient: IBrokerProvider,
-    @inject("INotifier") private notifier: INotifier
+    @inject("INotifier") private notifier: INotifier,
+    @inject("AppSettings") private settings: AppSettings
   ) {}
 
   async syncIfNeeded(): Promise<void> {
@@ -75,8 +63,8 @@ export class CalendarService {
     const importanceMap: CalendarImportance[] = [CalendarImportance.NONE, CalendarImportance.LOW, CalendarImportance.MEDIUM, CalendarImportance.HIGH];
     const importance = importanceMap[e.importance] || CalendarImportance.NONE;
 
-    const sign = env.MT5_BROKER_UTC_OFFSET >= 0 ? "+" : "-";
-    const hours = Math.abs(env.MT5_BROKER_UTC_OFFSET).toString().padStart(2, "0");
+    const sign = this.settings.brokerUtcOffset >= 0 ? "+" : "-";
+    const hours = Math.abs(this.settings.brokerUtcOffset).toString().padStart(2, "0");
     const timezoneStr = `${sign}${hours}:00`;
 
     return CalendarEvent.create({
@@ -101,23 +89,30 @@ export class CalendarService {
     try {
       const existingEvent = await this.calendarRepo.findByValueId(update.value_id);
       if (!existingEvent) {
-        logger.debug(`Calendar Live Update [Value ${update.value_id}] - Actual: ${update.actual} | Forecast: ${update.forecast} | Prev: ${update.previous}`, { context: "Broker" });
+        const evTime = update.time ?? "n/a";
+        const evName = update.name ?? "Unknown";
+        const evCcy = update.currency ?? "";
+        logger.debug(`Calendar Live Update [Value ${update.value_id}] ${evCcy} - ${evName} @ ${evTime} - Actual: ${update.actual} | Forecast: ${update.forecast} | Prev: ${update.previous}`, { context: "Broker" });
         return;
       }
 
-      logger.debug(`Calendar Live Update [Value ${update.value_id}] ${existingEvent.currency} - ${existingEvent.eventName} - Actual: ${update.actual} | Forecast: ${update.forecast} | Prev: ${update.previous}`, { context: "Broker" });
+      logger.debug(`Calendar Live Update [Value ${update.value_id}] ${existingEvent.currency} - ${existingEvent.eventName} @ ${existingEvent.eventTime.toISOString()} - Actual: ${update.actual} | Forecast: ${update.forecast} | Prev: ${update.previous}`, { context: "Broker" });
 
 
+      // COALESCE di repo (ON CONFLICT) yang pegang kebenaran terakhir.
+      // Broadcast hasil RETURNING * — bukan entity stale hasil withUpdatedValues
+      // — supaya update paralel (EA burst banyak event sekaligus) tidak
+      // meng-overwrite actual non-null jadi null di SSE.
       const updatedEvent = existingEvent.withUpdatedValues(
         update.actual !== undefined ? update.actual : existingEvent.actual,
         update.forecast !== undefined ? update.forecast : existingEvent.forecast,
         update.previous !== undefined ? update.previous : existingEvent.previous
       );
 
-      await this.calendarRepo.save(updatedEvent);
+      const savedEvent = await this.calendarRepo.save(updatedEvent);
 
-      if (env.MT5_TRACK_CALENDAR) {
-        this.notifier.broadcastGlobal("calendar_update", updatedEvent);
+      if (this.settings.trackCalendar) {
+        this.notifier.broadcastGlobal("calendar_update", savedEvent);
       }
     } catch (err) {
       logger.error(`Failed to handle live calendar update: ${(err as Error).message}`, { context: "Calendar" });

@@ -1,5 +1,5 @@
 import { pgClient } from "@data/orm/pgClient.js";
-import { UsageRepository } from "@domain/repositories/UsageRepository.js";
+import type { UsageRepository, UsageSummaryRow, UsageTaskTypeRow, UsageDailyRow } from "@domain/repositories/UsageRepository.js";
 
 export class PgUsageRepository implements UsageRepository {
   async cleanupOlderThan(days: number): Promise<number> {
@@ -10,7 +10,7 @@ export class PgUsageRepository implements UsageRepository {
     return rowCount || 0;
   }
 
-  async getSummary(userId: string, days: number): Promise<any> {
+  async getSummary(userId: string, days: number): Promise<UsageSummaryRow> {
     const { rows } = await pgClient.query(
       `SELECT
         COUNT(*) as request_count,
@@ -27,7 +27,7 @@ export class PgUsageRepository implements UsageRepository {
     return rows[0];
   }
 
-  async getByTaskType(userId: string, days: number): Promise<any[]> {
+  async getByTaskType(userId: string, days: number): Promise<UsageTaskTypeRow[]> {
     const { rows } = await pgClient.query(
       `SELECT task_type, COUNT(*) as request_count, SUM(total_tokens) as total_tokens
        FROM token_usage
@@ -39,7 +39,7 @@ export class PgUsageRepository implements UsageRepository {
     return rows;
   }
 
-  async getDailyUsage(userId: string, days: number): Promise<any[]> {
+  async getDailyUsage(userId: string, days: number): Promise<UsageDailyRow[]> {
     const { rows } = await pgClient.query(
       `SELECT DATE(created_at) as date, COUNT(*) as request_count, SUM(total_tokens) as total_tokens
        FROM token_usage

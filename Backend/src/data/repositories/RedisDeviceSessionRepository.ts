@@ -47,7 +47,6 @@ export class RedisDeviceSessionRepository implements DeviceSessionRepository {
   }
 
   async replaceSessionForDevice(userId: string, fingerprint: string, sessionToken: string): Promise<string | null> {
-    const key = `device_session:${userId}:${fingerprint}`;
     // Atomic get-and-set using Lua script to ensure atomicity
     const luaScript = `
       local old = redis.call('GET', KEYS[1])

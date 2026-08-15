@@ -3,6 +3,19 @@ import { pgClient } from "../orm/pgClient.js";
 import { MessageRepository } from "@domain/repositories/MessageRepository.js";
 import { Message } from "@domain/entities/Message.js";
 
+interface MessageRow {
+  id: string;
+  from_user_id: string | null;
+  to_user_id: string;
+  subject: string;
+  body: string;
+  read_at: Date | null;
+  thread_id: string | null;
+  reply_to_message_id: string | null;
+  deleted_at: Date | null;
+  created_at: Date;
+}
+
 @injectable()
 export class PgMessageRepository implements MessageRepository {
   async save(message: Message): Promise<Message> {
@@ -84,10 +97,10 @@ export class PgMessageRepository implements MessageRepository {
 
     const whereClause = conditions.join(" AND ");
     
-    let joinClause = "";
-    if (params.search) {
-      joinClause = "LEFT JOIN users u ON m.from_user_id = u.id";
-    }
+    // SELECT selalu mereferensikan u.* (from_email/from_name), jadi JOIN
+    // wajib selalu ada — bukan hanya saat search (kalau tidak: PostgreSQL
+    // error "missing FROM-clause entry for table \"u\"").
+    const joinClause = "LEFT JOIN users u ON m.from_user_id = u.id";
 
     const countQuery = `SELECT COUNT(*) as total FROM messages m ${joinClause} WHERE ${whereClause}`;
     const { rows: countRows } = await pgClient.query(countQuery, values);
@@ -129,10 +142,8 @@ export class PgMessageRepository implements MessageRepository {
     }
 
     const whereClause = conditions.join(" AND ");
-    let joinClause = "";
-    if (params.search) {
-      joinClause = "LEFT JOIN users u ON m.to_user_id = u.id";
-    }
+    // SELECT selalu mereferensikan u.* (to_email/to_name) — JOIN wajib selalu ada.
+    const joinClause = "LEFT JOIN users u ON m.to_user_id = u.id";
 
     const countQuery = `SELECT COUNT(*) as total FROM messages m ${joinClause} WHERE ${whereClause}`;
     const { rows: countRows } = await pgClient.query(countQuery, values);
@@ -215,10 +226,10 @@ export class PgMessageRepository implements MessageRepository {
     );
   }
 
-  private mapRow(row: any): Message {
+  private mapRow(row: MessageRow): Message {
     return new Message(
       row.id, row.from_user_id, row.to_user_id, row.subject, row.body,
-      row.read_at, row.thread_id, row.reply_to_message_id, row.deleted_at, row.created_at
+      row.read_at, row.thread_id as string, row.reply_to_message_id, row.deleted_at, row.created_at
     );
   }
 }

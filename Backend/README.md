@@ -10,16 +10,24 @@ Dependencies point inward — inner layers (`domain`) have zero knowledge of out
 
 ```text
 src/
-├── domain/            # Core business logic — zero framework/infra dependencies
-│   ├── entities/       # User, Session, ChatMessage, NewsArticle, etc.
+├── domain/            # Shared kernel domain — zero framework/infra dependencies
+│   ├── entities/       # User, Session, ChatMessage, BrokerSymbol, CalendarEvent, etc.
 │   ├── repositories/   # Interfaces (ports) for data access
-│   ├── services/       # Pure domain logic (MarketDataService, SymbolService, CalendarService, AiPromptRegistry...)
+│   ├── ports/           # Interfaces for external integrations (IBrokerProvider, INotifier, EmailPort...)
+│   ├── services/       # Pure domain logic (AiPromptRegistry, DeviceDomainService...)
 │   ├── value-objects/
 │   └── events/          # Domain events + EventDispatcher
 │
+├── contexts/          # Bounded contexts (DDD) — self-contained: domain/application/infrastructure
+│   └── news/            # News context: entity, repo iface, INewsProvider, NewsService, use-cases, PgNewsRepository, FinnhubNewsAdapter
+│       ├── domain/
+│       ├── application/
+│       └── infrastructure/
+│
 ├── application/       # Application-specific orchestration
-│   ├── use-cases/       # Grouped by feature: auth, admin, chat, market, news, user
-│   ├── ports/            # Interfaces for external integrations (IBrokerProvider, INewsProvider...)
+│   ├── use-cases/       # Grouped by feature: auth, admin, chat, market, user
+│   ├── services/         # Application services (CalendarService, MarketDataService, SymbolService, AuthService...)
+│   ├── mappers/          # Response DTO mappers (e.g. toUserResponseDto)
 │   ├── dtos/             # Zod schemas for request validation
 │   └── event-handlers/   # Listeners reacting to domain events
 │
@@ -30,7 +38,7 @@ src/
 │   └── external/          # FinnhubClient, AI gateway client, MT5 bridge adapters
 │
 ├── presentation/       # HTTP / Express delivery layer
-│   ├── controllers/      # Thin HTTP adapters that call use-cases
+│   ├── controllers/      # Thin HTTP adapters that call use-cases (constructor DI, no service locator)
 │   ├── routes/v1/         # Express route definitions
 │   └── middleware/        # auth, admin, validate, rate limiting, error handling
 │
@@ -38,8 +46,9 @@ src/
 │   └── sse/               # Server-Sent Events (SseNotifier)
 │
 ├── core/               # Shared kernel
-│   ├── errors/            # Typed AppError / ValidationError, etc.
+│   ├── errors/            # Typed AppError / ValidationError, etc. (the only core/ domain may import)
 │   ├── logging/           # Winston logger (daily rotate, request-ID tracking)
+│   ├── settings/          # AppSettings — env values injected into application/domain (read only in bootstrap)
 │   └── utils/              # crypto, hashing, date/parsing helpers
 │
 ├── background/jobs/    # Scheduled/interval jobs (see below)
