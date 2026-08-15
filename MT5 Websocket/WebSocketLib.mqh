@@ -6,6 +6,7 @@
 
 #include "JAson.mqh"
 #include "socketlib.mqh"
+#include "Logger.mqh"
 
 #import "kernel32.dll"
 void RtlMoveMemory(char &dest[], uchar &src[], int length);
@@ -51,13 +52,11 @@ bool PerformWebSocketHandshake(SOCKET64 sock, string request)
 
     for (int i = 0; i < lineCount; i++)
     {
-        Print(" before line = " + lines[i]);
-    
         string line = lines[i];
         StringTrimLeft(line);
         StringTrimRight(line);
     
-        Print(" after line = " + line);
+        LogDebug(" line: " + line);
     
         string lowerLine = line;
         StringToLower(lowerLine);
@@ -72,7 +71,6 @@ bool PerformWebSocketHandshake(SOCKET64 sock, string request)
             }
             StringTrimLeft(secKey);
             StringTrimRight(secKey);
-            Print("secKey: " + secKey);
             break;
         }
     }
@@ -84,7 +82,7 @@ bool PerformWebSocketHandshake(SOCKET64 sock, string request)
     }
 
     string acceptKey = GetWebSocketAcceptKey(secKey);
-    Print("acceptKey:" + acceptKey);
+    LogDebug("handshake: secKey=" + secKey + " acceptKey=" + acceptKey);
 
     string response =
         "HTTP/1.1 101 Switching Protocols\r\n"

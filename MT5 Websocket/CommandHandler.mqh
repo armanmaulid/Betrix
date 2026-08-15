@@ -10,6 +10,7 @@
 #include "WebSocketLib.mqh"
 #include "CommandCore.mqh"
 #include "ValidationUtils.mqh"
+#include "Logger.mqh"
 
 // Forward declaration
 class CData;
@@ -115,7 +116,7 @@ void CCommandHandler::HandleCommand(SOCKET64 clientSocketParam, HttpRequest &req
 //| WebSocket Request Handler                                        |
 //+------------------------------------------------------------------+
 void CCommandHandler::HandleWebSocketRequest(HttpRequest &request) {
-    Print(">>>> WebSocket detected <<<< \n >>Raw request: {" + request.rawRequest + "}");
+    LogDebug(">>>> WebSocket detected <<<< \n >>Raw request: {" + request.rawRequest + "}");
     PerformWebSocketHandshake(ClientSocket, request.rawRequest);
 }
 

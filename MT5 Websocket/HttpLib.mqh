@@ -6,6 +6,8 @@
 #property copyright "Copyright 2025, MetaQuotes Ltd."
 #property link      "https://www.mql5.com"
 
+#include "Logger.mqh"
+
 
 
 struct HttpRequest {
@@ -39,7 +41,7 @@ HttpRequest ParseHttpRequest(string httpRequest) {
     string lines[];
     StringReplace(httpRequest, "\r\n", "\n");
     int k = StringSplit(httpRequest, '\n', lines);
-    Print("line1: " + lines[0]);
+    LogDebug("HTTP parse: " + lines[0]);
     
     // Check if it's a websocket upgrade request
     for (int i = 0; i < k; i++) {
@@ -51,8 +53,6 @@ HttpRequest ParseHttpRequest(string httpRequest) {
 
     string parts[];
     int partsCount = StringSplit(lines[0], ' ', parts);
-
-    Print("---- Split HTTP Request parts ----");
 
     if(partsCount >= 3) {
         request.method = parts[0];
@@ -215,4 +215,3 @@ string GetStatusText(int status_code)
         default: return IntegerToString(status_code);  // fallback to code string
     }
 }
-

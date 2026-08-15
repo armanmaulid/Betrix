@@ -9,6 +9,7 @@
 #include "JAson.mqh"
 #include "socketlib.mqh"
 #include "WebSocketLib.mqh"
+#include "Logger.mqh"
 
 //+------------------------------------------------------------------+
 //| Structs                                                          |
@@ -200,6 +201,8 @@ void CData::SetSymbols(const string &inputSymbols[]) {
     ArrayResize(symbolData, 0);
 
     int count = ArraySize(inputSymbols);
+    string summary = "";
+
     if(count > 0) {
         ArrayResize(symbols, count);
         ArrayResize(symbolData, count);
@@ -211,12 +214,14 @@ void CData::SetSymbols(const string &inputSymbols[]) {
             symbolData[i].lastBid     = 0.0;
             symbolData[i].lastAsk     = 0.0;
             symbolData[i].initialized = false;
+
+            if(i > 0) summary += ", ";
+            summary += symbols[i];
         }
     }
 
-    Print("Symbols set for price tracking: ", count, " symbols");
-    for(int i = 0; i < count; i++)
-        Print("Symbol[", i, "]: ", symbols[i]);
+    Print("Symbols set for price tracking: ", count, " symbols",
+          (count > 0 ? " -> " + summary : ""));
 
     isTrackingPrice = (count > 0);
 }
@@ -228,6 +233,8 @@ void CData::SetOhlcRequests(const OhlcRequest &requests[]) {
     ArrayResize(ohlcRequests, 0);
 
     int count = ArraySize(requests);
+    string summary = "";
+
     if(count > 0) {
         ArrayResize(ohlcRequests, count);
 
@@ -237,14 +244,15 @@ void CData::SetOhlcRequests(const OhlcRequest &requests[]) {
             ohlcRequests[i].depth       = requests[i].depth;
             ohlcRequests[i].lastBarTime = 0;
             ohlcRequests[i].initialized = false;
+
+            if(i > 0) summary += ", ";
+            summary += requests[i].symbol + " " + TimeframeToString(requests[i].timeframe) +
+                       " depth=" + IntegerToString(requests[i].depth);
         }
     }
 
-    Print("OHLC requests set for tracking: ", count, " requests");
-    for(int i = 0; i < count; i++)
-        Print("OHLC[", i, "]: ", ohlcRequests[i].symbol, " ",
-              TimeframeToString(ohlcRequests[i].timeframe),
-              " depth=", ohlcRequests[i].depth);
+    Print("OHLC requests set for tracking: ", count, " requests",
+          (count > 0 ? " -> " + summary : ""));
 
     isTrackingOhlc = (count > 0);
 }
@@ -253,34 +261,44 @@ void CData::SetOhlcRequests(const OhlcRequest &requests[]) {
 //| Set symbols for Market Book (DOM) tracking                       |
 //+------------------------------------------------------------------+
 void CData::SetMbookSymbols(const string &inputSymbols[]) {
-    // Unsubscribe from previous symbols
+    // Unsubscribe from previous symbols - only the failures are worth a
+    // line, a clean unsubscribe of N symbols isn't news.
+    string unsubFailed = "";
     for (int i = 0; i < ArraySize(mbookSymbols); i++) {
-        if (MarketBookRelease(mbookSymbols[i]))
-            Print("Unsubscribed from market book: ", mbookSymbols[i]);
-        else
-            Print("Failed to unsubscribe: ", mbookSymbols[i], " (", GetLastError(), ")");
+        if (!MarketBookRelease(mbookSymbols[i])) {
+            if (unsubFailed != "") unsubFailed += ", ";
+            unsubFailed += mbookSymbols[i];
+        }
     }
+    if (unsubFailed != "")
+        Print("Mbook unsubscribe failed: ", unsubFailed, " (", GetLastError(), ")");
 
     ArrayResize(mbookSymbols, 0);
 
     // Subscribe to new symbols
     int count = ArraySize(inputSymbols);
+    string subscribed = "", subFailed = "";
+
     if(count > 0) {
         ArrayResize(mbookSymbols, count);
 
         for(int i = 0; i < count; i++) {
             mbookSymbols[i] = inputSymbols[i];
 
-            if (MarketBookAdd(mbookSymbols[i]))
-                Print("Subscribed to market book: ", mbookSymbols[i]);
-            else
-                Print("Failed to subscribe to: ", mbookSymbols[i], " (", GetLastError(), ")");
+            if (MarketBookAdd(mbookSymbols[i])) {
+                if (subscribed != "") subscribed += ", ";
+                subscribed += mbookSymbols[i];
+            } else {
+                if (subFailed != "") subFailed += ", ";
+                subFailed += mbookSymbols[i];
+            }
         }
     }
 
-    Print("Symbols set for mbook tracking: ", count, " symbols");
-    for(int i = 0; i < count; i++)
-        Print("Symbol[", i, "]: ", mbookSymbols[i]);
+    Print("Symbols set for mbook tracking: ", count, " symbols",
+          (subscribed != "" ? " -> subscribed: " + subscribed : ""));
+    if (subFailed != "")
+        Print("Mbook subscribe failed: ", subFailed, " (", GetLastError(), ")");
 
     // Reset change-detection state so new symbols always send on first tick
     ArrayResize(lastBookHashes, 0);
@@ -349,10 +367,9 @@ bool CData::HasPriceChanged(string symbol, double currentBid, double currentAsk)
     int index = FindSymbolIndex(symbol);
     if(index < 0) return false;
 
-    if(!symbolData[index].initialized) {
-        Print("Price not initialized for symbol: ", symbol);
-        return true;
-    }
+    // First price for a newly-tracked symbol is always sent - not worth a
+    // log line, "Symbols set for price tracking: ..." already announced it.
+    if(!symbolData[index].initialized) return true;
 
     return (symbolData[index].lastBid != currentBid ||
             symbolData[index].lastAsk != currentAsk);
@@ -438,7 +455,9 @@ void CData::SendSymbolOhlc(string symbol, ENUM_TIMEFRAMES timeframe, int depth) 
         return;
     }
 
-    Print("OHLC update for ", symbol, " ", TimeframeToString(timeframe), " - ", copied, " bars");
+    // Per-bar, per-symbol/timeframe - fires continuously all day with several
+    // tracked symbols, so it's debug-level, not something worth always showing.
+    LogDebug("OHLC update for " + symbol + " " + TimeframeToString(timeframe) + " - " + IntegerToString(copied) + " bars");
 
     CJAVal jRes;
     jRes["type"]      = "ohlc_update";

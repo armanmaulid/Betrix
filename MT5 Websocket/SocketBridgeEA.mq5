@@ -11,7 +11,11 @@
 #include "WebSocketLib.mqh"
 #include "SocketManager.mqh"
 
-#define HTTP_PORT 8890
+// Was #define HTTP_PORT 8890 - moved to an input so the port can be changed
+// per-chart/per-instance without recompiling (useful for running several EA
+// instances on different ports, or for the backend's .env to just match
+// whatever the person set here).
+input int InpPort = 8890;
 
 #define SOCKET_BUFFER_SIZE 4096
 #define TIMER_INTERVAL_MS 20
@@ -37,10 +41,30 @@ datetime g_lastStatusBroadcast = 0;
 //+------------------------------------------------------------------+
 int OnInit() {
    if (!InitializeWSA()) return INIT_FAILED;
+   CalendarWarmup();
    InitializeWebSocketServer();
    //EventSetTimer(1);
    EventSetMillisecondTimer(TIMER_INTERVAL_MS);
    return INIT_SUCCEEDED;
+}
+
+// MQL5 has no API to force-download the terminal's calendar database - it
+// only reads whatever the terminal already synced (which requires a live
+// connection to a broker server, handled entirely by the terminal itself).
+// This just verifies + reports that state right when the EA mounts, instead
+// of the backend discovering an empty calendar later via GET /v1/calendar.
+void CalendarWarmup() {
+   datetime from = TimeTradeServer() - 86400;
+   datetime to   = TimeTradeServer() + 86400;
+   MqlCalendarValue values[];
+
+   if (!CalendarValueHistory(values, from, to)) {
+      Print("Calendar warm-up: CalendarValueHistory failed, error ", GetLastError(),
+            " - /v1/calendar and /v1/track/calendar will stay empty until the terminal's calendar feed is available");
+      return;
+   }
+
+   Print("Calendar warm-up: ", ArraySize(values), " event(s) found in terminal calendar cache (window: yesterday-tomorrow)");
 }
 
 void OnDeinit(const int reason) {
@@ -90,8 +114,8 @@ void CleanupHandlers() {
 }
 
 void InitializeWebSocketServer() {
-    if (!httpServer.CreateServer(HTTP_PORT)) {
-        Print("Failed to create HTTP server on port ", HTTP_PORT);
+    if (!httpServer.CreateServer(InpPort)) {
+        Print("Failed to create HTTP server on port ", InpPort);
         return;
     }
 
@@ -107,7 +131,7 @@ void InitializeWebSocketServer() {
 
     g_eaStartTime = TimeTradeServer();
 
-    Print("WebSocket server initialized on port ", HTTP_PORT);
+    Print("WebSocket server initialized on port ", InpPort);
 }
 
 
