@@ -21,6 +21,8 @@ import { PgActivityLogRepository } from "@data/repositories/PgActivityLogReposit
 import { PgAnalyticsRepository } from "@data/repositories/PgAnalyticsRepository.js";
 import { RedisMarketDataRepository } from "@data/repositories/RedisMarketDataRepository.js";
 import { RedisCaptchaStore } from "@data/repositories/RedisCaptchaStore.js";
+import { RedisStreamTicketStore } from "@data/repositories/RedisStreamTicketStore.js";
+import { RedisOAuthCodeStore } from "@data/repositories/RedisOAuthCodeStore.js";
 
 // External services
 import { AiGatewayClient } from "@data/external/AiGatewayClient.js";
@@ -48,6 +50,8 @@ import { ChangeEmailUseCase } from "@application/use-cases/auth/ChangeEmailUseCa
 import { GetProfileUseCase } from "@application/use-cases/auth/GetProfileUseCase.js";
 import { UpdateProfileUseCase } from "@application/use-cases/auth/UpdateProfileUseCase.js";
 import { GetSessionsUseCase } from "@application/use-cases/auth/GetSessionsUseCase.js";
+import { GetStreamTicketUseCase } from "@application/use-cases/auth/GetStreamTicketUseCase.js";
+import { ExchangeOAuthCodeUseCase } from "@application/use-cases/auth/ExchangeOAuthCodeUseCase.js";
 import { RevokeSessionUseCase } from "@application/use-cases/auth/RevokeSessionUseCase.js";
 import { LogoutByCredentialsUseCase } from "@application/use-cases/auth/LogoutByCredentialsUseCase.js";
 import { LogoutAllUseCase } from "@application/use-cases/auth/LogoutAllUseCase.js";
@@ -130,6 +134,8 @@ export function registerDependencies() {
   container.register("NewsContextPort", { useClass: PgNewsRepository });
   container.register("MarketDataRepository", { useClass: RedisMarketDataRepository });
   container.register("CaptchaStore", { useClass: RedisCaptchaStore });
+  container.register("StreamTicketStore", { useClass: RedisStreamTicketStore });
+  container.register("OAuthCodeStore", { useClass: RedisOAuthCodeStore });
 
   // External services
   container.register("AiPort", { useClass: AiGatewayClient });
@@ -154,6 +160,8 @@ export function registerDependencies() {
   container.register("GetProfileUseCase", { useClass: GetProfileUseCase });
   container.register("UpdateProfileUseCase", { useClass: UpdateProfileUseCase });
   container.register("GetSessionsUseCase", { useClass: GetSessionsUseCase });
+  container.register("GetStreamTicketUseCase", { useClass: GetStreamTicketUseCase });
+  container.register("ExchangeOAuthCodeUseCase", { useClass: ExchangeOAuthCodeUseCase });
   container.register("RevokeSessionUseCase", { useClass: RevokeSessionUseCase });
   container.register("LogoutByCredentialsUseCase", { useClass: LogoutByCredentialsUseCase });
   container.register("LogoutAllUseCase", { useClass: LogoutAllUseCase });
