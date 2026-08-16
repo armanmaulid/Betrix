@@ -216,3 +216,29 @@ export async function revokeSession(sessionToken: string, fingerprint: string): 
   });
   if (!res.ok) return parseErrorAndThrow(res);
 }
+
+// POST /api/auth/stream-ticket — tukar session token → ticket sekali pakai
+// (single-use, TTL 60 dtk) khusus dipakai di URL SSE. EventSource tidak bisa
+// set header, jadi token sesi TIDAK BOLEH ditaruh di query string — ticket
+// inilah penggantinya. 401 kalau token invalid/expired (lempar AuthApiError).
+export async function getStreamTicket(sessionToken: string): Promise<{ ticket: string }> {
+  const res = await fetch(`${BACKEND_URL}/api/v1/auth/stream-ticket`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${sessionToken}` },
+  });
+  if (!res.ok) return parseErrorAndThrow(res);
+  return res.json();
+}
+
+// POST /api/auth/oauth/exchange — tukar one-time code dari redirect Google
+// OAuth (callback ?code=...) → session token + user. Response shape persis
+// `LoginSuccess`, jadi hasilnya bisa langsung dipakai `loginWithToken(...)`.
+export async function exchangeOAuthCode(code: string): Promise<LoginSuccess> {
+  const res = await fetch(`${BACKEND_URL}/api/v1/auth/oauth/exchange`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+  if (!res.ok) return parseErrorAndThrow(res);
+  return res.json();
+}

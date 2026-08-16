@@ -97,8 +97,8 @@ export const NewsFeed = React.memo(function NewsFeed() {
 
   // Listen for realtime SSE news updates
   useEffect(() => {
-    const es = acquireSharedEventSource();
-    if (!es) return;
+    let cancelled = false;
+    let es: EventSource | null = null;
 
     const onNewsUpdate = (e: MessageEvent) => {
       try {
@@ -122,10 +122,24 @@ export const NewsFeed = React.memo(function NewsFeed() {
       }
     };
 
-    es.addEventListener("news_update", onNewsUpdate);
+    // acquire jadi async karena stream butuh stream-ticket dulu (EventSource
+    // tidak bisa set header; ?token= sudah ditolak backend).
+    acquireSharedEventSource().then((source) => {
+      if (!source) return;
+      if (cancelled) {
+        releaseSharedEventSource();
+        return;
+      }
+      es = source;
+      es.addEventListener("news_update", onNewsUpdate);
+    });
+
     return () => {
-      es.removeEventListener("news_update", onNewsUpdate);
-      releaseSharedEventSource();
+      cancelled = true;
+      if (es) {
+        es.removeEventListener("news_update", onNewsUpdate);
+        releaseSharedEventSource();
+      }
     };
   }, []);
 

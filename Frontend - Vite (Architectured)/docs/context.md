@@ -9,7 +9,7 @@ Rules: work top-to-bottom, one phase per commit, run `npx tsc --noEmit && npm ru
 | --- | --- | --- |
 | 0 | Cheap wins, zero risk | ✅ DONE — 2026-08-16 |
 | 1 | Correctness bugs | ✅ DONE — 2026-08-16 |
-| 2 | Auth/session security | ⛔ BLOCKED — needs backend decision (token storage Option A/B) before start |
+| 2 | Auth/session security | ✅ DONE — 2026-08-16 |
 | 3 | AuthContext re-render loop + stale token | ✅ DONE — 2026-08-16 |
 | 4 | TradingViewWidget | ✅ DONE — 2026-08-16 |
 | 5 | Cancellation / leaks / duplication | ✅ DONE — 2026-08-16 |
@@ -102,9 +102,20 @@ Pending: manual a11y pass (browser inspector / axe on Login, Chat, Settings) to 
 
 Gate: `npx tsc --noEmit` = 0 errors; `npm run build` = 0 errors (vite v5.4.21, 1764 modules). Zero `@ts-nocheck`/`@ts-ignore` directives remain in the two files.
 
-## Phase 2 — RESUME INSTRUCTIONS (backend pending)
+## Phase 2 — completed
 
-**Status: ⛔ BLOCKED on backend, DECISION MADE 2026-08-16.** Full proposal: `docs/phase2-token-storage-proposal.md`. This section is self-contained so a fresh session can resume without re-reading the proposal.
+Commit: (pending — one commit on a branch off `main`). Changes:
+- `src/features/auth/api/authClient.ts` — `getStreamTicket(sessionToken)` (POST `/api/v1/auth/stream-ticket`, Bearer → `{ ticket }`, lempar `AuthApiError` kalau 401) + `exchangeOAuthCode(code)` (POST `/api/v1/auth/oauth/exchange` → `{ sessionToken, user }` bertipe `LoginSuccess`).
+- `src/features/auth/context/AuthContext.tsx` — SSE effect jadi `connect()` async: fetch ticket → `new EventSource(?ticket=)`; fetch ticket gagal (sesi mati) = stream tertutup + `isConnected=false`, TANPA fallback `?token=` dan tanpa retry loop; onerror readyState CLOSED (ticket terbakar, EventSource auto-reconnect tak bisa pakai ticket lama) → reconnect 2 dtk dengan ticket BARU; cleanup: `cancelled` flag + close stream + clear timer.
+- `src/features/market/hooks/useTickerPrices.ts` — `updateGlobalStream` jadi async: fetch ticket sesaat sebelum EventSource dibuka, dedup via `connectPromise` (satu fetch ticket per connect, semua caller berbagi), re-check `stillNeeded` setelah await (bisa logout/konsumen hilang selama fetch); `acquireSharedEventSource()` jadi async (`Promise<EventSource | null>`).
+- 4 konsumen (`NewsFeed`, `NewsPage`, `EconomicCalendar`, `EconomicCalendarPage`) — pola `.then` + `cancelled` flag; kalau resolve setelah unmount → `releaseSharedEventSource()` biar refcount seimbang.
+- `src/features/auth/pages/AuthCallbackPage.tsx` — baca `?code=` (bukan `?token=`) → `exchangeOAuthCode(code)` → `loginWithToken(sessionToken)` → navigate `/`; path `?token=` dibuang.
+- `vite.config.ts` — plugin `cspProdHardening()` (`transformIndexHtml`, `apply: "build"`): saat `vite build`, meta CSP di-rewrite — `script-src` jadi `'self' 'sha256-<hash>' https://*.tradingview.com https://*.tradingview-widget.com` (tanpa `'unsafe-inline'`), hash sha256 dihitung dinamis dari isi script inline anti-clickjacking via Web Crypto (`crypto.subtle`); `style-src 'unsafe-inline'` TIDAK disentuh; dev tidak disentuh (Fast Refresh butuh inline preamble). Verifikasi: hash di CSP === hash script inline di `dist/index.html` (cocok ✓).
+- `tsconfig.node.json` — tambah `lib: ["ES2022", "DOM"]` (typing Web Crypto untuk `vite.config.ts`), plus `outDir` + `tsBuildInfoFile` → `node_modules/.tmp/` — **root cause** misteri `vite.config.js` muncul-muncul: `tsc -b` (composite tanpa noEmit, TS6310 menolak noEmit di proyek yang di-reference) meng-emit `vite.config.js`/`.d.ts` ke root, dan Vite resolve `.js` duluan sehingga file emit diam-diam menimpa `vite.config.ts` (plugin CSP tidak pernah terpakai sampai ini dibereskan).
+
+Gate: `npx tsc --noEmit` = 0 errors; `npm run build` = 0 errors (vite v5.4.21, 1764 modules). CSP di `dist/index.html` ter-rewrite (tanpa `'unsafe-inline'` di `script-src`).
+
+Pending: manual verify (needs backend + browser): Network tab — URL SSE `?ticket=` (bukan `?token=`); reconnect pakai ticket baru; login Google callback `?code=` sukses; invalid code → error + localStorage kosong; logout → localStorage bersih; CSP prod tidak memblokir TradingView / anti-clickjacking tetap jalan.
 
 ### Keputusan
 Option B (stream ticket) + CSP hardening (prod-only) + OAuth one-time code. Option A (httpOnly cookie) NOT chosen — backend overhaul too big for this phase.
@@ -129,11 +140,10 @@ Option B (stream ticket) + CSP hardening (prod-only) + OAuth one-time code. Opti
 
 ## Notes / next steps
 
-All 7 frontend-only phases are done (0, 1, 3, 4, 5, 6, 7). Remaining:
+All 8 phases are done (0, 1, 2, 3, 4, 5, 6, 7) — Phase 2 dieksekusi setelah backend contract live (lihat `docs/phase2-backend-response.md`). Remaining:
 
-- Phase 2 (auth/session security) is ⛔ BLOCKED on backend — **resume instructions in "Phase 2 — RESUME INSTRUCTIONS" section above** (self-contained: decision, backend contract, frontend work per file, CSP gotcha, sequencing). When backend says ready, execute that section.
-- Manual verification pending across phases (needs backend + browser): chat session history (Phase 1), OAuth callback re-fire (Phase 3), single `tv.js` tag (Phase 4), a11y pass (Phase 6).
-- Commit discipline: one phase = one commit on a branch off `main` — no commits made yet; all phases are currently working-tree changes.
+- Manual verification pending (needs backend + browser): chat session history (Phase 1), OAuth callback re-fire (Phase 3), single `tv.js` tag (Phase 4), a11y pass (Phase 6), dan Phase 2 (Network tab: URL SSE `?ticket=` bukan `?token=`; reconnect pakai ticket baru; callback Google `?code=` sukses; logout → localStorage bersih; CSP prod tidak memblokir TradingView).
+- Commit discipline: one phase = one commit on a branch off `main`.
 
 ## Commit discipline
 

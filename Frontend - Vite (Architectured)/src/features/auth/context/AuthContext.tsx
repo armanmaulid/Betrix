@@ -65,31 +65,74 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!sessionToken || !user) return;
+    // Narrowing string|null tidak menembus closure async — salin ke const
+    // (bertipe string) supaya getStreamTicket bisa dipakai di dalam connect().
+    const token = sessionToken;
 
-    const es = new EventSource(`${BACKEND_URL}/api/v1/news/stream?token=${sessionToken}`);
+    let cancelled = false;
+    let es: EventSource | null = null;
+    let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 
-    es.onopen = () => setIsConnected(true);
-    es.onerror = () => setIsConnected(false);
-
-    es.addEventListener('credits_update', (e) => {
+    async function connect() {
+      if (cancelled) return;
       try {
-        const data = JSON.parse(e.data);
-        setUser(prev => prev ? { ...prev, credits: data.credits } : prev);
-      } catch (err) {
-        console.error("Failed to parse credits_update");
-      }
-    });
+        // Ticket sekali pakai (TTL 60 dtk) — fetch DI DALAM connect() supaya
+        // tidak basi, dan tiap connect/reconnect dapat ticket BARU.
+        // EventSource tidak bisa set header, jadi token sesi tidak boleh
+        // ditaruh di query string (?token= sudah ditolak backend dengan 400).
+        const { ticket } = await authApi.getStreamTicket(token);
+        if (cancelled) return;
 
-    es.addEventListener('logout', () => {
-      // Sesi ini dicabut paksa (misal dari menu Revoke di browser lain).
-      // Langsung hapus state lokal dan arahkan ke login.
-      localStorage.removeItem(STORAGE_KEY);
-      setSessionToken(null);
-      setUser(null);
-    });
+        const stream = new EventSource(`${BACKEND_URL}/api/v1/news/stream?ticket=${ticket}`);
+        es = stream;
+
+        stream.onopen = () => {
+          if (!cancelled) setIsConnected(true);
+        };
+
+        stream.onerror = () => {
+          setIsConnected(false);
+          // EventSource auto-reconnect memakai URL yang sama → ticket lama
+          // sudah terbakar → server tutup koneksi (readyState CLOSED).
+          // Deteksi itu dan reconnect dengan ticket BARU.
+          if (stream.readyState === EventSource.CLOSED) {
+            stream.close();
+            if (es === stream) es = null;
+            if (!cancelled) {
+              reconnectTimer = setTimeout(connect, 2000);
+            }
+          }
+        };
+
+        stream.addEventListener('credits_update', (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            setUser(prev => prev ? { ...prev, credits: data.credits } : prev);
+          } catch (err) {
+            console.error("Failed to parse credits_update");
+          }
+        });
+
+        stream.addEventListener('logout', () => {
+          // Sesi ini dicabut paksa (misal dari menu Revoke di browser lain).
+          // Langsung hapus state lokal dan arahkan ke login.
+          localStorage.removeItem(STORAGE_KEY);
+          setSessionToken(null);
+          setUser(null);
+        });
+      } catch {
+        // Fetch ticket gagal (sesi mati / token invalid) → stream tetap
+        // tertutup: TANPA fallback ke ?token= dan tanpa retry loop.
+        setIsConnected(false);
+      }
+    }
+
+    connect();
 
     return () => {
-      es.close();
+      cancelled = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (es) es.close();
       setIsConnected(false);
     };
   }, [sessionToken, user?.id]);
