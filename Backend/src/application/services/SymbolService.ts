@@ -12,20 +12,15 @@ export class SymbolService {
   ) {}
 
   async syncBrokerSymbols(): Promise<void> {
-    // Check symbol count first (incremental sync pattern)
-    const count = await this.brokerClient.fetchSymbolCount();
-    const storedCount = await this.symbolRepo.getStoredCount();
-    
-    if (count === storedCount) {
-      logger.info("Symbol count unchanged, skipping full sync", { context: "Symbols" });
-      return;
-    }
-
+    // Jangan skip berdasarkan kesamaan total count — tambah-1 + hapus-1 (net count
+    // sama) atau perubahan description/category/trade_mode (isActive) tanpa ubah
+    // total tidak akan pernah terdeteksi, dan broker_symbols jadi stale selamanya.
+    // saveMany sudah idempotent (ON CONFLICT DO UPDATE), jadi selalu jalan aman.
     const symbols = await this.brokerClient.fetchSymbols();
 
     if (symbols.length > 0) {
       await this.symbolRepo.saveMany(symbols);
-      await this.symbolRepo.setStoredCount(count);
+      await this.symbolRepo.setStoredCount(symbols.length);
       logger.info(`Synced ${symbols.length} broker symbols`, { context: "Symbols" });
     }
   }

@@ -13,6 +13,11 @@ interface AdminActionRow {
   ip: string | null;
   user_agent: string | null;
   created_at: Date;
+  actor_type: string;
+  actor_email: string | null;
+  actor_name: string | null;
+  target_email: string | null;
+  target_name: string | null;
 }
 
 @injectable()
@@ -131,7 +136,9 @@ export class PgAdminActionRepository implements AdminActionRepository {
     return new AdminAction(
       row.id, row.admin_id, row.action as AdminActionType,
       row.target_type, row.target_id, row.details,
-      row.ip, row.user_agent, row.created_at
+      row.ip, row.user_agent, row.created_at,
+      row.actor_type as "admin" | "user",
+      row.actor_email, row.actor_name, row.target_email, row.target_name
     );
   }
 }

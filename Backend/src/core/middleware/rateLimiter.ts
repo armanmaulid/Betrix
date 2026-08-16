@@ -4,7 +4,7 @@ import type { Request, Response } from "express";
 import { logger } from "@core/logging/logger.js";
 
 function createIpKeyGenerator() {
-  return (req: Request) => ipKeyGenerator(req.ip || "unknown");
+  return (req: Request) => ipKeyGenerator(req.normalizedIP || req.ip || "unknown");
 }
 
 export function createRateLimiter(options: {
@@ -41,31 +41,31 @@ export const globalLimiter = createRateLimiter({
   name: "global",
   windowMs: 60 * 1000,
   max: env.RATE_LIMIT_PER_MINUTE,
-  message: "Terlalu banyak request, coba lagi sebentar lagi",
+  message: "Too many requests, please try again shortly",
 });
 
 export const authLimiter = createRateLimiter({
   name: "auth",
   windowMs: 5 * 60 * 1000,
   max: 10,
-  message: "Terlalu banyak percobaan login/register, coba lagi dalam 5 menit",
+  message: "Too many login/register attempts, please try again in 5 minutes",
 });
 
 export const registerLimiter = createRateLimiter({
   name: "register",
   windowMs: 60 * 60 * 1000,
   max: env.RATE_LIMIT_REGISTER_PER_HOUR,
-  message: "Terlalu banyak percobaan registrasi, coba lagi nanti",
+  message: "Too many registration attempts, please try again later",
 });
 
 export const perUserLimiter = createRateLimiter({
   name: "per-user",
   windowMs: 60 * 1000,
   max: env.RATE_LIMIT_PER_USER_PER_MINUTE,
-  message: "Terlalu banyak request untuk akun ini, coba lagi sebentar lagi",
+  message: "Too many requests for this account, please try again shortly",
   keyGenerator: (req) => {
     const userId = req.user?.userId;
-    return userId ? `user:${userId}` : ipKeyGenerator(req.ip || "unknown");
+    return userId ? `user:${userId}` : ipKeyGenerator(req.normalizedIP || req.ip || "unknown");
   },
 });
 
@@ -77,9 +77,9 @@ export const sensitiveLimiter = createRateLimiter({
   name: "sensitive",
   windowMs: 60 * 60 * 1000,
   max: 3,
-  message: "Terlalu banyak percobaan operasi sensitif, coba lagi dalam 1 jam",
+  message: "Too many sensitive operation attempts, please try again in 1 hour",
   keyGenerator: (req) => {
     const userId = req.user?.userId;
-    return userId ? `sensitive:${userId}` : ipKeyGenerator(req.ip || "unknown");
+    return userId ? `sensitive:${userId}` : ipKeyGenerator(req.normalizedIP || req.ip || "unknown");
   },
 });

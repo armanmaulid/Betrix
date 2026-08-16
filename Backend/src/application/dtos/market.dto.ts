@@ -8,7 +8,7 @@ export const getMarketDataDto = z.object({
 
 export const getSymbolsDto = z.object({
   category: z.string().optional(),
-  activeOnly: z.coerce.boolean().default(true),
+  active: z.coerce.boolean().default(true),
 });
 
 export const getCalendarDto = z.object({

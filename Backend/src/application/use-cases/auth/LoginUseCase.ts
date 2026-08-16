@@ -6,17 +6,22 @@ import { LoginAttemptRepository } from "@domain/repositories/LoginAttemptReposit
 import { DeviceSessionRepository } from "@domain/repositories/DeviceSessionRepository.js";
 import { User, UserStatus } from "@domain/entities/User.js";
 import { Email } from "@domain/value-objects";
-import { AuthenticationError } from "@core/errors/index.js";
+import { AuthenticationError, AuthorizationError, CaptchaRequiredError } from "@core/errors/index.js";
 import { verifyPassword } from "@core/utils/index.js";
 import type { AppSettings } from "@core/settings/AppSettings.js";
 import { AuthService } from "@application/services/AuthService.js";
+import { CaptchaService } from "@application/services/CaptchaService.js";
 import { ActivityLogRepository } from "@domain/repositories/ActivityLogRepository.js";
 import { RequestInput } from "@core/utils/request.js";
+import { LOGIN_FAILURE_WINDOW_MINUTES, computeLoginDelaySeconds, isCaptchaRequired } from "@domain/services/loginPolicy.js";
+
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 interface LoginInput {
   email: string;
   password: string;
   request: RequestInput;
+  captcha?: { challengeId: string; answer: string };
 }
 
 interface LoginOutput {
@@ -34,15 +39,44 @@ export class LoginUseCase {
     @inject("LoginAttemptRepository") private loginAttemptRepo: LoginAttemptRepository,
     @inject("DeviceSessionRepository") private deviceSessionRepo: DeviceSessionRepository,
     @inject("AuthService") private authService: AuthService,
-    @inject("AppSettings") private settings: AppSettings
+    @inject("AppSettings") private settings: AppSettings,
+    @inject("CaptchaService") private captchaService: CaptchaService
   ) {}
 
   async execute(input: LoginInput): Promise<LoginOutput> {
     const email = new Email(input.email);
     const clientIP = input.request.ip;
 
-    if (await this.loginAttemptRepo.isAccountLocked(email.value, clientIP)) {
-      throw new AuthenticationError("Too many failed login attempts. Try again in 15 minutes.");
+    // Layered anti-bruteforce (BUG-04): hitung kegagalan per EMAIL (semua IP),
+    // bukan per (email, ip) — rotasi IP tidak bisa melewati counter.
+    const failures = await this.loginAttemptRepo.countRecentFailures(email.value, LOGIN_FAILURE_WINDOW_MINUTES);
+
+    // CAPTCHA in-app setelah beberapa kegagalan. Challenge dibuat on-demand dan
+    // dikirim di response 428 — FE tinggal menampilkannya, tanpa endpoint terpisah.
+    if (isCaptchaRequired(failures)) {
+      const captchaOk = input.captcha
+        ? await this.captchaService.verify(input.captcha.challengeId, input.captcha.answer)
+        : false;
+      if (!captchaOk) {
+        // Catat kegagalan hanya kalau captcha SUDAH dikirim tapi salah — kalau
+        // tidak dikirim sama sekali, itu bukan percobaan kredensial (jangan
+        // menaikkan counter kegagalan user sah).
+        if (input.captcha) {
+          await this.loginAttemptRepo.recordFailedLogin(email.value, clientIP);
+        }
+        const challenge = await this.captchaService.createChallenge();
+        throw new CaptchaRequiredError(
+          input.captcha ? "Incorrect or expired CAPTCHA" : "Human verification required",
+          challenge
+        );
+      }
+    }
+
+    // Progressive delay (bukan hard lock 15 menit) — user sah tidak pernah
+    // terkunci keluar dari akunnya sendiri; brute force justru melambat.
+    const delaySeconds = computeLoginDelaySeconds(failures);
+    if (delaySeconds > 0) {
+      await sleep(delaySeconds * 1000);
     }
 
     const user = await this.userRepo.findByEmail(email);
@@ -81,8 +115,10 @@ export class LoginUseCase {
 
     const result = await this.authService.establishAuthenticatedSession(user, requestForAuth, this.settings.deviceEnforcementEnabled);
     if (!result.ok) {
-      throw new AuthenticationError(result.error, { 
-        ...(result.hasActiveSession ? { hasActiveSession: true } : {}) 
+      // Blok device (BUG-09): 403 FORBIDDEN, bukan 401 — user & password sudah
+      // benar, tapi device ini terikat ke akun lain / punya session aktif.
+      throw new AuthorizationError(result.error, {
+        ...(result.hasActiveSession ? { hasActiveSession: true } : {}),
       });
     }
 

@@ -29,4 +29,5 @@ export interface ChatRepository {
     startDate?: Date;
     endDate?: Date;
   }): Promise<ChatMessage[]>;
+  cleanupOlderThan(days: number): Promise<number>;
 }

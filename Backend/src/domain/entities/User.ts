@@ -135,4 +135,24 @@ export class User {
       this.verifiedAt
     );
   }
+
+  withPasswordHash(passwordHash: string | null): User {
+    return new User(
+      this.id, this.email, passwordHash, this.name,
+      this.isAdmin, this.status, this.emailVerified, this.credits,
+      this.createdAt, this.lastActive, this.googleId,
+      this.phone, this.address, this.birthdate, this.gender, this.bio,
+      this.verifiedAt
+    );
+  }
+
+  withGoogleId(googleId: string | null): User {
+    return new User(
+      this.id, this.email, this.passwordHash, this.name,
+      this.isAdmin, this.status, this.emailVerified, this.credits,
+      this.createdAt, this.lastActive, googleId,
+      this.phone, this.address, this.birthdate, this.gender, this.bio,
+      this.verifiedAt
+    );
+  }
 }

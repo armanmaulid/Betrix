@@ -70,7 +70,13 @@ export class RegisterUseCase {
 
     if (this.settings.deviceEnforcementEnabled) {
       const fingerprint = DeviceFingerprint.create(input.request);
-      await this.deviceRepo.bind(Device.create({ userId: user.id, fingerprint: fingerprint.value }));
+      const bound = await this.deviceRepo.bind(Device.create({ userId: user.id, fingerprint: fingerprint.value }));
+      if (!bound) {
+        // Race TOCTOU (BUG-09): device direbut akun lain antara cek & bind →
+        // rollback user yang baru dibuat, laporkan konflik (bukan rampasan senyap).
+        await this.userRepo.delete(user.id);
+        throw new ConflictError("This device is already registered to another account");
+      }
     }
 
     const token = generateOTP();

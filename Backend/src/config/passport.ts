@@ -48,6 +48,13 @@ if (googleOAuthConfigured) {
               throw createErr;
             }
           }
+        } else if (!user.emailVerified) {
+          // Reclaim (BUG-10): akun unverified bisa jadi pre-registrasi orang lain.
+          // Google baru saja membuktikan pemilik email yang sah → set verified +
+          // invalidasi password lama (paksa reset) — jangan auto-login buta ke
+          // akun unverified yang password-nya diketahui pihak tak dikenal.
+          const reclaimed = user.withEmailVerified().withPasswordHash(null).withGoogleId(profile.id);
+          user = await userRepo.save(reclaimed);
         }
 
         return done(null, user);

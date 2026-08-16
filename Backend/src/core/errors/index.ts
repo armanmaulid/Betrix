@@ -24,8 +24,8 @@ export class AuthenticationError extends AppError {
 }
 
 export class AuthorizationError extends AppError {
-  constructor(message = "Insufficient permissions") {
-    super("FORBIDDEN", 403, message);
+  constructor(message = "Insufficient permissions", details?: Record<string, unknown>) {
+    super("FORBIDDEN", 403, message, details);
   }
 }
 
@@ -50,6 +50,12 @@ export class InsufficientCreditsError extends AppError {
 export class ConflictError extends AppError {
   constructor(message: string) {
     super("CONFLICT", 409, message);
+  }
+}
+
+export class CaptchaRequiredError extends AppError {
+  constructor(message: string, challenge: { challengeId: string; question: string }) {
+    super("CAPTCHA_REQUIRED", 428, message, { challenge });
   }
 }
 

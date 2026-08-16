@@ -9,6 +9,11 @@ export const registerDto = z.object({
 export const loginDto = z.object({
   email: z.string().email(),
   password: z.string().min(1),
+  // CAPTCHA in-app wajib setelah beberapa kegagalan (lihat loginPolicy).
+  captcha: z.object({
+    challengeId: z.string().min(1),
+    answer: z.string().min(1),
+  }).optional(),
 });
 
 export const changePasswordDto = z.object({

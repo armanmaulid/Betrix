@@ -60,15 +60,17 @@ export class GetAuditLogsUseCase {
       actions: result.actions.map(a => ({
         id: a.id,
         action: a.action,
-        actorType: a.action.startsWith("user_") ? "user" : "admin",
+        // Nilai nyata dari SQL (JOIN users di repo) — bukan tebakan action prefix.
+        // Fallback "admin" hanya untuk row yang tidak punya data join (tidak terjadi dari findAll).
+        actorType: a.actorType ?? "admin",
         targetType: a.targetType,
         targetId: a.targetId,
-        targetEmail: null,
-        targetName: null,
+        targetEmail: a.targetEmail ?? null,
+        targetName: a.targetName ?? null,
         details: a.details,
         ip: a.ip,
         userAgent: a.userAgent,
-        admin: { email: "", name: null },
+        admin: { email: a.actorEmail ?? "", name: a.actorName ?? null },
         timestamp: a.createdAt,
       })),
       pagination: {

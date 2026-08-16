@@ -4,7 +4,10 @@
 > Dibuat: 2026-08-15. Dipakai untuk **resume percakapan** tanpa kehilangan konteks.
 >
 > **Cara resume:** baca file ini dulu (state, keputusan, gotcha), lalu `docs/ddd-refactor-plan.md`
-> (plan + report per fase dengan angka verifikasi). Kalau lanjut kerja: mulai dari **Phase 8** (belum dieksekusi).
+> (refactor DDD, semua fase selesai) dan `docs/bugfix-plan.md` (11 bug, SEMUA phase selesai).
+> **Status 2026-08-16:** DDD refactor ✅ + 11/11 bug ✅ + semua pesan user-facing konsisten
+> Bahasa Inggris (§8q) + follow-up Phase 5 selesai (googleId reclaim + E2E live, §8r).
+> Verifikasi final: tsc 0 · lint 0/0 · boundary 0 · test **9 files / 62 tests / 0 failed**.
 
 ---
 
@@ -340,6 +343,132 @@ Full test E2E ulang setelah rangkaian perubahan fingerprint/session/IP — **1 b
 
 ---
 
+## 8k. Bug report deep review — verifikasi & plan perbaikan (2026-08-16)
+
+- **Sumber:** `docs/betrix-backend-bug-report.md` (deep review Claude: 11 bug bernomor + 4 catatan "not bugs").
+- **Verifikasi manual ke kode:** **11/11 bug NYATA** — tidak ada false-positive. Detail per bug di plan.
+- **Plan perbaikan:** `docs/bugfix-plan.md` (baru) — **5 phase** + **TODO list per bug** + template report per phase.
+  - Phase 1 — Routing & Validasi: BUG-01 (route duplikat market), BUG-02 (`activeOnly` vs `active`)
+  - Phase 2 — Rate limit & Session display: BUG-03 (`req.ip` mentah di key generator), BUG-05 (metadata device session pertama, bukan terbaru)
+  - Phase 3 — Audit Log Admin: BUG-06 (kolom actor/target dibuang SQL→entity), BUG-07 (`UpdateUserUseCase` tak tercatat audit log)
+  - Phase 4 — Operasional: BUG-08 (`cleanupOlderThan` 0 pemanggil; chat/activity tanpa method), BUG-11 (sync symbol di-skip pakai count)
+  - Phase 5 — Auth Hardening: BUG-04 (lockout per (email,ip)), BUG-09 (TOCTOU bind device), BUG-10 (Google OAuth match tanpa cek verified)
+- **Keputusan produk (arahan user, 2026-08-16):**
+  - BUG-04 → layered policy: progressive delay per email (1–5 tanpa penalti, 6+ naik 1s/2s/4s... capped) + IP throttle tetap + CAPTCHA percobaan ke-5; **hapus hard lock 15 menit**.
+  - BUG-10 → OAuth reclaim: akun existing `emailVerified=true` → auto-link; belum verified → set verified + **invalidasi password lama** → login.
+  - Keputusan terbuka (konfirmasi saat eksekusi Phase 5): implementasi CAPTCHA (in-app vs Turnstile), perilaku login BUG-09 (blok vs izinkan tanpa update device), `requireEmailVerification` jadi wajib?
+- **Status: PLAN DIBUAT — belum dieksekusi.** Baseline tetap: tsc 0 · lint 0/0 · boundary 0 · test 51/51.
+
+---
+
+## 8l. Bugfix Phase 1 selesai — BUG-01 & BUG-02 (2026-08-16)
+
+Per plan `docs/bugfix-plan.md`: Phase 1 (Routing & Validasi) dieksekusi tuntas.
+
+- **BUG-01** ✅ — `market.routes.ts`: hapus 3 registrasi route duplikat tanpa `validate()` (`/prices`, `/ohlc/all`, `/ohlc/:symbol/:timeframe`). Sebelumnya Express memakai registrasi pertama (tanpa validasi) → yang ber-validasi dead code. Kini tiap route **persis 1 registrasi** ber-validasi (`grep -c` = 1). Komentar `?symbols=`/`?timeframe=` dipindah ke registrasi yang masih hidup.
+- **BUG-02** ✅ — `market.dto.ts`: rename field `activeOnly` → `active` di `getSymbolsDto`. Sebelumnya DTO memvalidasi nama yang tidak pernah dibaca controller (controller baca `req.query.active`) → validasi `?active=` tak pernah jalan. Controller tidak diubah.
+- **Verifikasi:** tsc 0 · lint 0/0 · boundary 0 · test **7 files / 51 tests / 0 failed** (regresi 0).
+- **Next:** Phase 2 (BUG-03 rateLimiter normalizedIP, BUG-05 metadata device terbaru) — tanpa keputusan produk, bisa langsung eksekusi.
+
+---
+
+## 8m. Bugfix Phase 2 selesai — BUG-03 & BUG-05 (2026-08-16)
+
+Per plan `docs/bugfix-plan.md`: Phase 2 (Rate limit & Session display) dieksekusi tuntas.
+
+- **BUG-03** ✅ — `rateLimiter.ts`: `createIpKeyGenerator()` kini `req.normalizedIP || req.ip || "unknown"` (sebelumnya `req.ip` mentah → klien dual-stack/proxy bisa masuk 2 bucket berbeda). Bonus konsistensi: fallback `perUserLimiter` & `sensitiveLimiter` (unauthenticated) ikut pakai `normalizedIP`.
+- **BUG-05** ✅ — `GetSessionsUseCase`: `sessionMetaByFingerprint` pilih session dengan `createdAt` terbaru per fingerprint (sebelumnya first-seen — urutan `SMEMBERS` Redis tak dijamin, metadata device bisa tampil acak kalau device punya >1 session aktif). Kosmetik display saja, tanpa dampak keamanan.
+- **Verifikasi:** tsc 0 · lint 0/0 · boundary 0 · test **7 files / 51 tests / 0 failed**.
+- **Next:** Phase 3 (BUG-06 audit log kolom actor/target, BUG-07 `UpdateUserUseCase` tercatat) — prioritas compliance, tanpa keputusan produk.
+
+---
+
+## 8n. Bugfix Phase 3 selesai — BUG-06 & BUG-07 (2026-08-16)
+
+Per plan `docs/bugfix-plan.md`: Phase 3 (Audit Log Admin) dieksekusi tuntas — prioritas compliance (dua-duanya Medium–High).
+
+- **BUG-06** ✅ — Audit log kini menampilkan data nyata. Sebelumnya: SQL `findAll` sudah menghitung `actor_type/actor_email/actor_name/target_email/target_name` via JOIN users, tapi `mapRow()` membuangnya (entity tak punya field), dan kedua use case hardcode blank (`targetEmail: null`, `admin: {email:""}`) + `actorType: a.action.startsWith("user_") ? "user" : "admin"` (tak pernah true). Perubahan: 5 field optional di `AdminAction` entity, `mapRow` meneruskannya, `GetAuditLogsUseCase` & `ExportAuditLogsUseCase` pakai nilai entity (`a.actorType ?? "admin"` sebagai fallback type-safe yang tak pernah terpakai dari `findAll`).
+- **BUG-07** ✅ — `UpdateUserUseCase` (ban/suspend/reactivate + grant/revoke admin) kini inject `ActivityLogRepository` dan mencatat `update_user` dengan details (`statusChanged`/`isAdminChanged`/`newStatus`/`newIsAdmin`). Sebelumnya aksi paling sensitif ini **nol trace** — `AdminActionType.UPDATE_USER` hanya ada di enum, 0 pemakaian. `DeleteUserUseCase`/`ResetUserPassword`/`Broadcast` sudah log.
+- **Verifikasi:** tsc 0 · lint 0/0 · boundary 0 · test **7 files / 51 tests / 0 failed**.
+- **Next:** Phase 4 (BUG-08 `cleanupOlderThan` di-wire ke `SystemCleanupUseCase` + method baru chat/activity; BUG-11 sync symbol tanpa count-gate) — butuh konfirmasi retention period.
+
+---
+
+## 8o. Bugfix Phase 4 selesai — BUG-08 & BUG-11 (2026-08-16)
+
+Per plan `docs/bugfix-plan.md`: Phase 4 (Operasional & Scaling) dieksekusi tuntas. Retention yang dipakai: token_usage 90, failed_login_attempts 30, chat_logs 90, user_activity_logs 90 hari — **calendar_events & admin_actions sengaja TIDAK di-delete**.
+
+- **BUG-08** ✅ — `cleanupOlderThan` yang tadinya dead code kini ter-wire: `SystemCleanupUseCase` inject `UsageRepository`/`LoginAttemptRepository`/`ChatRepository`/`ActivityLogRepository` + tambah ke `Promise.allSettled`. `ChatRepository` & `ActivityLogRepository` (interface + Pg impl) dapat method `cleanupOlderThan` baru — activity cleanup hanya `user_activity_logs` (admin_actions di-exclude untuk audit trail compliance). Semua jalan via `HourlyCleanupJob` yang sudah ada. Sebelumnya `token_usage` & `chat_logs` (data paling cepat tumbuh, ±1 baris per pesan chat) tidak pernah dipangkas.
+- **BUG-11** ✅ — `SymbolService.syncBrokerSymbols`: hapus gate `count === storedCount → skip`. Sebelumnya rename/ubah `trade_mode`/`description`/`category` dengan total count sama → `broker_symbols` stale selamanya (memperparah M4). Kini selalu fetch + `saveMany` (idempotent via `ON CONFLICT DO UPDATE`); count hanya jadi log.
+- **Verifikasi:** tsc 0 · lint 0/0 · boundary 0 · test **7 files / 51 tests / 0 failed**. Container tidak perlu registrasi baru (token DI sudah ada).
+- **Next:** Phase 5 (BUG-04, 09, 10) — butuh konfirmasi 3 keputusan terbuka: implementasi CAPTCHA, perilaku login BUG-09 saat device milik akun lain, `requireEmailVerification` wajib?.
+
+---
+
+## 8p. Bugfix Phase 5 selesai — BUG-04, BUG-09, BUG-10 (2026-08-16) — SEMUA 11 BUG SELESAI
+
+Per plan `docs/bugfix-plan.md`: Phase 5 (Auth Hardening) dieksekusi tuntas — **11/11 bug diperbaiki**. Keputusan user: CAPTCHA opsi (a) in-app, BUG-09 blok login, `requireEmailVerification` tetap toggle .env.
+
+- **BUG-04** ✅ — **Layered lockout, hard lock 15 menit dihapus.** Baru: `domain/services/loginPolicy.ts` (pure — `computeLoginDelaySeconds` 1s/2s/4s…cap 30s mulai kegagalan ke-6; `isCaptchaRequired` ≥5; window 15 menit), `CaptchaStore` (port) + `RedisCaptchaStore` (data, TTL 5 menit) + `CaptchaService` (application — challenge matematika in-app `"Berapa X + Y?"`, jawaban sha256, sekali pakai), `CaptchaRequiredError` (428, challenge di `details` — FE menampilkannya langsung dari response, tanpa endpoint terpisah). `LoginAttemptRepository.isAccountLocked` → `countRecentFailures(email, window)` (SEMUA IP — rotasi IP tak bisa lolos). `LoginUseCase`: captcha gate (salah → record + challenge baru; tidak dikirim → tidak dihitung kegagalan) → progressive delay → verifikasi. `loginDto` + `AuthController.login`: field `captcha { challengeId, answer }`.
+- **BUG-09** ✅ — `PgDeviceRepository.bind`: `ON CONFLICT DO UPDATE SET last_seen_at` + `WHERE user_devices.user_id = EXCLUDED.user_id` — user_id **tidak pernah reassign** (sebelumnya bisa merampas device antar akun senyap); konflik antar akun → return null. `RegisterUseCase`: bind null → rollback user baru + `ConflictError`. `AuthService`: bind SEBELUM session dibuat → null = **blok login** 403 (keputusan user).
+- **BUG-10** ✅ — `passport.ts` Google strategy: akun existing `emailVerified=true` → auto-link; `!emailVerified` → **reclaim**: `withEmailVerified()` + `withPasswordHash(null)` (method baru di `User`) → save → login — email-squatting (pre-registrasi unverified) tidak lagi membajak login Google.
+- **Test:** bertambah `loginPolicy.test.ts` (6) → **8 files / 57 tests / 0 failed**; `LoginUseCase.test` & `RegisterUseCase.test` diupdate ke flow baru.
+- **Verifikasi final:** tsc 0 · lint 0/0 · boundary 0 · test 8 files / 57 tests ✅.
+- **Catatan follow-up (opsional):** `googleId` tidak di-set saat reclaim; E2E live (brute-force, 2 device, browser Google) belum dijalankan.
+
+## 8q. Konsistensi bahasa — semua pesan user-facing jadi Bahasa Inggris (2026-08-16)
+
+Permintaan user: pesan yang tampil di backend jangan campur aduk — **konsisten semua Inggris**. Audit string user-facing di `Backend/src` menemukan 11 string Indonesia → semuanya diubah:
+
+- **`AuthController.ts`** — `"Logout berhasil"` (×2) → `"Logout successful"`; `` `Logout dari ${count} device berhasil` `` → `` `Logged out from ${count} devices successfully` ``.
+- **`NewsController.ts`** — `` `asset tidak dikenal, pilih salah satu: ...` `` → `` `Asset not recognized, pick one of: ...` ``.
+- **`CaptchaService.ts`** — challenge CAPTCHA `` `Berapa X + Y?` `` → `` `What is X + Y?` `` (perlu update FE saat wiring).
+- **`LoginUseCase.ts`** — `"CAPTCHA salah atau kedaluwarsa"` → `"Incorrect or expired CAPTCHA"`.
+- **`rateLimiter.ts`** — 5 pesan 429 `"Terlalu banyak ..."` → `"Too many ..."` (perlu update FE jika menampilkan pesan ini).
+- **Test:** `LoginUseCase.test.ts` mock question + assert disinkronkan ke English.
+
+**Catatan scope:** yang diubah hanya **pesan user-facing (response error/message)**. Komentar kode berbahasa Indonesia sengaja dibiarkan (bukan output). Frontend (Vite/Next/Admin) masih punya string UI Indonesia sendiri — di luar scope task ini.
+
+**Verifikasi:** tsc 0 · lint 0/0 · boundary 0 · test **8 files / 57 tests / 0 failed** ✅. `grep` final: 0 match string Indonesia user-facing tersisa di `src/`.
+
+## 8r. Follow-up Phase 5 — googleId reclaim + E2E live (2026-08-16)
+
+**Follow-up #1 — `googleId` saat reclaim OAuth (BUG-10):** sebelumnya `passport.ts` reclaim hanya `withEmailVerified().withPasswordHash(null)` — `googleId` tidak di-set (tercatat di §8p). Sekarang: method baru `User.withGoogleId()` (pola immutability) + rantai reclaim `.withEmailVerified().withPasswordHash(null).withGoogleId(profile.id)`. Test baru `src/domain/entities/User.test.ts` (5 test) → **9 files / 62 tests / 0 failed**.
+
+**Follow-up #2 — E2E live** (infra docker lokal: Postgres :5432, Redis :6379; server `tsx src/main.ts` di port 3000, dimatikan setelah selesai):
+
+- **BUG-04 (layered lockout + CAPTCHA) — terverifikasi live ✅**: register → 201; login salah ×5 → 401; login ke-6 tanpa captcha → **428** `Human verification required` + `details.challenge` (`What is X + Y?` — Inggris, konsisten §8q); captcha salah → **428** `Incorrect or expired CAPTCHA` + challenge baru (kegagalan naik → captcha tetap wajib, sesuai policy); captcha benar → **200 + sessionToken**; `/me` → 200; logout → 200 `Logout successful`.
+- **BUG-09 (device bind) — terverifikasi live ✅**: register dari device yang sudah ter-bind ke akun lain → **409** `This device is already registered to another account` (rollback + ConflictError bekerja); login dari device milik akun lain → **403 FORBIDDEN** `Device is bound to another account`.
+- **BUG-10 (OAuth) — TIDAK bisa E2E penuh**: butuh browser Google interaktif + akun Google sungguhan (flow OAuth tidak bisa di-drive via curl). Path reclaim dijamin oleh unit test (`User.test.ts`); fix `googleId` sudah masuk.
+
+**Temuan & perbaikan dari E2E:**
+1. **Status blok device tadinya 401, bukan 403** — `AuthService` return `{ status: 403 }` tapi `LoginUseCase` membuang status & melempar `AuthenticationError` (401). Diperbaiki: `AuthorizationError` (403 FORBIDDEN) + konstruktor menerima `details` opsional (sama pola `AuthenticationError`) → `LoginUseCase` lempar `AuthorizationError` dengan `{ hasActiveSession }`. Verifikasi live ulang: **403 FORBIDDEN** ✅.
+2. **Fingerprint device bisa collide untuk UA custom** — `DeviceFingerprint.create` = hash(IP | browser | major version | OS | device.type via UAParser). UA custom yang tidak dikenali UAParser → fallback `"unknown"` → 2 UA berbeda bisa hash sama (terjadi saat E2E). By design (stabilitas > granularitas), layak diingat saat debugging device.
+
+**Verifikasi:** tsc 0 · lint 0/0 · boundary 0 · test **9 files / 62 tests / 0 failed**. Cleanup data test: 5 user `e2e-*@betrix.test` + 8 failed-login + 3 device + 4 activity log dihapus dari Postgres; key Redis (`session:*`, `user_sessions:*`) dari user test akan expire otomatis (TTL 24 jam).
+
+## 8s. Test drive `npm run dev` — semua Bug 1–11 live (2026-08-16)
+
+Permintaan user: jalankan `npm run dev` (tsx watch, port 3000) + test drive Bug 1–11. Server dijalankan dengan `DEVICE_ENFORCEMENT=true` (inline, tanpa ubah .env) agar BUG-09 bisa diuji; data test `e2e-*@betrix.test` dibersihkan setelahnya.
+
+| Bug | Verifikasi live | Hasil |
+|---|---|---|
+| BUG-01 | `/market/prices` & `/ohlc/all` tanpa query wajib | **400** Validation failed (validasi kini hidup; `?symbols=XAUUSD` → 200) ✅ |
+| BUG-02 | `/market/symbols?active=false` memfilter; `?active=abc` → coerce true (perilaku Zod standar) | mapping nama `active` bekerja ✅ |
+| BUG-03 | `PUT /auth/password` ×4 (sensitiveLimiter per-user) | ke-4 → **429** limiter aktif ✅ |
+| BUG-04 | register → 5× salah (401) → 428 + challenge → captcha benar | **200** recovery penuh ✅ |
+| BUG-05 | `GET /auth/sessions` | `ip: "127.0.0.1"` + `userAgent` tampil ✅ |
+| BUG-06 | `GET /admin/actions` + `/actions/export` | actor/target email+name terisi di JSON & CSV ✅ |
+| BUG-07 | `PUT /admin/users/:id {status:suspended}` | 200 + entry `update_user` tercatat ✅ |
+| BUG-08 | log server `[Cleanup] System cleanup completed` | kini menyertakan `failed login attempts`, `chat logs`, `user activity logs` ✅ |
+| BUG-09 | register device milik akun lain → 409; login device milik akun lain → 403 | **409** conflict + **403 FORBIDDEN** `Device is bound to another account` ✅ |
+| BUG-10 | Google OAuth | ⚠️ tidak bisa live (butuh browser + akun Google interaktif) — dijamin unit test |
+| BUG-11 | log server `[Symbols] Synced ...` | `Synced 8562 broker symbols` (tanpa count-gate) ✅ |
+
+**Catatan test-drive:** (1) fingerprint device = hash(IP+browser+OS+device via UAParser) — UA Chrome Windows kita collide dengan device `test@betrix.test` (akun test lama), jadi register 409; pakai UA berbeda untuk tiap akun. (2) Dengan enforcement ON, login kedua dari device yang sama → 403 `Device already has active session` (single-session per device by design). (3) Cleanup: 5 user e2e + 4 device + 4 activity + 1 admin_action dihapus; server dimatikan.
+
+---
+
 ## 9. Inventaris file yang sering disentuh
 
 - `eslint.config.js` — guardrail boundary (domain + konteks).
@@ -350,6 +479,8 @@ Full test E2E ulang setelah rangkaian perubahan fingerprint/session/IP — **1 b
 - `src/application/mappers/user.mapper.ts` — mapper DTO user.
 - `src/contexts/news/**` — konteks news (template bounded context).
 - `docs/ddd-refactor-plan.md` — plan + report semua fase (sumber kebenaran angka & keputusan).
+- `docs/bugfix-plan.md` — plan perbaikan 11 bug (5 phase + TODO list per bug + report per phase).
+- `docs/betrix-backend-bug-report.md` — sumber bug report (deep review, tidak diedit).
 - `docs/session-context.md` — file ini.
 
 ---

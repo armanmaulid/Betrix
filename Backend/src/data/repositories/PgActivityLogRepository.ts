@@ -86,4 +86,13 @@ export class PgActivityLogRepository implements ActivityLogRepository {
       outputTokens: input.outputTokens,
     });
   }
+
+  // Hanya user_activity_logs — admin_actions sengaja TIDAK di-delete (audit trail compliance).
+  async cleanupOlderThan(days: number): Promise<number> {
+    const { rowCount } = await pgClient.query(
+      `DELETE FROM user_activity_logs WHERE created_at < NOW() - INTERVAL '1 day' * $1`,
+      [days]
+    );
+    return rowCount || 0;
+  }
 }

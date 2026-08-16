@@ -52,4 +52,6 @@ export interface ActivityLogRepository {
   logChat(input: ChatLogInput): Promise<void>;
   logTokenUsage(input: TokenUsageInput): Promise<void>;
   logMetrics(input: MetricsLogInput): Promise<void>;
+  // Hanya membersihkan user_activity_logs — admin_actions TIDAK ikut (audit trail compliance).
+  cleanupOlderThan(days: number): Promise<number>;
 }

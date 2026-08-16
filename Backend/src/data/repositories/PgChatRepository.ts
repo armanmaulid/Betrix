@@ -147,6 +147,14 @@ export class PgChatRepository implements ChatRepository {
     return rowCount || 0;
   }
 
+  async cleanupOlderThan(days: number): Promise<number> {
+    const { rowCount } = await pgClient.query(
+      `DELETE FROM chat_logs WHERE created_at < NOW() - INTERVAL '1 day' * $1`,
+      [days]
+    );
+    return rowCount || 0;
+  }
+
   async findForExport(userId: string, params: {
     taskType?: ChatTaskType;
     startDate?: Date;

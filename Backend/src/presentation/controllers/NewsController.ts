@@ -33,7 +33,7 @@ export class NewsController {
 
       if (asset && !VALID_ASSETS.includes(asset as string)) {
         return res.status(400).json({
-          error: `asset tidak dikenal, pilih salah satu: ${VALID_ASSETS.join(", ")}`,
+          error: `Asset not recognized, pick one of: ${VALID_ASSETS.join(", ")}`,
           code: "VALIDATION_ERROR"
         });
       }

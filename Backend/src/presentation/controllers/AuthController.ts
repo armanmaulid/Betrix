@@ -76,6 +76,7 @@ export class AuthController {
         email: req.body.email,
         password: req.body.password,
         request: this.getRequestInput(req),
+        captcha: req.body.captcha,
       });
 
       res.json({
@@ -99,7 +100,7 @@ export class AuthController {
         request: this.getRequestInput(req),
       });
 
-      res.json({ message: "Logout berhasil" });
+      res.json({ message: "Logout successful" });
     } catch (err) {
       next(err);
     }
@@ -113,7 +114,7 @@ export class AuthController {
         ip: req.normalizedIP || req.ip || "",
         headers: { "user-agent": req.headers["user-agent"] },
       });
-      res.json({ message: "Logout berhasil" });
+      res.json({ message: "Logout successful" });
     } catch (err) {
       next(err);
     }
@@ -126,7 +127,7 @@ export class AuthController {
         ip: req.normalizedIP || req.ip || "",
         userAgent: req.headers["user-agent"],
       });
-      res.json({ message: `Logout dari ${count} device berhasil` });
+      res.json({ message: `Logged out from ${count} devices successfully` });
     } catch (err) {
       next(err);
     }

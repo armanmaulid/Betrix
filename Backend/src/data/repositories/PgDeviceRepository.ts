@@ -35,17 +35,20 @@ export class PgDeviceRepository implements DeviceRepository {
     return rows[0]?.user_id || null;
   }
 
-  async bind(device: Device): Promise<Device> {
+  async bind(device: Device): Promise<Device | null> {
+    // ON CONFLICT hanya boleh UPDATE last_seen_at UNTUK USER YANG SAMA —
+    // user_id TIDAK boleh di-reassign (BUG-09: TOCTOU race dulu bisa merampas
+    // device antar akun secara senyap). Konflik dgn akun lain → 0 row → null.
     const { rows } = await pgClient.query(
       `INSERT INTO user_devices (id, user_id, device_fingerprint, created_at, last_seen_at)
        VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (device_fingerprint) DO UPDATE SET
-         user_id = EXCLUDED.user_id,
          last_seen_at = EXCLUDED.last_seen_at
+       WHERE user_devices.user_id = EXCLUDED.user_id
        RETURNING *`,
       [device.id, device.userId, device.fingerprint, device.createdAt, device.lastSeenAt]
     );
-    return this.mapRow(rows[0]);
+    return rows[0] ? this.mapRow(rows[0]) : null;
   }
 
   async unbind(userId: string, fingerprint: DeviceFingerprint): Promise<void> {

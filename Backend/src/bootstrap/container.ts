@@ -20,6 +20,7 @@ import { PgUsageRepository } from "@data/repositories/PgUsageRepository.js";
 import { PgActivityLogRepository } from "@data/repositories/PgActivityLogRepository.js";
 import { PgAnalyticsRepository } from "@data/repositories/PgAnalyticsRepository.js";
 import { RedisMarketDataRepository } from "@data/repositories/RedisMarketDataRepository.js";
+import { RedisCaptchaStore } from "@data/repositories/RedisCaptchaStore.js";
 
 // External services
 import { AiGatewayClient } from "@data/external/AiGatewayClient.js";
@@ -99,6 +100,7 @@ import { NewsController } from "@presentation/controllers/NewsController.js";
 import { MarketDataService } from "@application/services/MarketDataService.js";
 import { CalendarService } from "@application/services/CalendarService.js";
 import { AuthService } from "@application/services/AuthService.js";
+import { CaptchaService } from "@application/services/CaptchaService.js";
 import { NewsService } from "@contexts/news/application/NewsService.js";
 
 // Events & Handlers
@@ -127,6 +129,7 @@ export function registerDependencies() {
   container.register("NewsRepository", { useClass: PgNewsRepository });
   container.register("NewsContextPort", { useClass: PgNewsRepository });
   container.register("MarketDataRepository", { useClass: RedisMarketDataRepository });
+  container.register("CaptchaStore", { useClass: RedisCaptchaStore });
 
   // External services
   container.register("AiPort", { useClass: AiGatewayClient });
@@ -221,6 +224,7 @@ export function registerDependencies() {
   container.register("AuthService", { useClass: AuthService });
   container.register("NewsService", { useClass: NewsService });
   container.register("AiPromptRegistry", { useClass: AiPromptRegistry });
+  container.register("CaptchaService", { useClass: CaptchaService });
 
   // Events & Handlers
   container.register("EventDispatcher", { useClass: EventDispatcher }, { lifecycle: Lifecycle.Singleton });

@@ -52,10 +52,15 @@ export class GetSessionsUseCase {
     const currentUserAgent = session.userAgent;
 
     // Fingerprint → ip/userAgent session terbaru (untuk device yang ter-bind).
-    const sessionMetaByFingerprint = new Map<string, { ip: string | null; userAgent: string | null }>();
+    // Pilih session dengan createdAt TERBARU per fingerprint — kalau device punya
+    // >1 session aktif (login 2x / IP berubah), metadata yang ditampilkan harus
+    // yang terbaru (urutan SMEMBERS Redis tidak dijamin, first-seen bisa acak).
+    const sessionMetaByFingerprint = new Map<string, { ip: string | null; userAgent: string | null; createdAt: Date }>();
     for (const s of userSessions) {
-      if (s.deviceFingerprint && !sessionMetaByFingerprint.has(s.deviceFingerprint)) {
-        sessionMetaByFingerprint.set(s.deviceFingerprint, { ip: s.ip, userAgent: s.userAgent });
+      if (!s.deviceFingerprint) continue;
+      const existing = sessionMetaByFingerprint.get(s.deviceFingerprint);
+      if (!existing || s.createdAt > existing.createdAt) {
+        sessionMetaByFingerprint.set(s.deviceFingerprint, { ip: s.ip, userAgent: s.userAgent, createdAt: s.createdAt });
       }
     }
 

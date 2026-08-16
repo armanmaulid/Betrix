@@ -4,6 +4,8 @@ import { SessionRepository } from "@domain/repositories/SessionRepository.js";
 import { UserStatus } from "@domain/entities/User.js";
 import { NotFoundError, ValidationError } from "@core/errors/index.js";
 import { INotifier } from "@domain/ports/INotifier.js";
+import { ActivityLogRepository } from "@domain/repositories/ActivityLogRepository.js";
+import { AdminActionType } from "@domain/entities/AdminAction.js";
 
 interface UpdateUserInput {
   adminId: string;
@@ -27,6 +29,7 @@ interface UpdateUserOutput {
 @injectable()
 export class UpdateUserUseCase {
   constructor(
+    @inject("ActivityLogRepository") private activityLogRepo: ActivityLogRepository,
     @inject("UserRepository") private userRepo: UserRepository,
     @inject("SessionRepository") private sessionRepo: SessionRepository,
     @inject("INotifier") private notifier: INotifier
@@ -55,6 +58,23 @@ export class UpdateUserUseCase {
     }
 
     await this.userRepo.save(updatedUser);
+
+    // Aksi admin paling sensitif (ban/suspend/reactivate + grant/revoke admin)
+    // wajib tercatat di audit log — sebelumnya tidak ada trace sama sekali.
+    await this.activityLogRepo.logAdminAction({
+      adminId: input.adminId,
+      action: AdminActionType.UPDATE_USER,
+      targetType: "user",
+      targetId: input.targetUserId,
+      details: {
+        statusChanged: input.status !== undefined,
+        isAdminChanged: input.isAdmin !== undefined,
+        newStatus: input.status,
+        newIsAdmin: input.isAdmin,
+      },
+      ip: input.requestIp,
+      userAgent: input.requestUserAgent,
+    });
 
     // Revoke sessions if banned/suspended
     if (input.status === UserStatus.BANNED || input.status === UserStatus.SUSPENDED) {

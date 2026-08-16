@@ -20,7 +20,12 @@ export class AdminAction {
     public readonly details: Record<string, unknown> | null,
     public readonly ip: string | null,
     public readonly userAgent: string | null,
-    public readonly createdAt: Date
+    public readonly createdAt: Date,
+    public readonly actorType?: "admin" | "user",
+    public readonly actorEmail?: string | null,
+    public readonly actorName?: string | null,
+    public readonly targetEmail?: string | null,
+    public readonly targetName?: string | null
   ) {}
 
   static create(data: {
@@ -31,6 +36,11 @@ export class AdminAction {
     details?: Record<string, unknown> | null;
     ip?: string | null;
     userAgent?: string | null;
+    actorType?: "admin" | "user";
+    actorEmail?: string | null;
+    actorName?: string | null;
+    targetEmail?: string | null;
+    targetName?: string | null;
   }): AdminAction {
     return new AdminAction(
       crypto.randomUUID(),
@@ -41,7 +51,12 @@ export class AdminAction {
       data.details ?? null,
       data.ip ?? null,
       data.userAgent ?? null,
-      new Date()
+      new Date(),
+      data.actorType,
+      data.actorEmail ?? null,
+      data.actorName ?? null,
+      data.targetEmail ?? null,
+      data.targetName ?? null
     );
   }
 }

@@ -31,6 +31,12 @@ export class AuthService {
 
     if (enforceDevice) {
       fingerprint = DeviceFingerprint.create(request);
+      // Bind SEBELUM session dibuat: kalau device milik akun lain, blok login
+      // (keputusan user BUG-09) — dulu bind di belakang & bisa reassign senyap.
+      const bound = await this.deviceRepo.bind(Device.create({ userId: user.id, fingerprint: fingerprint.value }));
+      if (!bound) {
+        return { ok: false, status: 403, error: "Device is bound to another account" };
+      }
       const result = await this.deviceSessionRepo.setSessionForDeviceAtomic(user.id, fingerprint.value, sessionToken);
       if (!result.success) {
         return { ok: false, status: 403, error: "Device already has active session", hasActiveSession: true };
@@ -44,10 +50,6 @@ export class AuthService {
       ip: request.ip,
       userAgent: request.headers["user-agent"],
     }));
-
-    if (fingerprint) {
-      await this.deviceRepo.bind(Device.create({ userId: user.id, fingerprint: fingerprint.value }));
-    }
 
     return { ok: true, user, sessionToken };
   }

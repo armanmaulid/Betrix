@@ -2,7 +2,7 @@ import "reflect-metadata";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { LoginUseCase } from "./LoginUseCase.js";
 import { User, UserStatus } from "@domain/entities/User.js";
-import { AuthenticationError } from "@core/errors/index.js";
+import { AuthenticationError, CaptchaRequiredError } from "@core/errors/index.js";
 import type { AppSettings } from "@core/settings/AppSettings.js";
 
 // Mock bcrypt-based utils so tests stay fast and deterministic.
@@ -55,9 +55,13 @@ function makeSettings(overrides: Partial<AppSettings> = {}): AppSettings {
 function makeUseCase(deps: Partial<{
   userRepo: { findByEmail: ReturnType<typeof vi.fn> };
   loginAttemptRepo: {
-    isAccountLocked: ReturnType<typeof vi.fn>;
+    countRecentFailures: ReturnType<typeof vi.fn>;
     recordFailedLogin: ReturnType<typeof vi.fn>;
     clearFailedLogins: ReturnType<typeof vi.fn>;
+  };
+  captchaService: {
+    createChallenge: ReturnType<typeof vi.fn>;
+    verify: ReturnType<typeof vi.fn>;
   };
   authDomainService: { establishAuthenticatedSession: ReturnType<typeof vi.fn> };
   activityLogRepo: { logUserActivity: ReturnType<typeof vi.fn> };
@@ -68,13 +72,17 @@ function makeUseCase(deps: Partial<{
   const sessionRepo = { save: vi.fn().mockResolvedValue(undefined) };
   const deviceRepo = { bind: vi.fn().mockResolvedValue(undefined) };
   const loginAttemptRepo = deps.loginAttemptRepo ?? {
-    isAccountLocked: vi.fn().mockResolvedValue(false),
+    countRecentFailures: vi.fn().mockResolvedValue(0),
     recordFailedLogin: vi.fn().mockResolvedValue(undefined),
     clearFailedLogins: vi.fn().mockResolvedValue(undefined),
   };
   const deviceSessionRepo = { setSessionForDeviceAtomic: vi.fn().mockResolvedValue({ success: true }) };
   const authDomainService = deps.authDomainService ?? {
     establishAuthenticatedSession: vi.fn().mockResolvedValue({ ok: true, user: null, sessionToken: "tok" }),
+  };
+  const captchaService = deps.captchaService ?? {
+    createChallenge: vi.fn().mockResolvedValue({ challengeId: "c1", question: "What is 1 + 1?" }),
+    verify: vi.fn().mockResolvedValue(true),
   };
   const settings = deps.settings ?? makeSettings();
 
@@ -86,10 +94,11 @@ function makeUseCase(deps: Partial<{
     loginAttemptRepo as never,
     deviceSessionRepo as never,
     authDomainService as never,
-    settings as never
+    settings as never,
+    captchaService as never
   );
 
-  return { uc, activityLogRepo, userRepo, loginAttemptRepo, authDomainService };
+  return { uc, activityLogRepo, userRepo, loginAttemptRepo, authDomainService, captchaService };
 }
 
 const validInput = {
@@ -107,15 +116,63 @@ describe("LoginUseCase", () => {
     vi.clearAllMocks();
   });
 
-  it("throws AuthenticationError when the account is locked", async () => {
+  it("requires CAPTCHA after enough failures and rejects a login without it", async () => {
     const loginAttemptRepo = {
-      isAccountLocked: vi.fn().mockResolvedValue(true),
+      countRecentFailures: vi.fn().mockResolvedValue(5),
       recordFailedLogin: vi.fn(),
       clearFailedLogins: vi.fn(),
     };
-    const { uc } = makeUseCase({ loginAttemptRepo });
+    const captchaService = {
+      createChallenge: vi.fn().mockResolvedValue({ challengeId: "c1", question: "What is 3 + 4?" }),
+      verify: vi.fn(),
+    };
+    const { uc } = makeUseCase({ loginAttemptRepo, captchaService });
 
-    await expect(uc.execute(validInput)).rejects.toThrow(AuthenticationError);
+    await expect(uc.execute(validInput)).rejects.toThrow(CaptchaRequiredError);
+    // Tanpa captcha → tidak dihitung sebagai kegagalan baru.
+    expect(loginAttemptRepo.recordFailedLogin).not.toHaveBeenCalled();
+    // Challenge baru dibuat agar FE bisa langsung menampilkannya dari response 428.
+    expect(captchaService.createChallenge).toHaveBeenCalled();
+  });
+
+  it("rejects a wrong CAPTCHA answer and records a failure", async () => {
+    const loginAttemptRepo = {
+      countRecentFailures: vi.fn().mockResolvedValue(5),
+      recordFailedLogin: vi.fn(),
+      clearFailedLogins: vi.fn(),
+    };
+    const captchaService = {
+      createChallenge: vi.fn().mockResolvedValue({ challengeId: "c2", question: "What is 3 + 4?" }),
+      verify: vi.fn().mockResolvedValue(false),
+    };
+    const { uc } = makeUseCase({ loginAttemptRepo, captchaService });
+    const input = { ...validInput, captcha: { challengeId: "c2", answer: "99" } };
+
+    await expect(uc.execute(input)).rejects.toThrow("Incorrect or expired CAPTCHA");
+    expect(loginAttemptRepo.recordFailedLogin).toHaveBeenCalledWith("user@example.com", "1.2.3.4");
+  });
+
+  it("passes through a valid CAPTCHA and logs in", async () => {
+    (verifyPassword as ReturnType<typeof vi.fn>).mockResolvedValue(true);
+    const user = makeUser();
+    const loginAttemptRepo = {
+      countRecentFailures: vi.fn().mockResolvedValue(5),
+      recordFailedLogin: vi.fn(),
+      clearFailedLogins: vi.fn(),
+    };
+    const captchaService = {
+      createChallenge: vi.fn(),
+      verify: vi.fn().mockResolvedValue(true),
+    };
+    const userRepo = { findByEmail: vi.fn().mockResolvedValue(user) };
+    const authDomainService = {
+      establishAuthenticatedSession: vi.fn().mockResolvedValue({ ok: true, user, sessionToken: "s" }),
+    };
+    const { uc } = makeUseCase({ userRepo, authDomainService, loginAttemptRepo, captchaService });
+    const input = { ...validInput, captcha: { challengeId: "c1", answer: "7" } };
+
+    const result = await uc.execute(input);
+    expect(result.sessionToken).toBe("s");
     expect(loginAttemptRepo.recordFailedLogin).not.toHaveBeenCalled();
   });
 
@@ -123,7 +180,7 @@ describe("LoginUseCase", () => {
     (verifyPassword as ReturnType<typeof vi.fn>).mockResolvedValue(false);
     const userRepo = { findByEmail: vi.fn().mockResolvedValue(null) };
     const loginAttemptRepo = {
-      isAccountLocked: vi.fn().mockResolvedValue(false),
+      countRecentFailures: vi.fn().mockResolvedValue(0),
       recordFailedLogin: vi.fn(),
       clearFailedLogins: vi.fn(),
     };
@@ -137,7 +194,7 @@ describe("LoginUseCase", () => {
     (verifyPassword as ReturnType<typeof vi.fn>).mockResolvedValue(false);
     const userRepo = { findByEmail: vi.fn().mockResolvedValue(makeUser()) };
     const loginAttemptRepo = {
-      isAccountLocked: vi.fn().mockResolvedValue(false),
+      countRecentFailures: vi.fn().mockResolvedValue(0),
       recordFailedLogin: vi.fn(),
       clearFailedLogins: vi.fn(),
     };

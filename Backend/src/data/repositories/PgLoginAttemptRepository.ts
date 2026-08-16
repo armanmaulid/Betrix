@@ -4,13 +4,13 @@ import { LoginAttemptRepository } from "@domain/repositories/LoginAttemptReposit
 
 @injectable()
 export class PgLoginAttemptRepository implements LoginAttemptRepository {
-  async isAccountLocked(email: string, ip: string): Promise<boolean> {
+  async countRecentFailures(email: string, windowMinutes: number): Promise<number> {
     const { rows } = await pgClient.query(
       `SELECT COUNT(*) as count FROM failed_login_attempts 
-       WHERE email = $1 AND ip = $2 AND attempted_at > NOW() - INTERVAL '15 minutes'`,
-      [email, ip]
+       WHERE email = $1 AND attempted_at > NOW() - make_interval(mins => $2)`,
+      [email, windowMinutes]
     );
-    return parseInt(rows[0].count) >= 10;
+    return parseInt(rows[0].count);
   }
 
   async recordFailedLogin(email: string, ip: string): Promise<void> {

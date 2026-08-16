@@ -24,11 +24,7 @@ export function createMarketRouter(): Router {
   // parameterized (:symbol) — kalau tidak, "all" di-capture sebagai symbol
   // → 404 "Price/Market book not found for symbol: all".
   router.get("/prices/all", controller.getAllPrices.bind(controller));
-  router.get("/prices", controller.getPrices.bind(controller)); // ?symbols=EURUSD,GBPUSD
   router.get("/prices/:symbol", controller.getPrice.bind(controller));
-
-  router.get("/ohlc/all", controller.getAllOHLC.bind(controller)); // ?timeframe=M5
-  router.get("/ohlc/:symbol/:timeframe", controller.getOHLC.bind(controller));
 
   router.get("/mbook/all", controller.getAllMarketBooks.bind(controller));
   router.get("/mbook/:symbol", controller.getMarketBook.bind(controller));
@@ -58,8 +54,8 @@ export function createMarketRouter(): Router {
   });
 
   // Apply validation to price endpoints
-  router.get("/prices", validate(pricesQuerySchema), controller.getPrices.bind(controller));
-  router.get("/ohlc/all", validate(ohlcQuerySchema), controller.getAllOHLC.bind(controller));
+  router.get("/prices", validate(pricesQuerySchema), controller.getPrices.bind(controller)); // ?symbols=EURUSD,GBPUSD
+  router.get("/ohlc/all", validate(ohlcQuerySchema), controller.getAllOHLC.bind(controller)); // ?timeframe=M5
   router.get("/ohlc/:symbol/:timeframe", validate(ohlcParamSchema), controller.getOHLC.bind(controller));
 
   return router;

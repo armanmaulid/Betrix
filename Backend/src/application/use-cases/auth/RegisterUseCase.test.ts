@@ -131,7 +131,8 @@ describe("RegisterUseCase", () => {
   it("binds the device fingerprint when enforcement is enabled", async () => {
     const deviceRepo = {
       findUserByFingerprint: vi.fn().mockResolvedValue(null),
-      bind: vi.fn().mockResolvedValue(undefined),
+      // bind sekarang return null kalau konflik (BUG-09) — mock truthy utk sukses.
+      bind: vi.fn().mockResolvedValue({ id: "d1", userId: "u1", fingerprint: "fp", createdAt: new Date(), lastSeenAt: new Date() }),
     };
     const { uc } = makeUseCase({ deviceRepo, settings: makeSettings({ deviceEnforcementEnabled: true }) });
 
