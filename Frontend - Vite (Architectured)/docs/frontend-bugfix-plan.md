@@ -59,7 +59,7 @@ No logic changes, nothing to test beyond the build passing.
 
 These aren't edge cases — they produce wrong output in normal use.
 
-- [ ] **SSE `done` event lost on chunk split** — `src/features/chat/api/chatClient.ts:46-73`.
+- [x] **SSE `done` event lost on chunk split** — `src/features/chat/api/chatClient.ts:46-73`.
       `let isDoneEvent = false` is declared *inside* the `while(true)` read
       loop, so it resets every `reader.read()` call. If `event: done` and its
       `data:` line land in separate network chunks, the flag is gone by the
@@ -71,7 +71,7 @@ These aren't edge cases — they produce wrong output in normal use.
       endings (some proxies normalize to CRLF) — don't just patch the
       variable scope and leave the parser otherwise as-is.
 
-- [ ] **Session shape mismatch corrupts chat history UI** —
+- [x] **Session shape mismatch corrupts chat history UI** —
       `src/features/chat/hooks/useChatStream.ts:140-151` (writer) vs
       `src/features/chat/components/ChatHistoryList.tsx` (reader, ~91-96).
       Writer pushes `{ session_id, title, message, created_at }` (snake_case);
@@ -140,7 +140,7 @@ Network tab's EventSource requests).
 
 Both bugs live in the same file and are easiest to fix together.
 
-- [ ] **`AuthContext` value not memoized → `AuthCallbackPage` re-fire loop** —
+- [x] **`AuthContext` value not memoized → `AuthCallbackPage` re-fire loop** —
       `AuthContext.tsx:139` (`<AuthContext.Provider value={{ user, setUser,
       isLoading, isConnected, login, loginWithToken, logout }}>`) creates a
       new object AND new function identities every render. `AuthCallbackPage.tsx`'s
@@ -156,7 +156,7 @@ Both bugs live in the same file and are easiest to fix together.
       `loginWithToken` from `AuthCallbackPage`'s dep array as a shortcut —
       fix the root cause (unstable identity) so every other consumer of this
       context benefits too.
-- [ ] **`loginWithToken` leaves a stale token on failure** — same file,
+- [x] **`loginWithToken` leaves a stale token on failure** — same file,
       `loginWithToken` (~117-122) calls `localStorage.setItem` and
       `setSessionToken(token)` *before* `await authApi.fetchMe(token)`. If
       `fetchMe` throws (expired/invalid token), nothing clears the token —
@@ -177,7 +177,7 @@ with a deliberately invalid `?token=` in the callback URL and confirm
 
 ## Phase 4 — TradingViewWidget
 
-- [ ] **Injected `<script>` never removed** —
+- [x] **Injected `<script>` never removed** —
       `src/features/market/components/TradingViewWidget.tsx`. The effect
       appends a new `<script src="https://s3.tradingview.com/tv.js">` to
       `document.head` (~line 126) on every run, but cleanup (~line 137-142)
@@ -192,7 +192,7 @@ with a deliberately invalid `?token=` in the callback URL and confirm
       before creating a new one, and only ever load it once globally (module-
       level flag/promise), since the script itself doesn't need to reload per
       widget instance — only `initWidget()` needs to re-run per mount.
-- [ ] **`onError` in the effect's dependency array** — same file, the
+- [x] **`onError` in the effect's dependency array** — same file, the
       effect's dep array (~line 137) includes `onError`. No current caller
       passes this prop (checked: `DashboardPage.tsx` is the only consumer, 3
       usages, none pass `onError`), so this isn't actively causing a remount
@@ -216,7 +216,7 @@ and confirm (via dev tools → Elements → `<head>`) that only one
 Independent items — fine to split across multiple agent runs/sessions if
 needed, unlike Phases 1-4 which build on each other.
 
-- [ ] **Shared SSE connection refcount leak** —
+- [x] **Shared SSE connection refcount leak** —
       `src/features/market/hooks/useTickerPrices.ts`. `activeSymbolRefs` (a
       module-level refcount) is only touched by `useTickerPrices` itself.
       Confirmed: `NewsFeed.tsx`, `NewsPage.tsx`, `EconomicCalendar.tsx`, and
@@ -229,7 +229,7 @@ needed, unlike Phases 1-4 which build on each other.
       unmount, close the shared source when the total count across ALL
       consumers — not just symbols — hits zero) rather than calling
       `getSharedEventSource()` as if it were side-effect-free.
-- [ ] **`globalEventSource.onerror` is empty** — same file (~line 106). No
+- [x] **`globalEventSource.onerror` is empty** — same file (~line 106). No
       401 handling, no reconnect fallback logic — a dead stream (e.g. after
       the token expires) just stays silently dead with no user-visible signal
       and no attempt to recover.
@@ -239,28 +239,28 @@ needed, unlike Phases 1-4 which build on each other.
       `isConnected`/`hasError` flag already exists in `AuthContext` — wire
       the ticker's connection health into something the UI can show, even if
       minimal).
-- [ ] **No `AbortSignal` on `streamChat`** — `chatClient.ts`. Navigating away
+- [x] **No `AbortSignal` on `streamChat`** — `chatClient.ts`. Navigating away
       or unmounting mid-stream leaves the `fetch` + reader running with no way
       to cancel. Add an `AbortController`, accept an optional `signal` param
       (or return the controller so the caller can abort), and wire it into
       the `fetch()` call + cancel the reader loop on abort.
-- [ ] **No `AbortSignal` on news/calendar fetches** —
+- [x] **No `AbortSignal` on news/calendar fetches** —
       `NewsPage.tsx` (`fetchInitial`/`loadMore`, ~73/86-99),
       `NewsFeed.tsx` (`load()`, ~61), `EconomicCalendarPage.tsx` (`load()`,
       ~164). Same pattern each time: fast tab-switching or rapid clicking
       causes out-of-order responses to overwrite newer data. Add an
       `AbortController` per request, abort the previous one before starting a
       new one, ignore the response if the signal was already aborted.
-- [ ] **`NewsPage.tsx` `loadMore` offset drift** (~86-99) — uses
+- [x] **`NewsPage.tsx` `loadMore` offset drift** (~86-99) — uses
       `items.length` as the pagination offset, but SSE prepends new items
       into the same `items` array concurrently, so the offset drifts from
       what the backend actually already returned → duplicate or missing
       pages. Track the offset as separate state incremented only by
       `loadMore` itself, independent of live-prepended SSE items.
-- [ ] **`NewsPage.tsx` unbounded `wireItems` growth** (~148-152) — SSE
+- [x] **`NewsPage.tsx` unbounded `wireItems` growth** (~148-152) — SSE
       prepends grow this array forever in a long session, unlike `NewsFeed`
       which caps at 50. Apply the same cap here.
-- [ ] **Centralize `BACKEND_URL`** — currently duplicated in 8 files
+- [x] **Centralize `BACKEND_URL`** — currently duplicated in 8 files
       (`authClient`, `chatClient`, `newsClient`, `marketClient`,
       `usageClient`, `useTickerPrices`, `StatusBar`, `AuthContext`), all doing
       `import.meta.env.VITE_API_URL || "http://localhost:3000"` independently.
@@ -270,7 +270,7 @@ needed, unlike Phases 1-4 which build on each other.
       uses an absolute URL + `/api/v1` — either actually route through the
       proxy (relative URLs) or delete the proxy block; don't leave dead config
       that implies a routing strategy nothing uses.
-- [ ] **`authClient.ts:64`** — `body?.error` is cast straight to
+- [x] **`authClient.ts:64`** — `body?.error` is cast straight to
       `AuthApiError.message` with no type check; if the backend ever returns a
       non-string `error` field, this becomes `setState(object)` somewhere
       downstream, which crashes React ("Objects are not valid as a React
@@ -288,25 +288,25 @@ navigating away mid-load.
 
 Batch these together — no interdependencies, no logic risk, straightforward.
 
-- [ ] Error message blocks → add `role="alert"` (or `aria-live="polite"`):
+- [x] Error message blocks → add `role="alert"` (or `aria-live="polite"`):
       `LoginPage.tsx` (~162-167), `RegisterPage.tsx` (~208-213),
       `AuthCallbackPage.tsx` (~47-49).
-- [ ] `SettingsPage.tsx` (~202-227, ~335-401) — associate every `<label>`
+- [x] `SettingsPage.tsx` (~202-227, ~335-401) — associate every `<label>`
       with its input via `htmlFor`/`id`.
-- [ ] `ChatCommandBox.tsx` (~211-222) — icon-only tier buttons (Leaf/Globe)
+- [x] `ChatCommandBox.tsx` (~211-222) — icon-only tier buttons (Leaf/Globe)
       need `aria-label`, not just `title`.
-- [ ] `TopBar.tsx` (~87-93) — credits indicator: either make it a real
+- [x] `TopBar.tsx` (~87-93) — credits indicator: either make it a real
       `<button>` if it's meant to be interactive, or drop `cursor-pointer`
       and any implied interactivity if it's purely decorative.
-- [ ] `LoginPage.tsx:118` / `RegisterPage.tsx:136` — inline Google SVG needs
+- [x] `LoginPage.tsx:118` / `RegisterPage.tsx:136` — inline Google SVG needs
       `aria-hidden="true"`.
-- [ ] `index.html:2` — `<html lang="id">` but the UI mixes English strings
+- [x] `index.html:2` — `<html lang="id">` but the UI mixes English strings
       throughout; decide the actual primary language and either translate
       consistently or fix the `lang` attribute to match reality.
-- [ ] `ChatCommandBox.tsx:39` — replace native `alert()` for oversized-image
+- [x] `ChatCommandBox.tsx:39` — replace native `alert()` for oversized-image
       errors with the same inline error pattern used elsewhere in the file.
-- [ ] `TickerStrip` — mark the decorative marquee `aria-hidden="true"`.
-- [ ] `ChatHistoryList.tsx:94` — session-load target is a `<span onClick>`;
+- [x] `TickerStrip` — mark the decorative marquee `aria-hidden="true"`.
+- [x] `ChatHistoryList.tsx:94` — session-load target is a `<span onClick>`;
       change to a `<button>` so it's keyboard/focus reachable.
 
 **Verify:** run a quick pass with the browser's built-in accessibility
@@ -320,17 +320,17 @@ confirm the specific issues above no longer flag.
 Lowest priority — do this last, or skip if time-constrained (nothing here is
 a live bug, just weakened tooling).
 
-- [ ] Remove `// @ts-nocheck` from `AuthLayout.tsx:1` and
+- [x] Remove `// @ts-nocheck` from `AuthLayout.tsx:1` and
       `TradingViewWidget.tsx:1`, fix whatever type errors surface. Do this
       file-by-file — expect `TradingViewWidget.tsx` to need real work since
       it's flagged as the most error-prone file in the report.
-- [ ] `useChatStore.ts` — replace `messages: any[]` with a real message type.
-- [ ] `analyzePageHelpers.tsx:6-19` — type `markdownComponents` render props
+- [x] `useChatStore.ts` — replace `messages: any[]` with a real message type.
+- [x] `analyzePageHelpers.tsx:6-19` — type `markdownComponents` render props
       as `Components` from `react-markdown` instead of `(props: any)`.
-- [ ] `tradingViewSymbols.ts:29` — the unmapped-symbol fallback emits
+- [x] `tradingViewSymbols.ts:29` — the unmapped-symbol fallback emits
       `OANDA:${mt5Symbol}` but the lookup is case-sensitive while input isn't
       guaranteed uppercase; normalize input to uppercase before the lookup.
-- [ ] `queries.ts:10` — `Parameters<typeof login>[0] extends undefined ? any
+- [x] `queries.ts:10` — `Parameters<typeof login>[0] extends undefined ? any
       : any` always resolves to `any` regardless of the condition; fix the
       conditional type or remove it if it's not actually doing anything.
 
