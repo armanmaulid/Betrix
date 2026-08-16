@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { createContext, useContext, useCallback, useMemo, useEffect, useState, type ReactNode } from "react";
 import * as authApi from "../api/authClient";
 import type { AuthUser } from "../api/authClient";
 import { emitLogout } from "../../../shared/lib/authEvents";
@@ -107,21 +107,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [sessionToken]);
 
-  async function login(email: string, password: string) {
+  const login = useCallback(async (email: string, password: string) => {
     const result = await authApi.login(email, password); // throws AuthApiError on failure
     localStorage.setItem(STORAGE_KEY, result.sessionToken);
     setSessionToken(result.sessionToken);
     setUser(result.user);
-  }
+  }, []);
 
-  async function loginWithToken(token: string) {
+  const loginWithToken = useCallback(async (token: string) => {
+    // Persist the token only AFTER the backend verifies it — writing it
+    // before fetchMe left a stale token in localStorage + state whenever
+    // fetchMe threw (expired/invalid token).
+    const { user: fetchedUser } = await authApi.fetchMe(token);
     localStorage.setItem(STORAGE_KEY, token);
     setSessionToken(token);
-    const { user: fetchedUser } = await authApi.fetchMe(token);
     setUser(fetchedUser);
-  }
+  }, []);
 
-  async function logout() {
+  const logout = useCallback(async () => {
     // Tutup semua stream (me/stream, news/stream (for ticker, calendar, &c.), news/stream) SEKARANG JUGA — jangan nunggu network round-trip ke backend atau nunggu ProtectedRoute unmount komponen yang makai stream.
     emitLogout();
     
@@ -133,10 +136,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(STORAGE_KEY);
     setSessionToken(null);
     setUser(null);
-  }
+  }, [sessionToken]);
+
+  // Memoized so consumers (e.g. AuthCallbackPage) get stable function
+  // identities — an unstable `loginWithToken` made its effect re-fire on
+  // every provider render (which loginWithToken itself triggers via
+  // setSessionToken/setUser), re-processing the token on slow networks.
+  const value = useMemo<AuthContextValue>(
+    () => ({ user, setUser, isLoading, isConnected, login, loginWithToken, logout }),
+    [user, setUser, isLoading, isConnected, login, loginWithToken, logout]
+  );
 
   return (
-    <AuthContext.Provider value={{ user, setUser, isLoading, isConnected, login, loginWithToken, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
