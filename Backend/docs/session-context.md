@@ -6,8 +6,10 @@
 > **Cara resume:** baca file ini dulu (state, keputusan, gotcha), lalu `docs/ddd-refactor-plan.md`
 > (refactor DDD, semua fase selesai) dan `docs/bugfix-plan.md` (11 bug, SEMUA phase selesai).
 > **Status 2026-08-16:** DDD refactor ✅ + 11/11 bug ✅ + semua pesan user-facing konsisten
-> Bahasa Inggris (§8q) + follow-up Phase 5 selesai (googleId reclaim + E2E live, §8r).
-> Verifikasi final: tsc 0 · lint 0/0 · boundary 0 · test **9 files / 62 tests / 0 failed**.
+> Bahasa Inggris (§8q) + follow-up Phase 5 selesai (googleId reclaim + E2E live, §8r)
+> + **Phase 2 backend selesai** (stream ticket + OAuth one-time code, §8u)
+> + handoff Tim Frontend via proposal balasan (§8v).
+> Verifikasi final: tsc 0 · lint 0/0 · boundary 0 · test **12 files / 74 tests / 0 failed**.
 
 ---
 
@@ -483,6 +485,54 @@ Permintaan user: jalankan `npm run dev` (tsx watch, port 3000) + test drive Bug 
 
 ---
 
+## 8u. Phase 2 backend selesai — stream ticket + OAuth one-time code (2026-08-16)
+
+Kontrak backend dari proposal FE (`Frontend - Vite (Architectured)/docs/phase2-token-storage-proposal.md` §7.1) diimplementasikan penuh. Keputusan: **Option B (stream ticket)** + **one-time code OAuth** (Option A httpOnly cookie tidak dipilih).
+
+### Endpoint baru
+- **`POST /api/v1/auth/stream-ticket`** (protected, Bearer) — `GetStreamTicketUseCase` (baru): validasi session → ticket opaque `randomBytes(32)` hex → `200 { ticket }`; 401 `AuthenticationError` kalau token invalid. TTL **60 dtk**, **single-use** (`RedisStreamTicketStore`, key `stream_ticket:<ticket>`).
+- **`POST /api/v1/auth/oauth/exchange`** (guest + authLimiter + validate `oauthExchangeDto`) — `ExchangeOAuthCodeUseCase` (baru): `getAndDelete(code)` → null → 400 `ValidationError "Invalid or expired OAuth code"`; session divalidasi masih hidup (logout antara redirect & exchange → invalid); fetch user fresh → `200 { sessionToken, user }` (shape `LoginSuccess`).
+
+### Perubahan
+- **`googleCallback`** (`AuthController`) — redirect `?token=<sessionToken>` → `?code=<one-time-code>` (`randomBytes(32)`, TTL 5 menit, `RedisOAuthCodeStore` key `oauth_code:<code>`, payload JSON `{ sessionToken, userId }`). Token sesi tidak pernah lagi muncul di URL callback.
+- **`streamAuth.middleware.ts`** (baru, khusus route stream) — `?ticket=` (burn + validasi session via `findSessionByToken`) atau `Authorization: Bearer`; `?token=` di URL → **400 `TOKEN_IN_URL_REJECTED`**; keduanya ada → **400 `AMBIGUOUS_AUTH`** (jangan fallback ke token). Dipakai `news/stream` (`news.routes.ts`).
+- **`auth.middleware.ts`/`guestMiddleware`** — fallback `req.query.token` **dihapus** (Bearer only). Diverifikasi 0 konsumen lain (`grep query.token` = hanya verifyEmail controller yang memakai token VERIFIKASI email, bukan session). Defense in depth: tidak ada route yang menerima session token di URL.
+- **`AuthController`** — inject `GetStreamTicketUseCase`, `ExchangeOAuthCodeUseCase`, `OAuthCodeStore`; handler `getStreamTicket` + `oauthExchange`.
+- **`container.ts`** — register `StreamTicketStore`, `OAuthCodeStore`, `GetStreamTicketUseCase`, `ExchangeOAuthCodeUseCase`.
+
+### Desain penting
+1. **Ticket menyimpan `sessionToken` (bukan userId)** — saat connect, stream middleware tetap validasi session live (`findByToken`). Logout langsung membatalkan ticket tanpa index per-user (best-effort terpenuhi secara alami).
+2. **⚠️ EventSource reconnect** — ticket single-use + TTL 60s: saat koneksi putus, EventSource auto-reconnect dengan URL lama → ticket sudah terbakar → 401. **Frontend harus minta ticket baru tiap kali membuat/membuka ulang EventSource** (termasuk di handler reconnect). Ini tanggung jawab FE §7.2 — dicatat supaya tidak kaget.
+3. **Sequencing §7.3 tetap berlaku**: deploy backend → frontend eksekusi §7.2. Catatan: setelah backend deploy, **FE lama akan kehilangan SSE + Google login** (stream kirim `?token=` → 400; callback terima `?code=` yang tak bisa diproses) — rilis bersamaan atau terima window singkat.
+4. `verifyEmail` (`req.query.token`) & email link (`EmailService`) memakai **token verifikasi email** (bukan session) — di luar scope, tidak disentuh.
+
+### Verifikasi
+- `npx tsc --noEmit` → 0 error · `npm run lint` → 0/0 · boundary `import/no-restricted-paths` → 0 · `npm test` → **12 files / 74 tests / 0 failed** (+7: `GetStreamTicketUseCase.test` 3, `ExchangeOAuthCodeUseCase.test` 4).
+- **E2E live (2026-08-16, DB/Redis Docker ON, MT5 bridge ON, server tsx port 3000)** — semua ✅:
+  1. register → 201 + sessionToken; `POST /auth/stream-ticket` (Bearer) → `200 { ticket }`
+  2. `GET /news/stream?ticket=` → `event: connected` + `price_update` BTCUSD live mengalir
+  3. `GET /news/stream?token=` → **400** `TOKEN_IN_URL_REJECTED` (token di URL ditolak)
+  4. Ticket dipakai ulang → **401** `Invalid or expired stream ticket` (single-use bekerja)
+  5. `POST /auth/oauth/exchange` code sampah → **400** `Invalid or expired OAuth code`
+  6. `?ticket=abc&token=...` keduanya → **400** `AMBIGUOUS_AUTH`
+  7. Ticket baru → logout → pakai ticket → **401** `Session not found or expired` (logout membatalkan ticket — desain ticket menyimpan sessionToken terbukti)
+- Cleanup: user `e2e-p2-*@betrix.test` dihapus dari Postgres (activity 1, users 1), server dimatikan. Alur penuh Google OAuth (redirect → `?code=` → exchange) tetap butuh browser Google — dijamin unit test + skenario 5 (code invalid).
+
+## 8v. Handoff Tim Frontend — proposal balasan Phase 2 (2026-08-16)
+
+Setelah kontrak backend selesai (§8u), dibuat **proposal balasan untuk Tim Frontend**:
+`Frontend - Vite (Architectured)/docs/phase2-backend-response.md` (ditaruh di folder docs FE, bersebelahan proposal asli `phase2-token-storage-proposal.md`).
+
+**Isi dokumen:**
+- Status kontrak backend: 5/5 selesai + bukti gate (tsc 0 · lint 0/0 · boundary 0 · 74 test) + hasil E2E live (§8u).
+- **Kontrak final persis** siap-implementasi: spesifikasi `POST /auth/stream-ticket`, tabel aturan auth `news/stream` (semua skenario + kode error: `TOKEN_IN_URL_REJECTED`, `AMBIGUOUS_AUTH`, `UNAUTHENTICATED`), `POST /auth/oauth/exchange` (shape `LoginSuccess`), redirect `?code=`.
+- **Gotcha critical FE:** (1) **EventSource reconnect = ticket sudah terbakar** (single-use + TTL 60s) → FE wajib fetch ticket BARU tiap buka ulang stream — pola kode disertakan; `useTickerPrices` sudah punya reconnect/backoff dari Phase 5, tinggal sisipkan fetch ticket sebelum `new EventSource`; (2) jangan fetch ticket jauh-jauh sebelum dipakai (TTL 60s).
+- Instruksi per file FE (pemetaan §7.2 proposal): `authClient` (+`getStreamTicket`/`exchangeOAuthCode`), `AuthContext` (:69), `useTickerPrices` (:71), `AuthCallbackPage` (:12 → baca `?code=`), CSP hardening prod-only di `vite.config.ts` (murni frontend — bisa dikerjakan kapan saja).
+- Urutan rilis: setelah backend deploy, **FE lama rusak di 2 titik** (SSE `?token=` → 400; callback terima `?code=`) → rilis backend + FE bersamaan.
+- Checklist verifikasi FE (Network tab `?ticket=` bukan `?token=`, reconnect, login Google, ticket basi 401, localStorage bersih, CSP prod) + referensi file backend.
+
+**Status:** menunggu FE eksekusi §2 dokumen tsb. Tidak ada perubahan backend tambahan setelah §8u.
+
 ## 9. Inventaris file yang sering disentuh
 
 - `eslint.config.js` — guardrail boundary (domain + konteks).
@@ -492,6 +542,11 @@ Permintaan user: jalankan `npm run dev` (tsx watch, port 3000) + test drive Bug 
 - `src/domain/services/ModelPolicy.ts` — policy model murni.
 - `src/application/mappers/user.mapper.ts` — mapper DTO user.
 - `src/contexts/news/**` — konteks news (template bounded context).
+- `src/domain/repositories/StreamTicketStore.ts` + `OAuthCodeStore.ts` — port Phase 2 (ticket stream sekali pakai + code OAuth).
+- `src/data/repositories/RedisStreamTicketStore.ts` + `RedisOAuthCodeStore.ts` — impl Redis (key `stream_ticket:<t>` TTL 60s / `oauth_code:<c>` TTL 5m).
+- `src/application/use-cases/auth/GetStreamTicketUseCase.ts` + `ExchangeOAuthCodeUseCase.ts` — use case Phase 2 (+ test-nya).
+- `src/presentation/middleware/streamAuth.middleware.ts` — auth khusus route stream: `?ticket=`/Bearer; `?token=` di URL ditolak.
+- `Frontend - Vite (Architectured)/docs/phase2-backend-response.md` — proposal balasan FE (handoff Phase 2, §8v).
 - `docs/ddd-refactor-plan.md` — plan + report semua fase (sumber kebenaran angka & keputusan).
 - `docs/bugfix-plan.md` — plan perbaikan 11 bug (5 phase + TODO list per bug + report per phase).
 - `docs/betrix-backend-bug-report.md` — sumber bug report (deep review, tidak diedit).

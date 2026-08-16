@@ -43,6 +43,10 @@ export const resendVerificationDto = z.object({
   email: z.string().email(),
 });
 
+export const oauthExchangeDto = z.object({
+  code: z.string().min(1),
+});
+
 export type RegisterDto = z.infer<typeof registerDto>;
 export type LoginDto = z.infer<typeof loginDto>;
 export type ChangePasswordDto = z.infer<typeof changePasswordDto>;
@@ -50,3 +54,4 @@ export type ChangeEmailDto = z.infer<typeof changeEmailDto>;
 export type UpdateProfileDto = z.infer<typeof updateProfileDto>;
 export type VerifyEmailDto = z.infer<typeof verifyEmailDto>;
 export type ResendVerificationDto = z.infer<typeof resendVerificationDto>;
+export type OAuthExchangeDto = z.infer<typeof oauthExchangeDto>;

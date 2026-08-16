@@ -10,11 +10,21 @@ export interface AuthenticatedRequest extends Request {
   };
 }
 
+/**
+ * Cari session dari raw token (dipakai authMiddleware & streamAuthMiddleware).
+ * Dipisah agar logika lookup tidak diduplikasi.
+ */
+export async function findSessionByToken(sessionToken: string) {
+  const sessionRepo = container.resolve("SessionRepository") as SessionRepository;
+  return sessionRepo.findByToken(sessionToken);
+}
+
 export async function authMiddleware(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization || "";
-  const sessionToken = authHeader.startsWith("Bearer ") 
-    ? authHeader.slice(7) 
-    : (req.query.token as string || null);
+  // Token sesi TIDAK diterima lagi dari query string (Phase 2 — token di URL
+  // bocor ke access log/history/Referer). Route stream SSE pakai ?ticket= via
+  // streamAuthMiddleware; semua route lain memakai header Bearer.
+  const sessionToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
 
   if (!sessionToken) {
     return res.status(401).json({ error: "Session token required", code: "UNAUTHENTICATED" });
@@ -40,9 +50,8 @@ export async function authMiddleware(req: Request, res: Response, next: NextFunc
 
 export async function guestMiddleware(req: Request, res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization || "";
-  const sessionToken = authHeader.startsWith("Bearer ") 
-    ? authHeader.slice(7) 
-    : (req.query.token as string || null);
+  // Sama seperti authMiddleware: Bearer saja, tanpa fallback ?token= di URL.
+  const sessionToken = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : null;
 
   if (!sessionToken) {
     return next();

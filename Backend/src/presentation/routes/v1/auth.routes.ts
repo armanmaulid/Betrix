@@ -5,7 +5,7 @@ import { AuthController } from "@presentation/controllers/AuthController.js";
 import { authMiddleware, guestMiddleware } from "@presentation/middleware/auth.middleware.js";
 import { validate } from "@presentation/middleware/validate.middleware.js";
 import { authLimiter, registerLimiter, sensitiveLimiter } from "@core/middleware/rateLimiter.js";
-import { registerDto, loginDto, changePasswordDto, changeEmailDto, updateProfileDto, verifyEmailDto, resendVerificationDto } from "@application/dtos/auth.dto.js";
+import { registerDto, loginDto, changePasswordDto, changeEmailDto, updateProfileDto, verifyEmailDto, resendVerificationDto, oauthExchangeDto } from "@application/dtos/auth.dto.js";
 
 export function createAuthRouter(): Router {
   const router = Router();
@@ -21,6 +21,9 @@ export function createAuthRouter(): Router {
   router.get("/google", passport.authenticate("google", { scope: ["profile", "email"], session: false }));
   router.get("/google/callback", passport.authenticate("google", { session: false, failureRedirect: "/login?error=google_denied" }), controller.googleCallback.bind(controller));
 
+  // OAuth one-time code → session token (FE tukar ?code= dari callback Google)
+  router.post("/oauth/exchange", authLimiter, validate(oauthExchangeDto), controller.oauthExchange.bind(controller));
+
   router.post("/logout-by-credentials", authLimiter, controller.logoutByCredentials.bind(controller));
   router.get("/verify-email", authLimiter, validate(verifyEmailDto), controller.verifyEmail.bind(controller));
   router.post("/verify-email", authLimiter, validate(verifyEmailDto), controller.verifyEmail.bind(controller));
@@ -32,6 +35,8 @@ export function createAuthRouter(): Router {
 
   protectedRouter.post("/logout", controller.logout.bind(controller));
   protectedRouter.post("/logout-all", controller.logoutAll.bind(controller));
+  // Stream ticket: tukar session token → ticket sekali pakai untuk URL SSE
+  protectedRouter.post("/stream-ticket", controller.getStreamTicket.bind(controller));
   router.use(protectedRouter);
   router.put("/password", authMiddleware, sensitiveLimiter, validate(changePasswordDto), controller.changePassword.bind(controller));
   router.put("/email", authMiddleware, sensitiveLimiter, validate(changeEmailDto), controller.changeEmail.bind(controller));

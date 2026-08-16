@@ -1,6 +1,10 @@
 import type { Request, Response, NextFunction } from "express";
 import { inject, injectable } from "tsyringe";
+import { randomBytes } from "crypto";
 import { RegisterUseCase } from "@application/use-cases/auth/RegisterUseCase.js";
+import { GetStreamTicketUseCase } from "@application/use-cases/auth/GetStreamTicketUseCase.js";
+import { ExchangeOAuthCodeUseCase } from "@application/use-cases/auth/ExchangeOAuthCodeUseCase.js";
+import { OAuthCodeStore } from "@domain/repositories/OAuthCodeStore.js";
 import { LoginUseCase } from "@application/use-cases/auth/LoginUseCase.js";
 import { LogoutUseCase } from "@application/use-cases/auth/LogoutUseCase.js";
 import { VerifyEmailUseCase } from "@application/use-cases/auth/VerifyEmailUseCase.js";
@@ -36,6 +40,9 @@ export class AuthController {
     @inject("UpdateProfileUseCase") private updateProfileUseCase: UpdateProfileUseCase,
     @inject("GetSessionsUseCase") private getSessionsUseCase: GetSessionsUseCase,
     @inject("RevokeSessionUseCase") private revokeSessionUseCase: RevokeSessionUseCase,
+    @inject("GetStreamTicketUseCase") private getStreamTicketUseCase: GetStreamTicketUseCase,
+    @inject("ExchangeOAuthCodeUseCase") private exchangeOAuthCodeUseCase: ExchangeOAuthCodeUseCase,
+    @inject("OAuthCodeStore") private oauthCodeStore: OAuthCodeStore,
     @inject("AppSettings") private settings: AppSettings
   ) {}
 
@@ -147,11 +154,19 @@ export class AuthController {
         this.settings.deviceEnforcementEnabled
       );
 
-      if (!result.ok) {
+      if (!result.ok || !result.sessionToken) {
         return res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/login?error=session_failed`);
       }
 
-      res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/auth/callback?token=${result.sessionToken}`);
+      // Phase 2: jangan bawa session token di URL redirect (bocor ke access
+      // log/history/Referer). FE tukar one-time code → token via /auth/oauth/exchange.
+      const code = randomBytes(32).toString("hex");
+      await this.oauthCodeStore.save(
+        code,
+        { sessionToken: result.sessionToken, userId: user.id },
+        OAUTH_CODE_TTL_SECONDS
+      );
+      res.redirect(`${process.env.FRONTEND_URL || "http://localhost:5173"}/auth/callback?code=${code}`);
     } catch (err) {
       next(err);
     }
@@ -252,4 +267,26 @@ export class AuthController {
       next(err);
     }
   }
+
+  async getStreamTicket(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await this.getStreamTicketUseCase.execute({ sessionToken: this.getSessionToken(req) });
+      res.json({ ticket: result.ticket });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  async oauthExchange(req: Request, res: Response, next: NextFunction) {
+    try {
+      const result = await this.exchangeOAuthCodeUseCase.execute({ code: req.body.code });
+      // Shape = LoginSuccess: FE langsung loginWithToken(sessionToken).
+      res.json({ sessionToken: result.sessionToken, user: toUserResponseDto(result.user) });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
+
+// One-time code OAuth: single-use, TTL ~5 menit (kontrak Phase 2).
+const OAUTH_CODE_TTL_SECONDS = 5 * 60;
