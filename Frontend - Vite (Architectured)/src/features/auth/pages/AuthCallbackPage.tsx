@@ -44,7 +44,7 @@ export function AuthCallbackPage() {
           </>
         }
       >
-        <div className="flex items-start gap-2 border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-[12px] text-[var(--danger)] animate-[shake_0.4s_ease-in-out]">
+        <div role="alert" className="flex items-start gap-2 border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-[12px] text-[var(--danger)] animate-[shake_0.4s_ease-in-out]">
           <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
           <span>{error}</span>
         </div>

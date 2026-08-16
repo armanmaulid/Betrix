@@ -198,20 +198,20 @@ export function SettingsPage() {
           <form onSubmit={handleUpdateProfile} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5 md:col-span-2">
-                <label className="text-[10px] text-[var(--text-muted)] tracking-wider">FULL NAME</label>
-                <input type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)]" />
+                <label htmlFor="settings-name" className="text-[10px] text-[var(--text-muted)] tracking-wider">FULL NAME</label>
+                <input id="settings-name" type="text" value={name} onChange={e => setName(e.target.value)} className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)]" />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[10px] text-[var(--text-muted)] tracking-wider">PHONE</label>
-                <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)]" />
+                <label htmlFor="settings-phone" className="text-[10px] text-[var(--text-muted)] tracking-wider">PHONE</label>
+                <input id="settings-phone" type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)]" />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[10px] text-[var(--text-muted)] tracking-wider">BIRTHDATE</label>
-                <input type="date" value={birthdate} onChange={e => setBirthdate(e.target.value)} className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)]" />
+                <label htmlFor="settings-birthdate" className="text-[10px] text-[var(--text-muted)] tracking-wider">BIRTHDATE</label>
+                <input id="settings-birthdate" type="date" value={birthdate} onChange={e => setBirthdate(e.target.value)} className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)]" />
               </div>
               <div className="space-y-1.5">
-                <label className="text-[10px] text-[var(--text-muted)] tracking-wider">GENDER</label>
-                <select value={gender} onChange={e => setGender(e.target.value)} className="w-full bg-black text-[var(--accent)] border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none">
+                <label htmlFor="settings-gender" className="text-[10px] text-[var(--text-muted)] tracking-wider">GENDER</label>
+                <select id="settings-gender" value={gender} onChange={e => setGender(e.target.value)} className="w-full bg-black text-[var(--accent)] border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none">
                   <option value="">Select...</option>
                   <option value="male">Male</option>
                   <option value="female">Female</option>
@@ -219,12 +219,12 @@ export function SettingsPage() {
                 </select>
               </div>
               <div className="space-y-1.5">
-                <label className="text-[10px] text-[var(--text-muted)] tracking-wider">ADDRESS</label>
-                <input type="text" value={address} onChange={e => setAddress(e.target.value)} className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)]" />
+                <label htmlFor="settings-address" className="text-[10px] text-[var(--text-muted)] tracking-wider">ADDRESS</label>
+                <input id="settings-address" type="text" value={address} onChange={e => setAddress(e.target.value)} className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)]" />
               </div>
               <div className="space-y-1.5 md:col-span-2">
-                <label className="text-[10px] text-[var(--text-muted)] tracking-wider">BIO</label>
-                <textarea value={bio} onChange={e => setBio(e.target.value)} rows={3} className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)] resize-none"></textarea>
+                <label htmlFor="settings-bio" className="text-[10px] text-[var(--text-muted)] tracking-wider">BIO</label>
+                <textarea id="settings-bio" value={bio} onChange={e => setBio(e.target.value)} rows={3} className="w-full bg-transparent border border-[var(--border)] px-3 py-1.5 text-[12px] focus:border-[var(--accent)] outline-none text-[var(--accent)] resize-none"></textarea>
               </div>
             </div>
             <div className="flex justify-end pt-4">
@@ -331,8 +331,9 @@ export function SettingsPage() {
 
         <form onSubmit={handleChangePassword} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-[10px] text-[var(--text-muted)] tracking-wider">CURRENT PASSWORD</label>
+            <label htmlFor="settings-current-password" className="text-[10px] text-[var(--text-muted)] tracking-wider">CURRENT PASSWORD</label>
             <input
+              id="settings-current-password"
               type="password"
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
@@ -341,8 +342,9 @@ export function SettingsPage() {
           </div>
           
           <div className="space-y-1.5">
-            <label className="text-[10px] text-[var(--text-muted)] tracking-wider">NEW PASSWORD</label>
+            <label htmlFor="settings-new-password" className="text-[10px] text-[var(--text-muted)] tracking-wider">NEW PASSWORD</label>
             <input
+              id="settings-new-password"
               type="password"
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
@@ -351,8 +353,9 @@ export function SettingsPage() {
           </div>
 
           <div className="space-y-1.5">
-            <label className="text-[10px] text-[var(--text-muted)] tracking-wider">CONFIRM NEW PASSWORD</label>
+            <label htmlFor="settings-confirm-password" className="text-[10px] text-[var(--text-muted)] tracking-wider">CONFIRM NEW PASSWORD</label>
             <input
+              id="settings-confirm-password"
               type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
@@ -381,8 +384,9 @@ export function SettingsPage() {
 
         <form onSubmit={handleChangeEmail} className="space-y-4">
           <div className="space-y-1.5">
-            <label className="text-[10px] text-[var(--text-muted)] tracking-wider">NEW EMAIL ADDRESS</label>
+            <label htmlFor="settings-new-email" className="text-[10px] text-[var(--text-muted)] tracking-wider">NEW EMAIL ADDRESS</label>
             <input
+              id="settings-new-email"
               type="email"
               value={emailToChange}
               onChange={(e) => setEmailToChange(e.target.value)}
@@ -392,8 +396,9 @@ export function SettingsPage() {
           </div>
           
           <div className="space-y-1.5">
-            <label className="text-[10px] text-[var(--text-muted)] tracking-wider">CURRENT PASSWORD</label>
+            <label htmlFor="settings-email-current-password" className="text-[10px] text-[var(--text-muted)] tracking-wider">CURRENT PASSWORD</label>
             <input
+              id="settings-email-current-password"
               type="password"
               value={emailCurrentPassword}
               onChange={(e) => setEmailCurrentPassword(e.target.value)}

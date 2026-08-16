@@ -85,7 +85,7 @@ export const TopBar = React.memo(function TopBar({ onSearchSymbol }: TopBarProps
       </form>
 
       <div
-        className="flex flex-shrink-0 cursor-pointer items-center gap-1.5 border-l border-[var(--border)] px-3 text-[10px] transition-colors hover:bg-[var(--surface-alt)]"
+        className="flex flex-shrink-0 items-center gap-1.5 border-l border-[var(--border)] px-3 text-[10px]"
         title="Sisa AI Credits"
       >
         <Zap size={12} className={user?.credits && user.credits > 0 ? "text-[var(--caution)]" : "text-[var(--danger)]"} />

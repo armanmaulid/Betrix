@@ -91,9 +91,12 @@ export function ChatHistoryList() {
         <div key={session.sessionId} className="bx-box-interactive flex items-center justify-between page-container py-3 group">
           <div className="flex items-center gap-2 text-[var(--text-primary)] w-full max-w-[80%]">
             <MessageSquare size={14} className="text-[var(--accent)] shrink-0" />
-            <span onClick={() => loadSession(session)} className="text-[11px] truncate hover:opacity-80 cursor-pointer transition-opacity w-full">
+            <button
+              onClick={() => loadSession(session)}
+              className="w-full cursor-pointer truncate bg-transparent p-0 text-left text-[11px] transition-opacity hover:opacity-80"
+            >
               {session.title || (session.turns && session.turns[0]?.message)}
-            </span>
+            </button>
           </div>
           <div className="flex items-center gap-4 text-[var(--text-muted)] text-[10px]">
             <div className="flex items-center gap-1.5 shrink-0">
