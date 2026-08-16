@@ -1,6 +1,33 @@
-// @ts-nocheck
 import { useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
+
+// Minimal typing untuk API embed TradingView (s3.tradingview.com/tv.js).
+// Tv.js sendiri untyped (global script), jadi kita definisikan bagian yang
+// dipakai saja — sisanya (events, getWidget, dst) tidak kita sentuh.
+interface TradingViewWidgetConfig {
+  autosize: boolean;
+  symbol: string;
+  interval: string;
+  timezone: string;
+  theme: string;
+  style: string;
+  locale: string;
+  enable_publishing: boolean;
+  allow_symbol_change: boolean;
+  hide_side_toolbar: boolean;
+  hide_top_toolbar: boolean;
+  hide_volume: boolean;
+  studies?: string[];
+  container_id: string;
+}
+
+declare global {
+  interface Window {
+    TradingView?: {
+      widget: new (config: TradingViewWidgetConfig) => unknown;
+    };
+  }
+}
 
 interface TradingViewWidgetProps {
   symbol: string; // Format TradingView, mis. "OANDA:XAUUSD" — lihat lib/tradingViewSymbols.ts
@@ -88,7 +115,7 @@ export function TradingViewWidget({ symbol, theme = "dark", interval = "15", cha
     scriptLoadedRef.current = false;
 
     let cancelled = false;
-    let loadTimeout: NodeJS.Timeout | undefined;
+    let loadTimeout: ReturnType<typeof setTimeout> | undefined;
 
     // Small delay untuk avoid race condition saat rapid symbol changes
     const timeoutId = setTimeout(() => {

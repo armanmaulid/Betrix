@@ -1,21 +1,22 @@
 import type { Candle } from "../../features/market/api/marketClient";
 import type { NewsItem } from "../../features/news/api/newsClient";
+import type { Components } from "react-markdown";
 
 // Styling elemen Markdown supaya senada dengan tema terminal gelap Betrix
 // (aksen orange --accent, border --border) alih-alih default browser polos.
-export const markdownComponents = {
-  h1: (props: any) => <h3 className="text-[13px] font-bold text-[var(--accent)] mt-3 mb-1.5 first:mt-0" {...props} />,
-  h2: (props: any) => <h3 className="text-[13px] font-bold text-[var(--accent)] mt-3 mb-1.5 first:mt-0" {...props} />,
-  h3: (props: any) => <h4 className="text-[12px] font-bold text-[var(--accent)] mt-2.5 mb-1 first:mt-0" {...props} />,
-  p: (props: any) => <p className="text-[12px] leading-relaxed text-[var(--text-primary)] mb-2 last:mb-0" {...props} />,
-  strong: (props: any) => <strong className="font-bold text-white" {...props} />,
-  em: (props: any) => <em className="italic text-[var(--text-primary)]" {...props} />,
-  ul: (props: any) => <ul className="list-disc list-outside pl-4 mb-2 space-y-0.5 text-[12px] text-[var(--text-primary)]" {...props} />,
-  ol: (props: any) => <ol className="list-decimal list-outside pl-4 mb-2 space-y-0.5 text-[12px] text-[var(--text-primary)]" {...props} />,
-  li: (props: any) => <li className="leading-relaxed" {...props} />,
+export const markdownComponents: Components = {
+  h1: (props) => <h3 className="text-[13px] font-bold text-[var(--accent)] mt-3 mb-1.5 first:mt-0" {...props} />,
+  h2: (props) => <h3 className="text-[13px] font-bold text-[var(--accent)] mt-3 mb-1.5 first:mt-0" {...props} />,
+  h3: (props) => <h4 className="text-[12px] font-bold text-[var(--accent)] mt-2.5 mb-1 first:mt-0" {...props} />,
+  p: (props) => <p className="text-[12px] leading-relaxed text-[var(--text-primary)] mb-2 last:mb-0" {...props} />,
+  strong: (props) => <strong className="font-bold text-white" {...props} />,
+  em: (props) => <em className="italic text-[var(--text-primary)]" {...props} />,
+  ul: (props) => <ul className="list-disc list-outside pl-4 mb-2 space-y-0.5 text-[12px] text-[var(--text-primary)]" {...props} />,
+  ol: (props) => <ol className="list-decimal list-outside pl-4 mb-2 space-y-0.5 text-[12px] text-[var(--text-primary)]" {...props} />,
+  li: (props) => <li className="leading-relaxed" {...props} />,
   hr: () => <hr className="border-t border-[var(--border)] my-3" />,
-  code: (props: any) => <code className="bg-[var(--surface-alt)] border border-[var(--border)] px-1 py-0.5 text-[11px] text-[var(--accent)]" {...props} />,
-  blockquote: (props: any) => <blockquote className="border-l-2 border-[var(--accent)] pl-3 text-[var(--text-muted)] italic my-2" {...props} />,
+  code: (props) => <code className="bg-[var(--surface-alt)] border border-[var(--border)] px-1 py-0.5 text-[11px] text-[var(--accent)]" {...props} />,
+  blockquote: (props) => <blockquote className="border-l-2 border-[var(--accent)] pl-3 text-[var(--text-muted)] italic my-2" {...props} />,
 };
 
 // Command instrumen yang men-trigger fetch data realtime MT5 (lihat mt5Client.js

@@ -26,5 +26,8 @@ export const MT5_TO_TRADINGVIEW: Record<string, string> = {
 };
 
 export function toTradingViewSymbol(mt5Symbol: string): string {
-  return MT5_TO_TRADINGVIEW[mt5Symbol] ?? `OANDA:${mt5Symbol}`;
+  // Lookup case-sensitive: normalisasi dulu supaya input lowercase (mis. "xauusd")
+  // tetap ketemu mapping-nya, dan fallback tidak menghasilkan "OANDA:xauusd".
+  const normalized = mt5Symbol.toUpperCase();
+  return MT5_TO_TRADINGVIEW[normalized] ?? `OANDA:${normalized}`;
 }

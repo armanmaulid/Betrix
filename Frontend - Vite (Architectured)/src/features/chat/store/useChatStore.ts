@@ -1,11 +1,22 @@
 import { create } from "zustand";
 
+export interface ChatMessage {
+  role: "user" | "agent" | "assistant";
+  content: string;
+  image?: string | null;
+  isTyping?: boolean;
+  thinkingTime?: string;
+  tools?: string;
+  cost?: string;
+  isFinishedGlow?: boolean;
+}
+
 interface ChatState {
   inputText: string;
   setInputText: (text: string) => void;
 
-  messages: any[];
-  setMessages: (updater: any[] | ((prev: any[]) => any[])) => void;
+  messages: ChatMessage[];
+  setMessages: (updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
 
   isStreaming: boolean;
   setIsStreaming: (isStreaming: boolean) => void;

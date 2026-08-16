@@ -2,8 +2,9 @@ import React, { useState } from "react";
 import { Globe, Copy, FileText, ChevronRight, Check } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { markdownComponents } from "../../../shared/lib/analyzePageHelpers";
+import { type ChatMessage } from "../store/useChatStore";
 
-export const ChatMessageItem = React.memo(({ msg }: { msg: any }) => {
+export const ChatMessageItem = React.memo(({ msg }: { msg: ChatMessage }) => {
   const [isCopied, setIsCopied] = useState(false);
 
   const handleCopy = () => {

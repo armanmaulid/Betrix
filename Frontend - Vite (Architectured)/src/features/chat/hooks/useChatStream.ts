@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { useChatStore } from "../store/useChatStore";
+import { useChatStore, type ChatMessage } from "../store/useChatStore";
 import { streamChat } from "../api/chatClient";
 import { fetchOHLC } from "../../market/api/marketClient";
 import { getNews, type NewsItem } from "../../news/api/newsClient";
@@ -51,14 +51,14 @@ export function useChatStream() {
     setMessages(prev => [
       ...prev, 
       { role: 'user', content: text, image: attachedImage },
-      { role: 'agent', content: "", isTyping: true } as any
+      { role: 'agent', content: "", isTyping: true }
     ]);
     
     const imageToSend = attachedImage;
     setAttachedImage(null);
 
     // 2. Extract clean history — normalize 'agent' → 'assistant' (backend only accepts user|assistant)
-    const chatHistory = messages.filter((m: any) => !m.isTyping).map((m: any) => ({
+    const chatHistory = messages.filter((m: ChatMessage) => !m.isTyping).map((m: ChatMessage) => ({
       role: m.role === 'agent' ? 'assistant' : m.role,
       content: m.content || "",
       image: m.image
