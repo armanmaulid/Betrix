@@ -138,13 +138,13 @@ export function useChatStream() {
     }
 
     setRecentSessions(prev => {
-      if (prev.find(s => s.session_id === activeSessionId)) return prev;
+      if (prev.find(s => s.sessionId === activeSessionId)) return prev;
       return [
         {
-          session_id: activeSessionId,
+          sessionId: activeSessionId,
           title: text,
           message: text,
-          created_at: new Date().toISOString()
+          createdAt: new Date().toISOString()
         },
         ...prev
       ].slice(0, 5);

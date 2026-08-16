@@ -35,40 +35,59 @@ export async function streamChat(
     if (!reader) throw new Error("No readable stream");
 
     let buffer = "";
+    // Hoisted outside the read loop so the flag survives chunk boundaries —
+    // `event: done` and its `data:` line can land in separate network chunks.
+    let isDoneEvent = false;
+    let isErrorEvent = false;
+
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
       
       buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
+      // Some proxies normalize line endings to CRLF — normalize to LF first
+      // so frame-boundary splitting below handles both.
+      buffer = buffer.replace(/\r\n/g, "\n");
 
-      let isDoneEvent = false;
+      // Parse on `\n\n` frame boundaries per the SSE spec; keep any trailing
+      // partial frame buffered for the next read.
+      const frames = buffer.split("\n\n");
+      buffer = frames.pop() || "";
 
-      for (const line of lines) {
-        if (line.trim() === "") continue;
-        
-        if (line.startsWith("event: done")) {
-          isDoneEvent = true;
-        } else if (line.startsWith("event: error")) {
-          // Will be handled in the next data line usually
-        } else if (line.startsWith("data: ")) {
-          const dataStr = line.substring(6);
-          if (dataStr.trim() === "[DONE]") continue; // Standard OpenAI SSE termination
-          
-          try {
-            const data = JSON.parse(dataStr);
-            if (isDoneEvent) {
-              onDone(data);
-              isDoneEvent = false;
-            } else if (data.token) {
-              onToken(data.token);
-            } else if (data.error) {
-              onError(data.error);
-            }
-          } catch (e) {
-            // Ignore parse errors for incomplete chunks
+      for (const frame of frames) {
+        isDoneEvent = false;
+        isErrorEvent = false;
+        const dataLines: string[] = [];
+
+        for (const line of frame.split("\n")) {
+          if (line.trim() === "") continue;
+          if (line.startsWith(":")) continue; // SSE comment / keep-alive
+          if (line.startsWith("event:")) {
+            const eventName = line.substring(6).trim();
+            if (eventName === "done") isDoneEvent = true;
+            else if (eventName === "error") isErrorEvent = true;
+          } else if (line.startsWith("data:")) {
+            // "data:" optionally followed by a single space, per the spec
+            dataLines.push(line.substring(5).replace(/^ /, ""));
           }
+        }
+
+        if (dataLines.length === 0) continue;
+
+        const dataStr = dataLines.join("\n");
+        if (dataStr.trim() === "[DONE]") continue; // Standard OpenAI SSE termination
+
+        try {
+          const data = JSON.parse(dataStr);
+          if (isDoneEvent) {
+            onDone(data);
+          } else if (isErrorEvent || data.error) {
+            onError(data.error || "Stream error");
+          } else if (data.token) {
+            onToken(data.token);
+          }
+        } catch (e) {
+          // Ignore parse errors for incomplete frames
         }
       }
     }
