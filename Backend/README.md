@@ -14,7 +14,7 @@ src/
 │   ├── entities/       # User, Session, ChatMessage, BrokerSymbol, CalendarEvent, etc.
 │   ├── repositories/   # Interfaces (ports) for data access
 │   ├── ports/           # Interfaces for external integrations (IBrokerProvider, INotifier, EmailPort...)
-│   ├── services/       # Pure domain logic (AiPromptRegistry, DeviceDomainService...)
+│   ├── services/       # Pure domain logic (AiPromptRegistry, DeviceDomainService, loginPolicy...)
 │   ├── value-objects/
 │   └── events/          # Domain events + EventDispatcher
 │
@@ -26,7 +26,7 @@ src/
 │
 ├── application/       # Application-specific orchestration
 │   ├── use-cases/       # Grouped by feature: auth, admin, chat, market, user
-│   ├── services/         # Application services (CalendarService, MarketDataService, SymbolService, AuthService...)
+│   ├── services/         # Application services (CalendarService, MarketDataService, SymbolService, AuthService, CaptchaService...)
 │   ├── mappers/          # Response DTO mappers (e.g. toUserResponseDto)
 │   ├── dtos/             # Zod schemas for request validation
 │   └── event-handlers/   # Listeners reacting to domain events
@@ -60,6 +60,9 @@ src/
 - **DI**: `tsyringe` — controllers resolve use-cases, which resolve repositories, keeping everything mockable.
 - **Validation**: `zod` DTOs validate `body`/`query`/`params` on every route via a `validate()` middleware.
 - **Auth**: JWT bearer tokens (`authMiddleware`) + Google OAuth (`passport-google-oauth20`) + optional device-fingerprint enforcement (`DEVICE_ENFORCEMENT`).
+- **Login anti-bruteforce**: no hard lockout — failures are counted per email (all IPs, 15-min window). 5+ recent failures require an in-app CAPTCHA (math challenge, `CaptchaService`/`CaptchaStore`, stored in Redis, 5-min TTL, one-time use) before another attempt is accepted; the challenge is returned inline in a `428 CAPTCHA_REQUIRED` response so the frontend never needs a separate endpoint. 6+ failures also add a progressive delay (1s, 2s, 4s... capped at 30s) before the credential check runs.
+- **Device binding**: a device fingerprint can only ever belong to one account — binding a device already owned by a different user returns `403` instead of silently reassigning it (registration rolls back the just-created user on conflict).
+- **Google OAuth reclaim**: if the Google-verified email matches an existing but unverified account, that account is reclaimed — its password is invalidated, it's marked verified, `googleId` is linked, and any live sessions on it are revoked (closes an email-squatting/pre-registration risk).
 
 ---
 
@@ -94,6 +97,8 @@ src/
 
 All routes except `/health`, `/auth/register`, `/auth/login`, and the Google OAuth routes require a valid JWT (`authMiddleware`); `/admin/*` additionally requires `adminMiddleware`.
 
+`POST /auth/login` accepts an optional `captcha: { challengeId, answer }` field. After 5+ recent failed attempts for that email, a request without a valid captcha gets a `428 CAPTCHA_REQUIRED` response with the next challenge embedded in `details.challenge` — no separate "get a challenge" call needed. `PUT|DELETE /admin/users/:id` (ban/suspend/grant-admin) and `GET /admin/actions` are now consistent: every admin action is recorded with the actual actor/target email and name (previously the audit log showed those fields blank).
+
 ---
 
 ## Background jobs
@@ -101,9 +106,11 @@ All routes except `/health`, `/auth/register`, `/auth/login`, and the Google OAu
 | Job | Trigger | Action |
 |---|---|---|
 | **Mt5SubscriptionJob** | On startup | Connects to the MT5 bridge, wires price/OHLC/calendar callbacks into `MarketDataService`/`CalendarService` |
-| **DailySyncJob** | Once per day, at broker midnight (`secondsUntilBrokerMidnight`, offset by `MT5_BROKER_UTC_OFFSET`) | Syncs the tradable symbol list from MT5, refreshes the economic calendar |
-| **HourlyCleanupJob** | Every 60 min | Runs `SystemCleanupUseCase` — purges expired sessions/tokens and stale data |
+| **DailySyncJob** | Once per day, at broker midnight (`secondsUntilBrokerMidnight`, offset by `MT5_BROKER_UTC_OFFSET`) | Force-syncs the tradable symbol list from MT5 (`force: true`, bypasses the 12h throttle below), refreshes the economic calendar |
+| **HourlyCleanupJob** | Every 60 min | Runs `SystemCleanupUseCase` — purges only ephemeral/derived state: expired verification tokens, old cached news, and the general cache (sessions expire via Redis TTL automatically). Everything else is kept in full from account creation onward: `token_usage`, `failed_login_attempts`, `chat_logs`, `user_activity_logs`, `calendar_events`, `admin_actions` are never auto-deleted — see the comment in `SystemCleanupUseCase.ts` for the reasoning per table |
 | **NewsPollingJob** | Every `FINNHUB_POLLING_INTERVAL_SEC` (default 10s), per provider | Polls news providers, backs off on repeated failures |
+
+Symbol sync (`SymbolService.syncBrokerSymbols`) also runs on startup outside these jobs; it's throttled to skip refetching if the last sync was under 12h ago (`SYNC_THROTTLE_MS`), avoiding redundant MT5 calls on quick restarts — the daily forced sync always runs regardless.
 
 Heavy syncs run non-blocking on startup so Express can bind to the port immediately.
 
@@ -210,7 +217,7 @@ npm start             # run compiled dist/main.js
 Other scripts:
 
 ```bash
-npm test              # vitest run
+npm test              # vitest run — 67 tests across 10 files
 npm run test:watch
 npm run test:coverage
 npm run lint
