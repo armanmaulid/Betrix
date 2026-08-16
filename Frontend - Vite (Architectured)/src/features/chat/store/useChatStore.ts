@@ -19,9 +19,6 @@ interface ChatState {
   optimizeEnabled: boolean;
   setOptimizeEnabled: (val: boolean | ((prev: boolean) => boolean)) => void;
 
-  webSearchEnabled: boolean;
-  setWebSearchEnabled: (val: boolean | ((prev: boolean) => boolean)) => void;
-
   attachedImage: string | null;
   setAttachedImage: (img: string | null) => void;
 
@@ -56,11 +53,6 @@ export const useChatStore = create<ChatState>((set) => ({
   optimizeEnabled: true,
   setOptimizeEnabled: (val) => set((state) => ({
     optimizeEnabled: typeof val === "function" ? val(state.optimizeEnabled) : val
-  })),
-
-  webSearchEnabled: false,
-  setWebSearchEnabled: (val) => set((state) => ({
-    webSearchEnabled: typeof val === "function" ? val(state.webSearchEnabled) : val
   })),
 
   attachedImage: null,

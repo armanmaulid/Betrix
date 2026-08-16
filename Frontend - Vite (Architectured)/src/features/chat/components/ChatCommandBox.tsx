@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
-import { ChevronDown, Globe, Leaf, Paperclip, Sparkles, X, ArrowRight } from "lucide-react";
+import { ChevronDown, Leaf, Paperclip, Sparkles, X, ArrowRight } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { useChatStream } from "../hooks/useChatStream";
 import { useBrokerSymbols } from "../../market/api/queries";
@@ -18,7 +18,6 @@ export function ChatCommandBox({ isChat = false }: { isChat?: boolean }) {
     activeTab, setActiveTab,
     agentTier, setAgentTier,
     optimizeEnabled, setOptimizeEnabled,
-    webSearchEnabled, setWebSearchEnabled,
     attachedImage, setAttachedImage
   } = useChatStore();
 
@@ -213,13 +212,6 @@ export function ChatCommandBox({ isChat = false }: { isChat?: boolean }) {
             className={`p-1 transition-opacity hover:opacity-80 ${!optimizeEnabled && agentTier === "cheap" ? "bg-[var(--success)] text-black" : "bg-[var(--success-soft)] text-[var(--success)]"}`}
           >
             <Leaf size={14} />
-          </button>
-          <button
-            onClick={() => setWebSearchEnabled((v: boolean) => !v)}
-            title="Search Web (belum aktif di backend, lihat catatan tim)"
-            className={`p-1 transition-opacity hover:opacity-80 ${webSearchEnabled ? "bg-[var(--info)] text-black" : "bg-[var(--info-soft)] text-[var(--info)]"}`}
-          >
-            <Globe size={14} />
           </button>
         </div>
       </div>
