@@ -18,7 +18,7 @@ Rules: work top-to-bottom, one phase per commit, run `npx tsc --noEmit && npm ru
 
 ## Phase 0 — completed
 
-Commit: (pending commit on main). Changes:
+Commit: `024e598`. Changes:
 - Deleted `src/features/analysis/pages/refactor_analyze.py` (destructive stray script).
 - Deleted `vite.config.js` + `vite.config.d.ts` (Vite resolved `.js` first, `.ts` was silently ignored). `vite.config.ts` is now the sole config.
 - Deleted dead components: `StrategyPanel.tsx`, `SignalResultCard.tsx`, `LightweightChartWidget.tsx`.
@@ -31,7 +31,7 @@ Gate: `npx tsc --noEmit` = 0 errors; `npm run build` = 0 errors (vite v5.4.21, 1
 
 ## Phase 1 — completed
 
-Commit: (pending — one commit on a branch off `main`). Changes:
+Commit: `60e1df2`. Changes:
 - `src/features/chat/api/chatClient.ts` — SSE parser: `isDoneEvent`/`isErrorEvent` hoisted out of the `while` read loop (flag survives chunk boundaries); switched from `\n`-only line split to `\n\n` frame-boundary parsing per SSE spec with `\r\n` → `\n` normalization; `event: error` now actually triggers `onError` (was only a comment).
 - `src/features/chat/hooks/useChatStream.ts` — session writer now emits canonical camelCase `{ sessionId, title, message, createdAt }` (was snake_case `{ session_id, created_at }`), matching `ChatHistoryList.tsx` reader — fixes `key={undefined}`, `timeAgo` → "NaNd ago", and `setCurrentSessionId(undefined)` on click. Grep for remaining `session_id`/`created_at` in `chat` feature: 0 matches.
 
@@ -41,7 +41,7 @@ Pending: manual verify (new chat → message appears in recent-sessions with rea
 
 ## Phase 3 — completed
 
-Commit: (pending — one commit on a branch off `main`). Changes:
+Commit: `2fda8e6`. Changes:
 - `src/features/auth/context/AuthContext.tsx` — `login`/`loginWithToken`/`logout` wrapped in `useCallback` (correct deps; `logout` keyed on `sessionToken`), context value object wrapped in `useMemo` keyed on its actual state + callbacks → `AuthCallbackPage` effect (`[token, loginWithToken, navigate]`) gets a stable `loginWithToken` and no longer re-fires on provider re-renders. Root-cause fix; `AuthCallbackPage.tsx` unchanged.
 - Same file — `loginWithToken` now persists the token to localStorage + state only AFTER `authApi.fetchMe(token)` succeeds; on throw nothing is written, so no stale token survives (previously the invalid token stayed in localStorage + state and only self-healed on reload).
 
@@ -51,7 +51,7 @@ Pending: manual verify (throttle "Slow 3G" → Google OAuth callback → `/api/v
 
 ## Phase 4 — completed
 
-Commit: (pending — one commit on a branch off `main`). Changes:
+Commit: `a3af2a3`. Changes:
 - `src/features/market/components/TradingViewWidget.tsx` — `tv.js` now loads at most ONCE per page load via a module-level `tradingViewScriptPromise` + `ensureTradingViewScript()` (resets to null on failure so the retry button can attempt a fresh load). Each mount re-runs `initWidget()` only; no more `<script>` leak per symbol switch. Added a `cancelled` flag so the async `.then`/`.catch` can't setState after unmount.
 - Same file — `onError` stabilized via `onErrorRef` (separate effect with `[onError]` keeps the ref current; main effect calls `onErrorRef.current?.()`), and `onError` removed from the main effect's dep array — an inline `onError` arrow from a parent can no longer remount the widget every render.
 
@@ -61,7 +61,7 @@ Pending: manual verify (open dashboard, switch the traded symbol several times, 
 
 ## Phase 5 — completed
 
-Commit: (pending — one commit on a branch off `main`). Changes:
+Commit: `b3ca8c8`. Changes:
 - `src/shared/lib/config.ts` (new) — single `BACKEND_URL` source; removed the duplicate `import.meta.env.VITE_API_URL || "http://localhost:3000"` from 8 files (`authClient`, `chatClient`, `newsClient`, `marketClient`, `usageClient`, `useTickerPrices`, `StatusBar`, `AuthContext`). Deleted the dead `/api` proxy block from `vite.config.ts`.
 - `useTickerPrices.ts` — shared SSE refcount now covers ALL consumers: added `baseConsumers` + `acquireSharedEventSource()`/`releaseSharedEventSource()` (increment on mount, decrement on unmount, close when total = 0); `getSharedEventSource` removed. `onopen`/`onerror` wired: connection health tracked + exposed via `useStreamConnection()`; on server-close (readyState CLOSED, e.g. 401) the stream is recreated once after 2s backoff while anyone still needs it and a token exists.
 - `NewsFeed`, `NewsPage`, `EconomicCalendar`, `EconomicCalendarPage` — now use `acquireSharedEventSource()`/`releaseSharedEventSource()` (previously called `getSharedEventSource()` with no decrement → connection leaked forever).
@@ -76,7 +76,7 @@ Pending: manual verify (click through chat, news, calendar pages checking the Ne
 
 ## Phase 6 — completed
 
-Commit: (pending — one commit on a branch off `main`). Changes:
+Commit: `2f79ce3`. Changes:
 - `role="alert"` on error blocks: `LoginPage.tsx`, `RegisterPage.tsx`, `AuthCallbackPage.tsx`.
 - Google SVG buttons: `aria-hidden="true"` on `LoginPage.tsx` + `RegisterPage.tsx`.
 - `SettingsPage.tsx` — all 11 label/input pairs (FULL NAME, PHONE, BIRTHDATE, GENDER, ADDRESS, BIO, password/email panels) now associated via `htmlFor`/`id`.
@@ -104,7 +104,7 @@ Gate: `npx tsc --noEmit` = 0 errors; `npm run build` = 0 errors (vite v5.4.21, 1
 
 ## Phase 2 — completed
 
-Commit: (pending — one commit on a branch off `main`). Changes:
+Commit: `1627907` (frontend execution; amend dari `eeb652e`). Changes:
 - `src/features/auth/api/authClient.ts` — `getStreamTicket(sessionToken)` (POST `/api/v1/auth/stream-ticket`, Bearer → `{ ticket }`, lempar `AuthApiError` kalau 401) + `exchangeOAuthCode(code)` (POST `/api/v1/auth/oauth/exchange` → `{ sessionToken, user }` bertipe `LoginSuccess`).
 - `src/features/auth/context/AuthContext.tsx` — SSE effect jadi `connect()` async: fetch ticket → `new EventSource(?ticket=)`; fetch ticket gagal (sesi mati) = stream tertutup + `isConnected=false`, TANPA fallback `?token=` dan tanpa retry loop; onerror readyState CLOSED (ticket terbakar, EventSource auto-reconnect tak bisa pakai ticket lama) → reconnect 2 dtk dengan ticket BARU; cleanup: `cancelled` flag + close stream + clear timer.
 - `src/features/market/hooks/useTickerPrices.ts` — `updateGlobalStream` jadi async: fetch ticket sesaat sebelum EventSource dibuka, dedup via `connectPromise` (satu fetch ticket per connect, semua caller berbagi), re-check `stillNeeded` setelah await (bisa logout/konsumen hilang selama fetch); `acquireSharedEventSource()` jadi async (`Promise<EventSource | null>`).
@@ -115,10 +115,12 @@ Commit: (pending — one commit on a branch off `main`). Changes:
 
 Gate: `npx tsc --noEmit` = 0 errors; `npm run build` = 0 errors (vite v5.4.21, 1764 modules). CSP di `dist/index.html` ter-rewrite (tanpa `'unsafe-inline'` di `script-src`).
 
-Pending: manual verify (needs backend + browser): Network tab — URL SSE `?ticket=` (bukan `?token=`); reconnect pakai ticket baru; login Google callback `?code=` sukses; invalid code → error + localStorage kosong; logout → localStorage bersih; CSP prod tidak memblokir TradingView / anti-clickjacking tetap jalan.
+Verifikasi live (log backend 2026-08-16): login Google → `exchange` 200 (sebelum fix backend: 400) → `me` 304 → `stream-ticket` 200 → `news/stream?ticket=` terbuka (bukan `?token=`). Manual verify tersisa (needs browser): reconnect pakai ticket baru saat onerror, invalid code → localStorage kosong, logout → localStorage bersih, CSP prod tidak memblokir TradingView / anti-clickjacking tetap jalan.
 
 ### Keputusan
 Option B (stream ticket) + CSP hardening (prod-only) + OAuth one-time code. Option A (httpOnly cookie) NOT chosen — backend overhaul too big for this phase.
+
+> ✅ Semua bagian di bawah (kontrak, frontend work, CSP, sequencing) sudah DIEKSEKUSI — backend live + frontend Phase 2 committed (`1627907`). Dipertahankan sebagai riwayat keputusan/kontrak.
 
 ### Kontrak backend (serahkan ke backend; eksekusi menunggu konfirmasi + deploy)
 1. **`POST /api/v1/auth/stream-ticket`** — request `Authorization: Bearer <token>` → 200 `{ ticket }`. Ticket: opaque, single-use (burn after 1 use), TTL 30–60 dtk. 401 kalau token invalid. Logout sesi → hapus ticket sesi. Route `news/stream` terima `?ticket=` GANTI `?token=`; kalau keduanya ada → tolak, jangan fallback ke token.
@@ -132,6 +134,7 @@ Option B (stream ticket) + CSP hardening (prod-only) + OAuth one-time code. Opti
 4. `src/features/auth/pages/AuthCallbackPage.tsx:12` — baca `?code=` (bukan `?token=`) → `exchangeOAuthCode` → `loginWithToken(sessionToken)`.
 
 ### CSP hardening (pure frontend, SAFE TO DO ANYTIME — belum dikerjakan)
+> ✅ SUDAH DIKERJAKAN di Phase 2 (`1627907`) — lihat deskripsi Phase 2 di atas.
 - **JANGAN** edit meta CSP di `index.html` apa adanya → `@vitejs/plugin-react` v4 inject inline preamble (`injectIntoGlobalHook`) saat dev; hapus `'unsafe-inline'` = React Fast Refresh mati di dev.
 - `vite.config.ts`: plugin `transformIndexHtml` yang menulis ulang meta CSP **hanya saat `vite build`** → `script-src 'self' 'sha256-<hash anti-clickjack>' https://*.tradingview.com https://*.tradingview-widget.com` (tanpa `'unsafe-inline'`). Script anti-clickjacking TETAP inline di `index.html`, diizinkan via hash (jangan dipindah ke file eksternal — risiko blank page kalau fetch gagal). `style-src 'unsafe-inline'` tidak disentuh.
 
@@ -140,9 +143,18 @@ Option B (stream ticket) + CSP hardening (prod-only) + OAuth one-time code. Opti
 
 ## Notes / next steps
 
-All 8 phases are done (0, 1, 2, 3, 4, 5, 6, 7) — Phase 2 dieksekusi setelah backend contract live (lihat `docs/phase2-backend-response.md`). Remaining:
+All 8 phases are done (0, 1, 2, 3, 4, 5, 6, 7) — Phase 2 dieksekusi setelah backend contract live (lihat `docs/phase2-backend-response.md`). Branch `fix/frontend-bugfix-plan` sudah di-push ke `origin` (commit `60e1df2`..`0e5d921`, termasuk Phase 0 `024e598` + Phase 2 contract `8d0f2c3` dari riwayat lama).
 
-- Manual verification pending (needs backend + browser): chat session history (Phase 1), OAuth callback re-fire (Phase 3), single `tv.js` tag (Phase 4), a11y pass (Phase 6), dan Phase 2 (Network tab: URL SSE `?ticket=` bukan `?token=`; reconnect pakai ticket baru; callback Google `?code=` sukses; logout → localStorage bersih; CSP prod tidak memblokir TradingView).
+### Backend fix di luar scope FE (ditemukan saat verifikasi Phase 2)
+
+Commit `0e5d921` (di branch yang sama, file `Backend/src/data/repositories/RedisOAuthCodeStore.ts` + test): Upstash REST client auto-parses JSON on read (`automaticDeserialization` default true), jadi `getAndDelete` menerima **object** bukan string — `JSON.parse(object)` throw → catch → null → 400 "Invalid or expired OAuth code" SELALU, walau code valid. Fix: parse hanya kalau nilai masih string, object dipakai langsung (pola sama dengan `RedisSessionRepository`/`RedisMarketDataRepository`). +5 test regresi. Verifikasi live: exchange 200 setelah fix.
+
+Catatan kecil (tidak difix, bukan bug): kedua POST `exchange` (StrictMode dev double-effect) sama-sama 200 karena `getAndDelete` non-atomik (`get` lalu `del`) — keduanya sempat baca code sebelum dihapus. Tidak berbahaya (sessionToken sama untuk user sama). Kalau kontrak "single-use" mau ditegakkan ketat, ganti ke `redisClient.getdel()` atomik (tersedia di `@upstash/redis` 1.38).
+
+Remaining:
+
+- Manual verification pending (needs browser): chat session history (Phase 1), OAuth callback re-fire (Phase 3), single `tv.js` tag (Phase 4), a11y pass (Phase 6), dan sisa Phase 2 (reconnect ticket baru saat onerror; invalid code → localStorage kosong; logout → localStorage bersih; CSP prod tidak memblokir TradingView).
+- PR ke `main` belum dibuat — branch `fix/frontend-bugfix-plan` siap: https://github.com/armanmaulid/Betrix/pull/new/fix/frontend-bugfix-plan
 - Commit discipline: one phase = one commit on a branch off `main`.
 
 ## Commit discipline
