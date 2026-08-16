@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarClock, RefreshCw, Info, Search, TrendingUp, CheckCircle2, Clock3, Zap } from "lucide-react";
 import { useShellContext } from "../../../app/layout/TerminalShellLayout";
 import { fetchEconomicCalendar, type CalendarEvent } from "../api/marketClient";
-import { getSharedEventSource } from "../hooks/useTickerPrices";
+import { acquireSharedEventSource, releaseSharedEventSource } from "../hooks/useTickerPrices";
 
 const IMPACT_DOT: Record<CalendarEvent["importance"], string> = {
   high: "bg-[var(--danger)]",
@@ -151,6 +151,7 @@ export function EconomicCalendarPage() {
   const didInitFilters = useRef(false);
   const scrolledForKeyRef = useRef<string | null>(null);
   const listContainerRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   const [filter, setFilter] = useState<FilterState>({
     countries: new Set(),
@@ -162,13 +163,17 @@ export function EconomicCalendarPage() {
   });
 
   async function load() {
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     setIsLoading(true);
     setError(null);
     try {
       const { from, to } = getPeriodRange(filter.period);
       const data = await fetchEconomicCalendar(
         from.toISOString().slice(0, 10),
-        to.toISOString().slice(0, 10)
+        to.toISOString().slice(0, 10),
+        controller.signal
       );
       setEvents(data.events);
       setGeneratedAt(data.generatedAt);
@@ -199,6 +204,7 @@ export function EconomicCalendarPage() {
         });
       }
     } catch (err) {
+      if (controller.signal.aborted) return;
       setError(err instanceof Error ? err.message : "Gagal memuat calendar");
     } finally {
       setIsLoading(false);
@@ -210,12 +216,13 @@ export function EconomicCalendarPage() {
     // Hubungkan search bar global shell → filter teks event.
     setOnSearch((s: string) => setFilter((prev) => ({ ...prev, text: s })));
     setRightPanel(null);
+    return () => abortControllerRef.current?.abort();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filter.period]);
 
   // Live update via SSE calendar_update (relay dari mt5-bridge).
   useEffect(() => {
-    const es = getSharedEventSource();
+    const es = acquireSharedEventSource();
     if (!es) return;
 
     const onCalendarUpdate = (e: MessageEvent) => {
@@ -237,6 +244,7 @@ export function EconomicCalendarPage() {
 
     return () => {
       es.removeEventListener("calendar_update", onCalendarUpdate);
+      releaseSharedEventSource();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { useAuth } from "../../features/auth/context/AuthContext";
 import { Activity, Server, Clock, Database, User } from "lucide-react";
 import { useVisibilityPoll } from "../../hooks/useVisibilityPoll";
+import { BACKEND_URL } from "../../shared/lib/config";
 
 const POLL_MS = 10_000; // Tiap 10 detik hitung ping (skip saat tab background)
 
@@ -23,7 +24,6 @@ export const StatusBar = React.memo(function StatusBar() {
 
     const start = performance.now();
     try {
-      const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
       await fetch(`${BACKEND_URL}/health`);
       const end = performance.now();
       if (!cancelledRef.current) setPing(Math.round(end - start));

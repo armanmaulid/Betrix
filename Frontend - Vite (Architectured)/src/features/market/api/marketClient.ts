@@ -1,4 +1,4 @@
-const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+import { BACKEND_URL } from "../../../shared/lib/config";
 
 export interface Candle {
   time: number; // unix seconds
@@ -71,11 +71,12 @@ export interface CalendarResponse {
 export async function fetchEconomicCalendar(
   fromDate: string, // "YYYY-MM-DD"
   toDate: string, // "YYYY-MM-DD"
+  signal?: AbortSignal,
 ): Promise<CalendarResponse> {
   const token = localStorage.getItem("eaconsole.sessionToken");
   const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
   const params = new URLSearchParams({ fromDate, toDate });
-  const res = await fetch(`${BACKEND_URL}/api/v1/market/calendar?${params}`, { headers });
+  const res = await fetch(`${BACKEND_URL}/api/v1/market/calendar?${params}`, { headers, signal });
 
   if (res.status === 401) {
     localStorage.removeItem("eaconsole.sessionToken");

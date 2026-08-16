@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { onLogout } from "../../../shared/lib/authEvents";
+import { BACKEND_URL } from "../../../shared/lib/config";
 
 export interface TickerSymbol {
   symbol: string; // Nama persis di MT5 Market Watch broker kamu
@@ -23,10 +24,13 @@ export interface TickerPrice {
 // Global State for Market Stream Multiplexer
 let globalEventSource: EventSource | null = null;
 let activeSymbolRefs: Record<string, number> = {}; // { "EURUSD": 3 }
+let baseConsumers = 0; // consumers that don't subscribe to specific symbols (news/calendar panels)
 let globalBaseData: Record<string, { prevClose: number }> = {};
 let currentPrices: Record<string, TickerPrice> = {};
 const listeners = new Set<(data: Record<string, TickerPrice>) => void>();
 let restartTimeout: ReturnType<typeof setTimeout>;
+let isStreamConnected = false;
+const connectionListeners = new Set<(connected: boolean) => void>();
 
 // State di atas hidup di luar siklus hidup komponen React (sengaja, biar
 // koneksi stream di-share antar komponen yang sama-sama butuh ticker).
@@ -44,6 +48,8 @@ onLogout(() => {
     globalEventSource = null;
   }
   activeSymbolRefs = {};
+  baseConsumers = 0;
+  isStreamConnected = false;
 });
 
 function getActiveSymbolKey() {
@@ -52,13 +58,11 @@ function getActiveSymbolKey() {
 
 function updateGlobalStream() {
   const symbolKey = getActiveSymbolKey();
-  
-  if (!symbolKey && !globalEventSource) {
-    // If nobody called useTickerPrices but someone wants the stream directly
-    // (e.g. NewsPage), we can bypass the symbol check since the stream is global.
-  } else if (!symbolKey && globalEventSource) {
+
+  if (!symbolKey && baseConsumers === 0 && globalEventSource) {
     globalEventSource.close();
     globalEventSource = null;
+    isStreamConnected = false;
     return; // Nobody is listening to anything
   }
 
@@ -66,8 +70,9 @@ function updateGlobalStream() {
   // The backend SSE URL is global and doesn't filter by symbol anymore.
   if (globalEventSource) return;
 
-  const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
   const token = localStorage.getItem("eaconsole.sessionToken") || "";
+  if (!token) return; // Don't open an unauthenticated stream (would 401-loop)
+
   const url = `${BACKEND_URL}/api/v1/news/stream?token=${token}`;
   
   globalEventSource = new EventSource(url);
@@ -103,17 +108,67 @@ function updateGlobalStream() {
     }
   });
 
+  globalEventSource.onopen = () => {
+    isStreamConnected = true;
+    connectionListeners.forEach((l) => l(true));
+  };
+
   globalEventSource.onerror = () => {
-    // Basic fallback: if error, wait and try to reconnect (EventSource handles native reconnect, 
-    // but if it's 401 it might close completely, we can rely on standard fetch 401 handling)
+    isStreamConnected = false;
+    connectionListeners.forEach((l) => l(false));
+
+    // EventSource auto-reconnects transient errors natively, but when the
+    // server closes the connection (e.g. 401 after token expiry) it stays
+    // CLOSED with no retry. Detect that and recreate the stream once, after
+    // a short backoff, while anyone still needs it.
+    if (globalEventSource && globalEventSource.readyState === EventSource.CLOSED) {
+      globalEventSource.close();
+      globalEventSource = null;
+      clearTimeout(restartTimeout);
+      const stillNeeded = Object.keys(activeSymbolRefs).length > 0 || baseConsumers > 0;
+      if (stillNeeded && localStorage.getItem("eaconsole.sessionToken")) {
+        restartTimeout = setTimeout(updateGlobalStream, 2000);
+      }
+    }
   };
 }
 
-export function getSharedEventSource(): EventSource | null {
+// Consumers that only need the stream without subscribing to specific ticker
+// symbols (news / calendar panels) must use acquire/release so the shared
+// EventSource is refcounted across ALL consumers — otherwise it opens and
+// never closes when no ticker component is mounted. The counter only
+// increments when a source can actually be provided, so a failed acquire
+// (e.g. no session token) doesn't leak a count.
+export function acquireSharedEventSource(): EventSource | null {
   if (!globalEventSource) {
     updateGlobalStream();
   }
+  if (!globalEventSource) return null;
+  baseConsumers++;
   return globalEventSource;
+}
+
+export function releaseSharedEventSource(): void {
+  if (baseConsumers > 0) baseConsumers--;
+  if (baseConsumers === 0 && Object.keys(activeSymbolRefs).length === 0 && globalEventSource) {
+    globalEventSource.close();
+    globalEventSource = null;
+    isStreamConnected = false;
+  }
+}
+
+// Connection health of the shared stream, for UI to show a LIVE/OFFLINE
+// indicator (driven by the stream's onopen/onerror).
+export function useStreamConnection(): boolean {
+  const [connected, setConnected] = useState(isStreamConnected);
+  useEffect(() => {
+    const listener = (c: boolean) => setConnected(c);
+    connectionListeners.add(listener);
+    return () => {
+      connectionListeners.delete(listener);
+    };
+  }, []);
+  return connected;
 }
 
 export function useTickerPrices(symbols: TickerSymbol[]): Record<string, TickerPrice> {
@@ -151,7 +206,7 @@ export function useTickerPrices(symbols: TickerSymbol[]): Record<string, TickerP
 
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_API_URL || "http://localhost:3000"}/api/v1/market/ohlc/all?timeframe=D1`,
+          `${BACKEND_URL}/api/v1/market/ohlc/all?timeframe=D1`,
           { headers: { Authorization: `Bearer ${localStorage.getItem("eaconsole.sessionToken")}` }, signal: abortController.signal }
         );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);

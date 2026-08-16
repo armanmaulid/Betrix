@@ -2,6 +2,7 @@ import { createContext, useContext, useCallback, useMemo, useEffect, useState, t
 import * as authApi from "../api/authClient";
 import type { AuthUser } from "../api/authClient";
 import { emitLogout } from "../../../shared/lib/authEvents";
+import { BACKEND_URL } from "../../../shared/lib/config";
 
 // Only the session token lives in localStorage — user profile is always
 // re-fetched from /api/auth/me on load rather than cached, so a change made
@@ -65,7 +66,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!sessionToken || !user) return;
 
-    const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
     const es = new EventSource(`${BACKEND_URL}/api/v1/news/stream?token=${sessionToken}`);
 
     es.onopen = () => setIsConnected(true);

@@ -3,7 +3,7 @@ import { CalendarClock, RefreshCw, Info, Filter, X } from "lucide-react";
 import { type CalendarEvent } from "../api/marketClient";
 import { useEconomicCalendar, marketKeys } from "../api/queries";
 import { useQueryClient } from "@tanstack/react-query";
-import { getSharedEventSource } from "../hooks/useTickerPrices";
+import { acquireSharedEventSource, releaseSharedEventSource } from "../hooks/useTickerPrices";
 
 const IMPACT_DOT: Record<CalendarEvent["importance"], string> = {
   high: "bg-[var(--danger)]",
@@ -167,7 +167,7 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
 
   // Live update: dengerin event calendar_update dari backend
   useEffect(() => {
-    const es = getSharedEventSource();
+    const es = acquireSharedEventSource();
     if (!es) return;
 
     const onCalendarUpdate = (e: MessageEvent) => {
@@ -193,6 +193,7 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
 
     return () => {
       es.removeEventListener("calendar_update", onCalendarUpdate);
+      releaseSharedEventSource();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromDateStr, toDateStr, queryClient]);

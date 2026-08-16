@@ -1,4 +1,4 @@
-const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+import { BACKEND_URL } from "../../../shared/lib/config";
 
 export interface DailyUsage {
   date: string;

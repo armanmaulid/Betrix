@@ -1,4 +1,4 @@
-const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+import { BACKEND_URL } from "../../../shared/lib/config";
 
 const historyCache = new Map<string, { data: any; timestamp: number }>();
 
@@ -12,7 +12,8 @@ export async function streamChat(
   image: string | null,
   onToken: (token: string) => void,
   onDone: (result: any) => void,
-  onError: (error: string) => void
+  onError: (error: string) => void,
+  signal?: AbortSignal
 ) {
   const token = localStorage.getItem("eaconsole.sessionToken");
   try {
@@ -22,7 +23,8 @@ export async function streamChat(
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ message, displayMessage, history, taskType, sessionId, tier, image })
+      body: JSON.stringify({ message, displayMessage, history, taskType, sessionId, tier, image }),
+      signal
     });
 
     if (!res.ok) {
@@ -43,6 +45,7 @@ export async function streamChat(
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
+      if (signal?.aborted) break; // Caller navigated away / unmounted — stop reading
       
       buffer += decoder.decode(value, { stream: true });
       // Some proxies normalize line endings to CRLF — normalize to LF first
@@ -92,6 +95,8 @@ export async function streamChat(
       }
     }
   } catch (err: any) {
+    // Abort is not an error worth surfacing — the caller chose to cancel.
+    if (signal?.aborted || err?.name === "AbortError") return;
     onError(err.message);
   }
 }

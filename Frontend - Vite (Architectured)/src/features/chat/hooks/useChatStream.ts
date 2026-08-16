@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { useChatStore } from "../store/useChatStore";
 import { streamChat } from "../api/chatClient";
 import { fetchOHLC } from "../../market/api/marketClient";
@@ -14,6 +15,13 @@ import {
 import { useSearchParams } from "react-router-dom";
 
 export function useChatStream() {
+  // Abort the in-flight stream when the hook's consumer unmounts so the
+  // fetch + reader don't keep running after navigating away.
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
+
   const [searchParams] = useSearchParams();
   const symbol = searchParams.get('symbol');
   const { data: allBrokerSymbols = [] } = useBrokerSymbols();
@@ -173,6 +181,9 @@ export function useChatStream() {
       lastRenderTime = Date.now();
     };
 
+    const abortController = new AbortController();
+    abortRef.current = abortController;
+
     streamChat(
       messageToSend, 
       text,
@@ -225,7 +236,8 @@ export function useChatStream() {
           return newMsgs;
         });
         setIsStreaming(false);
-      }
+      },
+      abortController.signal
     );
   };
 
