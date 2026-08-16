@@ -13,6 +13,34 @@ interface TradingViewWidgetProps {
   onError?: () => void; // Callback saat widget fail, parent bisa switch ke fallback chart
 }
 
+// Module-level: s3.tradingview.com/tv.js is a global library — load it at
+// most ONCE per page load. Every widget instance only needs to re-run
+// initWidget() once the script is available; appending a fresh <script> per
+// mount (or per symbol switch) leaked one tag each time. Reset the promise on
+// failure so the retry button can attempt a fresh load.
+let tradingViewScriptPromise: Promise<void> | null = null;
+
+function ensureTradingViewScript(): Promise<void> {
+  if (window.TradingView) return Promise.resolve();
+  if (tradingViewScriptPromise) return tradingViewScriptPromise;
+
+  tradingViewScriptPromise = new Promise<void>((resolve, reject) => {
+    const script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src = "https://s3.tradingview.com/tv.js";
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("TradingView script failed to load"));
+    document.head.appendChild(script);
+  }).catch((err) => {
+    // Allow a later mount (or retry) to attempt a fresh load.
+    tradingViewScriptPromise = null;
+    throw err;
+  });
+
+  return tradingViewScriptPromise;
+}
+
 // Widget resmi TradingView (Advanced Real-Time Chart) — GRATIS, embed
 // publik, tidak butuh akun/API key. Beban render & data sepenuhnya
 // ditanggung infra TradingView, jadi aman dibuka ratusan orang bersamaan
@@ -35,6 +63,13 @@ export function TradingViewWidget({ symbol, theme = "dark", interval = "15", cha
   const [error, setError] = useState<string | null>(null);
   const scriptLoadedRef = useRef(false);
   const mountedRef = useRef(true);
+  const onErrorRef = useRef(onError);
+  // Keep the latest onError in a ref so the main effect below doesn't need it
+  // in its dependency array — an inline arrow from a parent would otherwise
+  // remount the whole widget on every parent render.
+  useEffect(() => {
+    onErrorRef.current = onError;
+  }, [onError]);
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
@@ -52,11 +87,12 @@ export function TradingViewWidget({ symbol, theme = "dark", interval = "15", cha
     setError(null);
     scriptLoadedRef.current = false;
 
+    let cancelled = false;
     let loadTimeout: NodeJS.Timeout | undefined;
 
     // Small delay untuk avoid race condition saat rapid symbol changes
     const timeoutId = setTimeout(() => {
-      if (!mountedRef.current) return;
+      if (cancelled || !mountedRef.current) return;
 
       container.innerHTML = "";
 
@@ -85,48 +121,44 @@ export function TradingViewWidget({ symbol, theme = "dark", interval = "15", cha
         }
       };
 
+      const failWidget = (message: string) => {
+        if (loadTimeout) clearTimeout(loadTimeout);
+        // Reset the shared script promise so a retry can attempt a fresh load.
+        tradingViewScriptPromise = null;
+        if (cancelled || !mountedRef.current) return;
+        setError(message);
+        setIsLoading(false);
+        onErrorRef.current?.();
+      };
+
       if (window.TradingView) {
         setIsLoading(false);
         initWidget();
         return;
       }
 
-      const script = document.createElement("script");
-      script.type = "text/javascript";
-      script.src = "https://s3.tradingview.com/tv.js";
-      script.async = true;
-
-      script.onload = () => {
-        scriptLoadedRef.current = true;
-        if (mountedRef.current) {
-          setIsLoading(false);
-          initWidget();
-        }
-        if (loadTimeout) clearTimeout(loadTimeout);
-      };
-
-      script.onerror = () => {
-        if (mountedRef.current) {
-          setError("TradingView widget gagal dimuat");
-          setIsLoading(false);
-          onError?.();
-        }
-        if (loadTimeout) clearTimeout(loadTimeout);
-      };
-
       // Timeout fallback: kalau 10 detik script belum onload, anggap failed
       loadTimeout = setTimeout(() => {
-        if (!scriptLoadedRef.current && mountedRef.current) {
-          setError("TradingView widget timeout");
-          setIsLoading(false);
-          onError?.();
+        if (!scriptLoadedRef.current) {
+          failWidget("TradingView widget timeout");
         }
       }, 10000);
 
-      document.head.appendChild(script);
+      ensureTradingViewScript()
+        .then(() => {
+          if (cancelled || !mountedRef.current) return;
+          scriptLoadedRef.current = true;
+          setIsLoading(false);
+          initWidget();
+          if (loadTimeout) clearTimeout(loadTimeout);
+        })
+        .catch(() => {
+          failWidget("TradingView widget gagal dimuat");
+        });
     }, 150); // 150ms debounce untuk avoid rapid remount
 
     return () => {
+      cancelled = true;
       clearTimeout(timeoutId);
       if (loadTimeout) clearTimeout(loadTimeout);
       // Only cleanup if script was loaded to avoid cutting off initialization
@@ -134,7 +166,7 @@ export function TradingViewWidget({ symbol, theme = "dark", interval = "15", cha
         container.innerHTML = "";
       }
     };
-  }, [symbol, theme, interval, chartStyle, hideVolume, hideTopToolbar, JSON.stringify(studies), retryCount, onError]);
+  }, [symbol, theme, interval, chartStyle, hideVolume, hideTopToolbar, JSON.stringify(studies), retryCount]);
 
   return (
     <div className="relative h-full w-full">
