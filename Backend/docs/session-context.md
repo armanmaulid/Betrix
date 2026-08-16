@@ -467,6 +467,20 @@ Permintaan user: jalankan `npm run dev` (tsx watch, port 3000) + test drive Bug 
 
 **Catatan test-drive:** (1) fingerprint device = hash(IP+browser+OS+device via UAParser) — UA Chrome Windows kita collide dengan device `test@betrix.test` (akun test lama), jadi register 409; pakai UA berbeda untuk tiap akun. (2) Dengan enforcement ON, login kedua dari device yang sama → 403 `Device already has active session` (single-session per device by design). (3) Cleanup: 5 user e2e + 4 device + 4 activity + 1 admin_action dihapus; server dimatikan.
 
+## 8t. Symbol sync throttle (Opsi B) — hentikan fetch symbol/list tiap restart (2026-08-16)
+
+**Latar:** MT5 log mencatat `GET /v1/symbol/list` setiap kali backend restart. Penyebab: fix BUG-11 menghapus count-gate (count tidak mendeteksi rename/trade_mode change dengan total sama), jadi `SymbolService.syncBrokerSymbols` selalu fetch + upsert, dan `background/jobs/index.ts` memanggilnya tiap boot. `GET /v1/symbol/count` masih ada di `Mt5HttpClient.fetchSymbolCount()` tapi tak terpakai.
+
+**Keputusan user: Opsi B (throttle waktu)** + DailySyncJob memakai `MT5_BROKER_UTC_OFFSET=3` (ternyata **sudah** — `secondsUntilBrokerMidnight(env.MT5_BROKER_UTC_OFFSET)` + 5 menit).
+
+**Implementasi:**
+- `SymbolRepository` + `PgSymbolRepository`: method `getLastSyncedAt()` / `setLastSyncedAt()` — key `last_synced_at` di tabel `symbol_sync_metadata` (bersanding `stored_count`).
+- `SymbolService.syncBrokerSymbols({ force? })`: throttle **12 jam** — kalau `last_synced_at` masih fresh → log `Skipping symbol sync — last synced X min ago` dan return (tanpa fetch). `force: true` bypass throttle.
+- `background/jobs/index.ts` (boot): panggil tanpa force → throttle aktif. `DailySyncJob`: `{ force: true }` → full refresh harian selalu jalan (menutup celah BUG-11 tetap terjaga).
+- Unit test baru `SymbolService.test.ts` (5 test: skip fresh, force bypass, null, stale ≥12h, empty list) → **10 files / 67 tests / 0 failed**.
+
+**Verifikasi live (2 skenario):** (1) `last_synced_at` fresh → restart → `Skipping symbol sync — last synced 0 min ago (throttle 12h)` — **tidak ada** `GET /v1/symbol/list` di MT5 ✅. (2) key `last_synced_at` dihapus → restart → `Synced 8562 broker symbols` + key terisi ulang ✅. Server dimatikan setelah test (kill tree — child `tsx watch` harus ikut mati, kalau tidak port 3000 EADDRINUSE).
+
 ---
 
 ## 9. Inventaris file yang sering disentuh

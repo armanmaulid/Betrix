@@ -123,6 +123,22 @@ export class PgSymbolRepository implements SymbolRepository {
     );
   }
 
+  async getLastSyncedAt(): Promise<Date | null> {
+    const { rows } = await pgClient.query(
+      `SELECT updated_at FROM symbol_sync_metadata WHERE key = 'last_synced_at'`
+    );
+    return rows[0] ? new Date(rows[0].updated_at) : null;
+  }
+
+  async setLastSyncedAt(date: Date): Promise<void> {
+    await pgClient.query(
+      `INSERT INTO symbol_sync_metadata (key, value, updated_at)
+       VALUES ('last_synced_at', $1, CURRENT_TIMESTAMP)
+       ON CONFLICT (key) DO UPDATE SET value = $1, updated_at = CURRENT_TIMESTAMP`,
+      [date.toISOString()]
+    );
+  }
+
   private mapRow(row: BrokerSymbolRow): BrokerSymbol {
     return new BrokerSymbol(
       row.symbol, row.description, row.path, row.category,

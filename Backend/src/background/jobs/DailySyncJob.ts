@@ -8,7 +8,9 @@ import { CalendarService } from "@application/services/CalendarService.js";
 export class DailySyncJob {
   static async execute(): Promise<void> {
     const symbolService = container.resolve(SymbolService);
-    await symbolService.syncBrokerSymbols().catch(err => 
+    // force: true — daily sync selalu full refresh (bypass throttle boot),
+    // jadwal sudah berbasis broker time (secondsUntilBrokerMidnight + MT5_BROKER_UTC_OFFSET).
+    await symbolService.syncBrokerSymbols({ force: true }).catch(err => 
       logger.error("Daily sync broker symbols failed", { context: "DailyJob", error: err.message })
     );
     

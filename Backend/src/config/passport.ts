@@ -3,6 +3,7 @@ import type { Profile, VerifyCallback } from "passport-google-oauth20";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import { container } from "tsyringe";
 import type { UserRepository } from "@domain/repositories/UserRepository.js";
+import type { SessionRepository } from "@domain/repositories/SessionRepository.js";
 import { env } from "@config/env";
 import { User } from "@domain/entities/User.js";
 import { Email } from "@domain/value-objects";
@@ -55,6 +56,11 @@ if (googleOAuthConfigured) {
           // akun unverified yang password-nya diketahui pihak tak dikenal.
           const reclaimed = user.withEmailVerified().withPasswordHash(null).withGoogleId(profile.id);
           user = await userRepo.save(reclaimed);
+          // Kill any live session the squatter may still hold — password
+          // alone isn't enough, an already-issued session token stays valid
+          // otherwise (same pattern as ChangePasswordUseCase/ResetUserPasswordUseCase).
+          const sessionRepo = container.resolve("SessionRepository") as SessionRepository;
+          await sessionRepo.deleteByUserId(user.id);
         }
 
         return done(null, user);

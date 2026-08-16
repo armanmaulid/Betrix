@@ -9,4 +9,6 @@ export interface SymbolRepository {
   findById(symbol: string): Promise<BrokerSymbol | null>;
   getStoredCount(): Promise<number>;
   setStoredCount(count: number): Promise<void>;
+  getLastSyncedAt(): Promise<Date | null>;
+  setLastSyncedAt(date: Date): Promise<void>;
 }
