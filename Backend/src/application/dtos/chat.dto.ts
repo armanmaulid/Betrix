@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { NEWS_ASSETS } from "@core/constants/index.js";
 
 export const chatTaskTypeSchema = z.enum([
   "general",
@@ -11,6 +12,18 @@ export const chatTaskTypeSchema = z.enum([
 
 export const modelTierSchema = z.enum(["cheap", "balanced", "deep"]);
 
+export const contextParamsSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("market_analysis"),
+    symbol: z.string().min(1).max(20).transform((s) => s.toUpperCase()),
+    timeframe: z.enum(["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1", "MN1"]),
+  }),
+  z.object({
+    type: z.literal("news_context"),
+    assets: z.array(z.enum(NEWS_ASSETS)).min(1).max(6),
+  }),
+]);
+
 export const sendMessageDto = z.object({
   message: z.string().min(1).max(8000),
   taskType: chatTaskTypeSchema.default("general"),
@@ -22,6 +35,7 @@ export const sendMessageDto = z.object({
   sessionId: z.string().uuid().optional(),
   tier: modelTierSchema.optional(),
   image: z.string().nullish(),
+  contextParams: contextParamsSchema.optional(),
 });
 
 export const getHistoryDto = z.object({
@@ -44,6 +58,7 @@ export const exportHistoryDto = z.object({
 });
 
 export type SendMessageDto = z.infer<typeof sendMessageDto>;
+export type ContextParams = z.infer<typeof contextParamsSchema>;
 export type GetHistoryDto = z.infer<typeof getHistoryDto>;
 export type DeleteSessionDto = z.infer<typeof deleteSessionDto>;
 export type ExportHistoryDto = z.infer<typeof exportHistoryDto>;

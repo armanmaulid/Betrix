@@ -533,6 +533,54 @@ Setelah kontrak backend selesai (§8u), dibuat **proposal balasan untuk Tim Fron
 
 **Status:** menunggu FE eksekusi §2 dokumen tsb. Tidak ada perubahan backend tambahan setelah §8u.
 
+## 8w. Prompt migration ke backend — selesai + balasan FE (2026-08-17)
+
+Proposal FE `Frontend - Vite (Architectured)/docs/backend-prompt-migration-proposal.md`
+("pindahkan konstruksi prompt LLM ke backend") diimplementasikan penuh + balasan ditulis:
+`docs/backend-prompt-migration-response.md` (folder docs FE).
+
+**Latar:** FE membangun seluruh prompt analisa trading di klien (`buildTradeAnalysisPrompt` +
+tabel candle MT5 mentah) lalu kirim sebagai satu string `message`. Risiko: prompt injection/leakage,
+data spoofing, payload besar.
+
+**Implementasi (addition-only, backward-compatible):**
+- **`contextParams`** (field opsional) di `sendMessageDto` — `discriminatedUnion("type")`:
+  `market_analysis { symbol→uppercase, timeframe enum 9 }` + `news_context { assets enum NEWS_ASSETS min1 max6 }`.
+- **`TradeAnalysisPromptBuilder`** (BARU, `domain/services/`, pure) — migrasi verbatim FE:
+  `buildTradeContext` (data pasar + instruksi Entry/SL/TP1-3) + `buildNewsContext`. Candle kosong → `[DATA PASAR TIDAK TERSEDIA]`.
+- **`TradeAnalysisContextService`** (BARU, `application/services/`) — orchestrate: `getSymbolInfo` null →
+  `AppError("SYMBOL_NOT_FOUND", 400)`; `getOHLC` catch MT5 down → fallback context (bukan 5xx);
+  news via **`NewsContextPort.getLatestHeadlines`** (port antar-konteks, BUKAN `GetNewsUseCase` langsung — hindari coupling).
+- **`StreamMessageUseCase` + `SendMessageUseCase`** — inject context service, sisipkan
+  `contextBlock + [PERMINTAAN USER] + message` sebelum `messages`.
+- **`ChatController`** — teruskan `contextParams` + **fix SSE lazy-header**: sebelumnya
+  `flushHeaders()` sebelum `execute()` → error validasi jadi `event: error` + HTTP 200. Kini flush
+  saat token pertama; error pre-stream → JSON 4xx `{error, code}`.
+- **`NEWS_ASSETS`** dipindah `NewsController` → `@core/constants` (DTO tidak boleh import controller).
+
+**Keputusan (jawaban §7 proposal):**
+- Instruksi format → **context block** (bukan system prompt) — perilaku identik.
+- Validasi simbol → **dikenal broker saja** (`SYMBOL_NOT_FOUND`); **`SYMBOL_CATEGORY_MISMATCH` TIDAK diimplementasikan**. Kategori tetap di FE.
+- News → FE kirim `assets`, backend tak tahu tab.
+
+**Deviasi:** `[PERMINTAAN USER]` di-append oleh use case (bukan builder) — hindari duplikasi
+(builder hanya data+instruksi).
+
+**Temuan E2E (2026-08-17, DB/Redis ON, server :3000):**
+1. **BUG diperbaiki:** stream error balas 200 + `event: error` (bukan 400) — fix lazy-header (di atas).
+2. **Infra (bukan kode):** `dahono/qwen3.8-max` (tier deep → `trade_reasoning`/`risk_narrative`) →
+   gateway 404 `No active credentials for provider: openai`. **Perlu provision model / ganti `MODEL_DEEP`**
+   sebelum FE merge — `trade_reasoning` default balas kosong tanpa `tier:balanced` override.
+
+**Catatan untuk FE (di balasan §5.1):** `CHAT_SHORTCUTS` FE hardcode command + mapping kategori
+manual tidak sinkron dengan `category` broker. Contoh `/futures XAUUSD` — XAUUSD itu metal, bukan futures.
+Rekomendasi: command popover derive dari `allBrokerSymbols[].category` (satu sumber: kategori broker).
+
+**Verifikasi:** tsc 0 · lint 0/0 · boundary 0 · test **14 files / 84 tests / 0 failed**.
+E2E live: market_analysis stream (391 token, format Entry/TP muncul) · news_context (9377 byte) ·
+symbol unknown → 400 `SYMBOL_NOT_FOUND` (stream+non-stream) · timeframe/asset invalid → 400 ·
+MT5 down → fallback · chat biasa identik. Server dimatikan setelah test.
+
 ## 9. Inventaris file yang sering disentuh
 
 - `eslint.config.js` — guardrail boundary (domain + konteks).
