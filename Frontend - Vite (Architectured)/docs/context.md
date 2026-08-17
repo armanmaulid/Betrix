@@ -170,8 +170,20 @@ Remaining:
 
 - **Masih butuh manual (di luar kendali automation):** reconnect ticket baru saat server restart/evict; CSP prod (`vite build` → `dist/index.html`); Google OAuth end-to-end (akun Google asli).
 - **Temuan non-regresi (catatan):** console warn `frame-ancestors` diabaikan via `<meta>` — anti-clickjacking meta CSP tidak efektif untuk itu; frame-busting inline script masih jalan. Item arsitektur, bukan bugfix.
+- **Committed & pushed** `54aae73` (18 file, +1276/−840) → `origin/fix/frontend-bugfix-plan`. Exclude: `Backend/docs/session-context.md` (tim backend) + `FRONTEND_DESIGN_FIX_PLAN.md` (mau dihapus).
 - PR ke `main` belum dibuat — branch `fix/frontend-bugfix-plan` siap: https://github.com/armanmaulid/Betrix/pull/new/fix/frontend-bugfix-plan
 - Commit discipline: one phase = one commit on a branch off `main`.
+
+## TODO tersisa (17 Aug 2026)
+
+| # | Item | Status |
+| --- | --- | --- |
+| 1 | Blocker Ops: `MODEL_DEEP` `dahono/qwen3.8-max` → gateway 404 | Tunggu provision/ganti `.env` |
+| 2 | Smoke test browser FE migration (`/forex XAUUSD M15` payload `contextParams` + Entry/SL/TP; `SYMBOL_NOT_FOUND`; Settings tiap tab; nav hash) | Belum dijalankan |
+| 3 | `/portfolio` + `/watchlist` dead command di popover | Keputusan: hapus / implementasi |
+| 4 | `chatClient` cache `Map` 15s → React Query | TUNDA, bukan kritis |
+| 5 | PR ke `main` | Belum dibuat |
+| 6 | Hapus `FRONTEND_DESIGN_FIX_PLAN.md` | Belum dieksekusi |
 
 ### Critical anti-pattern arsitektur (dari `frontend-architecture-review.md`)
 
