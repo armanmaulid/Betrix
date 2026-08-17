@@ -1,23 +1,41 @@
-import { useChatStore } from "../store/useChatStore";
-import { streamChat } from "../api/chatClient";
-import { fetchOHLC } from "../../market/api/marketClient";
-import { getNews, type NewsItem } from "../../news/api/newsClient";
-import { useBrokerSymbols } from "../../market/api/queries";
+import { useEffect, useRef } from "react";
+import { useChatStore, type ChatMessage } from "../store/useChatStore";
+import { streamChat, type ChatContextParams } from "../api/chatClient";
 import {
   parseInstrumentCommand,
-  buildTradeAnalysisPrompt,
   FRONTEND_TASK_TIER_MAP,
   TIER_CREDIT_COST,
   TAB_TO_NEWS_ASSETS,
-  buildNewsContextPrefix,
 } from "../../../shared/lib/analyzePageHelpers";
 import { useSearchParams } from "react-router-dom";
 
+// Error code backend (`SYMBOL_NOT_FOUND`, `VALIDATION_ERROR`, dst) → pesan
+// user-facing Indonesia. Backend kirim `{ error, code }` sebagai JSON 4xx
+// sebelum stream mulai; FE menampilkan pesan bersih, bukan string mentah.
+function friendlyError(error: string): string {
+  if (error === "SYMBOL_NOT_FOUND") {
+    return "Simbol tidak ditemukan di platform broker. Cek popover suggestion saat mengetik '/'.";
+  }
+  if (error === "VALIDATION_ERROR") {
+    return "Input tidak valid (simbol/timeframe/asset). Periksa kembali perintah kamu.";
+  }
+  if (error === "RATE_LIMITED") {
+    return "Terlalu banyak permintaan. Coba lagi beberapa saat lagi.";
+  }
+  return error;
+}
+
 export function useChatStream() {
+  // Abort the in-flight stream when the hook's consumer unmounts so the
+  // fetch + reader don't keep running after navigating away.
+  const abortRef = useRef<AbortController | null>(null);
+  useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
+
   const [searchParams] = useSearchParams();
   const symbol = searchParams.get('symbol');
-  const { data: allBrokerSymbols = [] } = useBrokerSymbols();
-  
+
   const {
     inputText, setInputText,
     messages, setMessages,
@@ -33,7 +51,7 @@ export function useChatStream() {
 
   const handleSubmit = async () => {
     if (!inputText.trim() || isStreaming) return;
-    
+
     const text = inputText;
     setInputText("");
     setView('chat');
@@ -41,92 +59,44 @@ export function useChatStream() {
 
     // 1. Add user message
     setMessages(prev => [
-      ...prev, 
+      ...prev,
       { role: 'user', content: text, image: attachedImage },
-      { role: 'agent', content: "", isTyping: true } as any
+      { role: 'agent', content: "", isTyping: true }
     ]);
-    
+
     const imageToSend = attachedImage;
     setAttachedImage(null);
 
     // 2. Extract clean history — normalize 'agent' → 'assistant' (backend only accepts user|assistant)
-    const chatHistory = messages.filter((m: any) => !m.isTyping).map((m: any) => ({
+    const chatHistory = messages.filter((m: ChatMessage) => !m.isTyping).map((m: ChatMessage) => ({
       role: m.role === 'agent' ? 'assistant' : m.role,
       content: m.content || "",
       image: m.image
     }));
 
-    // "general" — bukan "faq": enum backend (ChatTaskType) tidak punya "faq",
-    // sehingga dulu jatuh ke tier fallback balanced (3 CRD) padahal estimasi FE cheap.
-    let taskType = symbol ? "market_insight" : "general";
-    let messageToSend = text;
-
+    // Konstruksi prompt (candle + instruksi format + konteks berita) SUDAH
+    // pindah ke backend. FE hanya kirim `contextParams` terstruktur — data
+    // MT5 diambil backend langsung dari broker (lihat
+    // docs/backend-prompt-migration-response.md). messageToSend = teks mentah.
     const instrument = parseInstrumentCommand(text);
     const tabAssets = TAB_TO_NEWS_ASSETS[activeTab];
 
-    let newsPrefix = "";
-    if (tabAssets) {
-      try {
-        const token = localStorage.getItem("eaconsole.sessionToken") || "";
-        const newsLists = await Promise.all(
-          tabAssets.map(asset => getNews(token, { asset, limit: 3 }).catch(() => [] as NewsItem[]))
-        );
-        const merged = newsLists.flat().sort(
-          (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime()
-        );
-        newsPrefix = buildNewsContextPrefix(activeTab, merged);
-      } catch (err) {
-        console.error("Failed to fetch news context:", err);
-      }
-    }
+    let taskType = symbol ? "market_insight" : "general";
+    let contextParams: ChatContextParams | undefined;
 
     if (instrument) {
       taskType = "trade_reasoning";
-      let isInstrumentValid = true;
-      let invalidReason = "";
-
-      if (allBrokerSymbols.length > 0) {
-        const cmdMatch = text.trim().match(/^\/(\w+)\s/);
-        const cmd = cmdMatch ? cmdMatch[1].toLowerCase() : "";
-        let expectedCategoryTokens: string[] = [];
-        if (cmd === "forex") expectedCategoryTokens = ["forex"];
-        else if (cmd === "crypto") expectedCategoryTokens = ["crypto"];
-        else if (cmd === "stock") expectedCategoryTokens = ["stock", "equity"];
-        else if (cmd === "etf") expectedCategoryTokens = ["etf", "fund"];
-        else if (cmd === "bond") expectedCategoryTokens = ["bond"];
-        else if (cmd === "index") expectedCategoryTokens = ["index", "indices"];
-        else if (cmd === "futures") expectedCategoryTokens = ["commodity", "commodities", "futures", "energy", "metal"];
-
-        const foundSymbol = allBrokerSymbols.find(s => s.symbol.toUpperCase() === instrument.symbol);
-        
-        if (!foundSymbol) {
-          isInstrumentValid = false;
-          invalidReason = `Simbol ${instrument.symbol} tidak ditemukan di platform broker saat ini. Minta user untuk mengetik '/${cmd} ' dan melihat popover suggestion untuk daftar simbol yang didukung broker.`;
-        } else {
-          const cat = (foundSymbol.category || "").toLowerCase();
-          const path = (foundSymbol.path || "").toLowerCase();
-          const isValidCategory = expectedCategoryTokens.length === 0 || expectedCategoryTokens.some(t => cat.includes(t) || path.includes(t));
-          if (!isValidCategory) {
-            isInstrumentValid = false;
-            invalidReason = `Simbol ${instrument.symbol} memang ada di broker, tetapi itu BUKAN instrumen ${cmd} (kategori aslinya adalah '${foundSymbol.category || "Unknown"}'). Minta user untuk menggunakan command yang sesuai (misalnya /stock atau /crypto).`;
-          }
-        }
-      }
-
-      if (!isInstrumentValid) {
-        messageToSend = `[KESALAHAN INPUT USER]\nUser mencoba menggunakan command instrumen namun simbolnya tidak valid. Beritahu user: ${invalidReason}\n\n[PERMINTAAN USER]\n${text}`;
-      } else {
-        try {
-          const result = await fetchOHLC(instrument.symbol, instrument.timeframe);
-          const candles = result?.candles ?? [];
-          messageToSend = newsPrefix + buildTradeAnalysisPrompt(instrument, candles, text);
-        } catch (err: any) {
-          messageToSend = newsPrefix + `[DATA PASAR TIDAK TERSEDIA: ${err?.message || "gagal mengambil data MT5"}]\n\nUser meminta analisa ${instrument.symbol} (${instrument.timeframe}) tapi data MT5 gagal diambil. Beritahu user datanya sedang tidak tersedia, JANGAN mengarang harga.\n\n[PERMINTAAN USER]\n${text}`;
-        }
-      }
+      contextParams = {
+        type: "market_analysis",
+        symbol: instrument.symbol,
+        timeframe: instrument.timeframe,
+      };
     } else if (tabAssets) {
       taskType = "market_insight";
-      messageToSend = newsPrefix + text;
+      contextParams = {
+        type: "news_context",
+        assets: tabAssets,
+      };
     }
 
     const tierOverride = optimizeEnabled ? undefined : agentTier;
@@ -138,13 +108,13 @@ export function useChatStream() {
     }
 
     setRecentSessions(prev => {
-      if (prev.find(s => s.session_id === activeSessionId)) return prev;
+      if (prev.find(s => s.sessionId === activeSessionId)) return prev;
       return [
         {
-          session_id: activeSessionId,
+          sessionId: activeSessionId,
           title: text,
           message: text,
-          created_at: new Date().toISOString()
+          createdAt: new Date().toISOString()
         },
         ...prev
       ].slice(0, 5);
@@ -173,14 +143,18 @@ export function useChatStream() {
       lastRenderTime = Date.now();
     };
 
+    const abortController = new AbortController();
+    abortRef.current = abortController;
+
     streamChat(
-      messageToSend, 
       text,
-      chatHistory, 
+      text,
+      chatHistory,
       taskType,
       activeSessionId,
       tierOverride,
       imageToSend,
+      contextParams,
       (token) => {
         pendingTokens += token;
         const now = Date.now();
@@ -219,13 +193,14 @@ export function useChatStream() {
           const last = newMsgs[lastIndex];
           newMsgs[lastIndex] = {
             ...last,
-            content: last.content ? last.content + `\n\n[Error: ${error}]` : `Error: ${error}`,
+            content: last.content ? last.content + `\n\n[Error: ${friendlyError(error)}]` : `Error: ${friendlyError(error)}`,
             isTyping: false
           };
           return newMsgs;
         });
         setIsStreaming(false);
-      }
+      },
+      abortController.signal
     );
   };
 

@@ -581,6 +581,38 @@ E2E live: market_analysis stream (391 token, format Entry/TP muncul) · news_con
 symbol unknown → 400 `SYMBOL_NOT_FOUND` (stream+non-stream) · timeframe/asset invalid → 400 ·
 MT5 down → fallback · chat biasa identik. Server dimatikan setelah test.
 
+## 8x. Commit prompt migration + insiden stash FE (2026-08-17)
+
+**Permintaan user:** commit & push main. Keputusan: commit **Backend saya saja** (bukan FE team
+work), target = merge ke main + push main.
+
+**State git (monorepo `D:/Betrix`, remote `github.com/armanmaulid/Betrix`):**
+- Root repo = `D:/Betrix` (bukan `Backend`). Branch aktif: `fix/frontend-bugfix-plan`.
+- `origin/main` (9363c4b) = **squash** dari work FE Phase 2 + backend Phase 2 (pesan identik
+  `8d0f2c3` tapi hash beda) — remote main sudah **di-rewrite**, bukan linear dari local `main` (stale).
+- Uncommitted di working tree = campuran: Backend saya (prompt migration) + **FE team work**
+  (SettingsPage -663, useChatStream -99, chatClient, marketClient, analyzePageHelpers, settings/ dir baru, dll).
+
+**Eksekusi:**
+1. `git add` hanya 14 file milik saya (Backend prompt migration + 1 dokumen balasan FE) →
+   commit `39da3d3` di branch `fix/frontend-bugfix-plan`.
+2. FE team work **di-stash** (`git stash push -u`) supaya `checkout main` bisa jalan (working tree kotor memblok switch).
+3. `checkout main` → `merge --ff-only origin/main` (main lokal ikut remote).
+4. `git cherry-pick 39da3d3` → commit baru `ae8fb8b` di main (clean, 523 insertions, 0 conflict).
+5. Balik `checkout fix/frontend-bugfix-plan` → `git stash pop` → **FE work utuh kembali**
+   (11 file modified + 4 file `settings/` untracked). Stash kosong, tidak ada yang hilang.
+
+**Insiden (panik tim FE):** tim FE kira kerjaannya di-revert. Faktanya cuma di-stash sementara
+(±2 menit) untuk switch branch — sudah di-pop balik utuh. **Tidak ada revert/hapus.**
+Lesson: `git status` di bash environment ini ter-aliaskan (selalu balas "clean — nothing to commit"
+bohong) — verifikasi wajib lewat `git diff --stat` / `git ls-files --others` / `git stash list`.
+
+**Status push: BELUM push.** Commit `ae8fb8b` masih lokal di `main` (belum `git push origin main`).
+Ditunggu konfirmasi user (tim FE sempat protes — koordinasi branch dulu sebelum push).
+
+**Blocker infra (belum beres):** `MODEL_DEEP=dahono/qwen3.8-max` belum diprovision di gateway
+(404 `No active credentials for provider: openai`) → `trade_reasoning` default balas kosong.
+
 ## 9. Inventaris file yang sering disentuh
 
 - `eslint.config.js` — guardrail boundary (domain + konteks).

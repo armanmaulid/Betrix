@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from "react";
 import { useShellContext } from "../../../app/layout/TerminalShellLayout";
 import { getNews, type NewsItem } from "../api/newsClient";
-import { getSharedEventSource } from "../../market/hooks/useTickerPrices";
+import { acquireSharedEventSource, releaseSharedEventSource } from "../../market/hooks/useTickerPrices";
 import { RefreshCw, Loader2 } from "lucide-react";
 
 const ASSET_LABEL: Record<string, string> = {
@@ -67,16 +67,25 @@ export function NewsPage() {
 
   const [newIds, setNewIds] = useState<Set<string>>(new Set());
   const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  // Pagination offset tracked separately from items.length — SSE prepends new
+  // items into the same array, so using items.length as the offset drifts.
+  const [archiveOffset, setArchiveOffset] = useState(0);
 
   const sessionToken = localStorage.getItem("eaconsole.sessionToken") || "";
 
   const fetchInitial = async (asset: string | null = null) => {
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     setIsLoading(true);
     setError(null);
     try {
-      const data = await getNews(sessionToken, { limit: 30, asset: asset || undefined });
+      const data = await getNews(sessionToken, { limit: 30, asset: asset || undefined, signal: controller.signal });
       setItems(data);
+      setArchiveOffset(data.length);
     } catch (err: any) {
+      if (controller.signal.aborted) return;
       setError(err.message || "Gagal memuat berita");
     } finally {
       setIsLoading(false);
@@ -84,14 +93,19 @@ export function NewsPage() {
   };
 
   const loadMore = async () => {
-    if (isLoadingMore || items.length === 0) return;
+    if (isLoadingMore || archiveOffset === 0) return;
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     setIsLoadingMore(true);
     try {
-      const data = await getNews(sessionToken, { limit: 30, offset: items.length, asset: activeAsset || undefined });
+      const data = await getNews(sessionToken, { limit: 30, offset: archiveOffset, asset: activeAsset || undefined, signal: controller.signal });
       if (data.length > 0) {
         setItems((prev) => [...prev, ...data]);
+        setArchiveOffset((prev) => prev + data.length);
       }
     } catch (err: any) {
+      if (controller.signal.aborted) return;
       setError(err.message || "Gagal memuat berita tambahan");
     } finally {
       setIsLoadingMore(false);
@@ -118,8 +132,8 @@ export function NewsPage() {
   }, [sessionToken]);
 
   useEffect(() => {
-    const es = getSharedEventSource();
-    if (!es) return;
+    let cancelled = false;
+    let es: EventSource | null = null;
 
     const onNewsUpdate = (e: MessageEvent) => {
       try {
@@ -148,7 +162,8 @@ export function NewsPage() {
           setWireItems((prev) => {
             const existingIds = new Set(prev.map((p) => p.id));
             const trulyNew = globalArticles.filter((a) => !existingIds.has(a.id));
-            return [...trulyNew, ...prev];
+            // Cap like NewsFeed so a long session doesn't grow this forever.
+            return [...trulyNew, ...prev].slice(0, 50);
           });
         }
       } catch (err) {
@@ -156,10 +171,24 @@ export function NewsPage() {
       }
     };
 
-    es.addEventListener("news_update", onNewsUpdate);
+    // acquire jadi async karena stream butuh stream-ticket dulu (EventSource
+    // tidak bisa set header; ?token= sudah ditolak backend).
+    acquireSharedEventSource().then((source) => {
+      if (!source) return;
+      if (cancelled) {
+        releaseSharedEventSource();
+        return;
+      }
+      es = source;
+      es.addEventListener("news_update", onNewsUpdate);
+    });
 
     return () => {
-      es.removeEventListener("news_update", onNewsUpdate);
+      cancelled = true;
+      if (es) {
+        es.removeEventListener("news_update", onNewsUpdate);
+        releaseSharedEventSource();
+      }
       clearTimeout(highlightTimeoutRef.current);
     };
   }, [activeAsset, sessionToken]);

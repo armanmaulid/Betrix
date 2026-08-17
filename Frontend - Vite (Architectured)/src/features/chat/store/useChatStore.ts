@@ -1,11 +1,22 @@
 import { create } from "zustand";
 
+export interface ChatMessage {
+  role: "user" | "agent" | "assistant";
+  content: string;
+  image?: string | null;
+  isTyping?: boolean;
+  thinkingTime?: string;
+  tools?: string;
+  cost?: string;
+  isFinishedGlow?: boolean;
+}
+
 interface ChatState {
   inputText: string;
   setInputText: (text: string) => void;
 
-  messages: any[];
-  setMessages: (updater: any[] | ((prev: any[]) => any[])) => void;
+  messages: ChatMessage[];
+  setMessages: (updater: ChatMessage[] | ((prev: ChatMessage[]) => ChatMessage[])) => void;
 
   isStreaming: boolean;
   setIsStreaming: (isStreaming: boolean) => void;
@@ -18,9 +29,6 @@ interface ChatState {
 
   optimizeEnabled: boolean;
   setOptimizeEnabled: (val: boolean | ((prev: boolean) => boolean)) => void;
-
-  webSearchEnabled: boolean;
-  setWebSearchEnabled: (val: boolean | ((prev: boolean) => boolean)) => void;
 
   attachedImage: string | null;
   setAttachedImage: (img: string | null) => void;
@@ -56,11 +64,6 @@ export const useChatStore = create<ChatState>((set) => ({
   optimizeEnabled: true,
   setOptimizeEnabled: (val) => set((state) => ({
     optimizeEnabled: typeof val === "function" ? val(state.optimizeEnabled) : val
-  })),
-
-  webSearchEnabled: false,
-  setWebSearchEnabled: (val) => set((state) => ({
-    webSearchEnabled: typeof val === "function" ? val(state.webSearchEnabled) : val
   })),
 
   attachedImage: null,

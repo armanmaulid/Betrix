@@ -91,7 +91,11 @@ export const TickerStrip = React.memo(function TickerStrip({ symbols = MARKET_SY
         style={{ animationDuration: `${durationSeconds}s` }}
       >
         {renderItems("a")}
-        {renderItems("b")}
+        {/* Salinan kedua cuma ada buat loop translateX(-50%) yang mulus —
+            sembunyikan dari assistive tech biar harga tidak disebut dua kali. */}
+        <div aria-hidden="true" className="contents">
+          {renderItems("b")}
+        </div>
       </div>
     </div>
   );

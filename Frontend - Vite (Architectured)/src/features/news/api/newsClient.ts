@@ -1,4 +1,4 @@
-const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+import { BACKEND_URL } from "../../../shared/lib/config";
 
 const newsCache = new Map<string, { data: NewsItem[], timestamp: number }>();
 
@@ -16,6 +16,7 @@ export interface GetNewsOptions {
   asset?: string;
   limit?: number;
   offset?: number;
+  signal?: AbortSignal;
 }
 
 export async function getNews(token: string, options: GetNewsOptions = {}): Promise<NewsItem[]> {
@@ -37,6 +38,7 @@ export async function getNews(token: string, options: GetNewsOptions = {}): Prom
 
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
+    signal: options.signal,
   });
 
   if (res.status === 401) {

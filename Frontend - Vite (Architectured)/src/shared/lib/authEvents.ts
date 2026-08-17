@@ -17,3 +17,18 @@ export function onLogout(listener: Listener): () => void {
 export function emitLogout(): void {
   listeners.forEach((listener) => listener());
 }
+
+// Sinyal terpisah dari logout eksplisit: dipakai oleh API client (marketClient)
+// saat menerima 401 di tengah request biasa. Berbeda dari emitLogout() yang hanya
+// menutup stream — ini harus MENGURANGI state auth (sessionToken + user) supaya
+// ProtectedRoute melakukan redirect SPA (soft) alih-alih full page reload.
+const expiryListeners = new Set<Listener>();
+
+export function onSessionExpired(listener: Listener): () => void {
+  expiryListeners.add(listener);
+  return () => expiryListeners.delete(listener);
+}
+
+export function emitSessionExpired(): void {
+  expiryListeners.forEach((listener) => listener());
+}

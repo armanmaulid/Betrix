@@ -5,7 +5,7 @@
 // subsequent request. No cookies, no refresh tokens — a single 24h-TTL
 // token per device (see sessionStore.js / deviceSessionStore.js).
 // Base URL to backend Express server. Defaults to Vite dev proxy target or local.
-const BACKEND_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
+import { BACKEND_URL } from "../../../shared/lib/config";
 
 export function getGoogleOAuthUrl(): string {
   return `${BACKEND_URL}/api/v1/auth/google`;
@@ -61,7 +61,13 @@ export class AuthApiError extends Error {
 
 async function parseErrorAndThrow(res: Response): Promise<never> {
   const body = await res.json().catch(() => null);
-  throw new AuthApiError(body?.error || `Request gagal (${res.status})`, res.status, {
+  // Guard the server error field: it's cast straight into AuthApiError.message,
+  // and a non-string value would become `setState(object)` downstream (React
+  // crashes with "Objects are not valid as a React child").
+  const message = typeof body?.error === "string" && body.error
+    ? body.error
+    : `Request gagal (${res.status})`;
+  throw new AuthApiError(message, res.status, {
     needsVerification: body?.needsVerification,
     hasActiveSession: body?.hasActiveSession,
   });
@@ -209,4 +215,30 @@ export async function revokeSession(sessionToken: string, fingerprint: string): 
     headers: { Authorization: `Bearer ${sessionToken}` },
   });
   if (!res.ok) return parseErrorAndThrow(res);
+}
+
+// POST /api/auth/stream-ticket — tukar session token → ticket sekali pakai
+// (single-use, TTL 60 dtk) khusus dipakai di URL SSE. EventSource tidak bisa
+// set header, jadi token sesi TIDAK BOLEH ditaruh di query string — ticket
+// inilah penggantinya. 401 kalau token invalid/expired (lempar AuthApiError).
+export async function getStreamTicket(sessionToken: string): Promise<{ ticket: string }> {
+  const res = await fetch(`${BACKEND_URL}/api/v1/auth/stream-ticket`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${sessionToken}` },
+  });
+  if (!res.ok) return parseErrorAndThrow(res);
+  return res.json();
+}
+
+// POST /api/auth/oauth/exchange — tukar one-time code dari redirect Google
+// OAuth (callback ?code=...) → session token + user. Response shape persis
+// `LoginSuccess`, jadi hasilnya bisa langsung dipakai `loginWithToken(...)`.
+export async function exchangeOAuthCode(code: string): Promise<LoginSuccess> {
+  const res = await fetch(`${BACKEND_URL}/api/v1/auth/oauth/exchange`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code }),
+  });
+  if (!res.ok) return parseErrorAndThrow(res);
+  return res.json();
 }

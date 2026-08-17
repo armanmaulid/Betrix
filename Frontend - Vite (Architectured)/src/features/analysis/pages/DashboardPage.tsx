@@ -80,10 +80,10 @@ export function DashboardPage() {
             <TradingViewWidget symbol="CAPITALCOM:DXY" interval="D" chartStyle="2" hideVolume={true} hideTopToolbar={true} />
           </div>
         </div>
-        <div className="w-2/3">
-          <TradingViewWidget 
-            symbol={toTradingViewSymbol(symbol)} 
-            studies={["RSI@tv-basicstudies", "BB@tv-basicstudies"]} 
+        <div id="panel-chart" className="w-2/3 scroll-mt-10">
+          <TradingViewWidget
+            symbol={toTradingViewSymbol(symbol)}
+            studies={["RSI@tv-basicstudies", "BB@tv-basicstudies"]}
           />
         </div>
       </div>

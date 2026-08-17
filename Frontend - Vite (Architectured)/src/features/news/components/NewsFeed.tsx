@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Newspaper, RefreshCw } from "lucide-react";
 import { getNews, type NewsItem } from "../api/newsClient";
-import { getSharedEventSource } from "../../market/hooks/useTickerPrices";
+import { acquireSharedEventSource, releaseSharedEventSource } from "../../market/hooks/useTickerPrices";
 
 // types imported from newsClient
 
@@ -57,14 +57,18 @@ export const NewsFeed = React.memo(function NewsFeed() {
   // the first time the feed renders (only items that show up on later
   // polls count as "new").
   const prevIdsRef = useRef<Set<string> | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   async function load() {
+    abortControllerRef.current?.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
     setError(null);
     try {
       const token = localStorage.getItem("eaconsole.sessionToken");
       if (!token) throw new Error("No session token");
       
-      const fetched = await getNews(token, { limit: 20 });
+      const fetched = await getNews(token, { limit: 20, signal: controller.signal });
 
       if (prevIdsRef.current) {
         const freshIds = new Set(fetched.filter((it) => !prevIdsRef.current!.has(it.id)).map((it) => it.id));
@@ -79,6 +83,7 @@ export const NewsFeed = React.memo(function NewsFeed() {
       prevIdsRef.current = new Set(fetched.map((it) => it.id));
       setItems(fetched);
     } catch (err) {
+      if (controller.signal.aborted) return;
       setError(err instanceof Error ? err.message : "Gagal memuat berita");
     } finally {
       setIsLoading(false);
@@ -92,8 +97,8 @@ export const NewsFeed = React.memo(function NewsFeed() {
 
   // Listen for realtime SSE news updates
   useEffect(() => {
-    const es = getSharedEventSource();
-    if (!es) return;
+    let cancelled = false;
+    let es: EventSource | null = null;
 
     const onNewsUpdate = (e: MessageEvent) => {
       try {
@@ -117,12 +122,32 @@ export const NewsFeed = React.memo(function NewsFeed() {
       }
     };
 
-    es.addEventListener("news_update", onNewsUpdate);
-    return () => es.removeEventListener("news_update", onNewsUpdate);
+    // acquire jadi async karena stream butuh stream-ticket dulu (EventSource
+    // tidak bisa set header; ?token= sudah ditolak backend).
+    acquireSharedEventSource().then((source) => {
+      if (!source) return;
+      if (cancelled) {
+        releaseSharedEventSource();
+        return;
+      }
+      es = source;
+      es.addEventListener("news_update", onNewsUpdate);
+    });
+
+    return () => {
+      cancelled = true;
+      if (es) {
+        es.removeEventListener("news_update", onNewsUpdate);
+        releaseSharedEventSource();
+      }
+    };
   }, []);
 
   useEffect(() => {
-    return () => clearTimeout(highlightTimeoutRef.current);
+    return () => {
+      abortControllerRef.current?.abort();
+      clearTimeout(highlightTimeoutRef.current);
+    };
   }, []);
 
   return (

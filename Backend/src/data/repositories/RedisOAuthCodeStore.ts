@@ -9,11 +9,18 @@ export class RedisOAuthCodeStore implements OAuthCodeStore {
   }
 
   async getAndDelete(code: string): Promise<OAuthCodePayload | null> {
-    const raw = await redisClient.get<string>(`oauth_code:${code}`);
+    const raw = await redisClient.get<string | Record<string, unknown>>(`oauth_code:${code}`);
     if (!raw) return null;
     await redisClient.del(`oauth_code:${code}`);
+    // Upstash REST client auto-parses JSON on read (automaticDeserialization
+    // defaults to true), jadi `raw` bisa sudah berupa object — parse hanya
+    // kalau masih string (pola sama dengan RedisSessionRepository /
+    // RedisMarketDataRepository). Tanpa guard ini, JSON.parse(object) throw
+    // dan tiap code dianggap invalid (400 "Invalid or expired OAuth code").
     try {
-      return JSON.parse(raw) as OAuthCodePayload;
+      return typeof raw === "string"
+        ? (JSON.parse(raw) as OAuthCodePayload)
+        : (raw as unknown as OAuthCodePayload);
     } catch {
       return null;
     }

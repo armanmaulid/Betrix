@@ -1,5 +1,4 @@
-// @ts-nocheck
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 
 // Bloomberg Terminal immersive auth shell: full-screen with animated ticker
 // waterfall background, center glass-morphism form card, floating particles,
@@ -173,7 +172,7 @@ function GeometricOverlays() {
 
 // Floating particles (orange dots ascending)
 function Particles() {
-  const particles = Array.from({ length: 20 }, (_, i) => ({
+  const particles = Array.from({ length: 20 }, () => ({
     left: `${Math.random() * 100}%`,
     delay: `${Math.random() * 8}s`,
     duration: `${12 + Math.random() * 8}s`,
@@ -185,14 +184,14 @@ function Particles() {
       {particles.map((p, i) => (
         <div
           key={i}
-          className="absolute bottom-0 h-1 w-1 bg-[var(--accent)] opacity-60 animate-[particle-float_linear_infinite]"
-          style={{
-            left: p.left,
-            animationDelay: p.delay,
-            animationDuration: p.duration,
-            // @ts-ignore
-            "--drift": p.drift,
-          }}
+          className="absolute bottom-0 h-1 w-1 bg-[var(--accent)] opacity-60 animate-[particle-float_linear_infinite]"            style={{
+              left: p.left,
+              animationDelay: p.delay,
+              animationDuration: p.duration,
+              // CSS custom property (`--*`) belum ada di tipe csstype yang
+              // terpasang — cast sempit, bukan @ts-ignore.
+              "--drift": p.drift,
+            } as CSSProperties}
         />
       ))}
     </div>

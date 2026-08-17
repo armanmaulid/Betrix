@@ -1,5 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
-import { ChevronDown, Globe, Leaf, Paperclip, Sparkles, X, ArrowRight } from "lucide-react";
+import { ChevronDown, Leaf, Paperclip, Sparkles, X, ArrowRight, AlertTriangle } from "lucide-react";
 import { useChatStore } from "../store/useChatStore";
 import { useChatStream } from "../hooks/useChatStream";
 import { useBrokerSymbols } from "../../market/api/queries";
@@ -7,7 +7,8 @@ import {
   CHAT_SHORTCUTS,
   INSTRUMENT_COMMANDS,
   AGENT_TIER_LABEL,
-  TIER_CREDIT_COST
+  TIER_CREDIT_COST,
+  symbolMatchesCommand,
 } from "../../../shared/lib/analyzePageHelpers";
 import { type BrokerSymbol } from "../../market/api/marketClient";
 
@@ -18,7 +19,6 @@ export function ChatCommandBox({ isChat = false }: { isChat?: boolean }) {
     activeTab, setActiveTab,
     agentTier, setAgentTier,
     optimizeEnabled, setOptimizeEnabled,
-    webSearchEnabled, setWebSearchEnabled,
     attachedImage, setAttachedImage
   } = useChatStore();
 
@@ -29,6 +29,7 @@ export function ChatCommandBox({ isChat = false }: { isChat?: boolean }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showAgentMenu, setShowAgentMenu] = useState(false);
   const agentMenuRef = useRef<HTMLDivElement>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
 
@@ -36,10 +37,11 @@ export function ChatCommandBox({ isChat = false }: { isChat?: boolean }) {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > MAX_IMAGE_BYTES) {
-        alert(`Ukuran gambar terlalu besar! Maksimal ${MAX_IMAGE_BYTES / 1024 / 1024}MB.`);
+        setUploadError(`Ukuran gambar terlalu besar! Maksimal ${MAX_IMAGE_BYTES / 1024 / 1024}MB.`);
         e.target.value = '';
         return;
       }
+      setUploadError(null);
       const reader = new FileReader();
       reader.onloadend = () => {
         setAttachedImage(reader.result as string);
@@ -73,20 +75,9 @@ export function ChatCommandBox({ isChat = false }: { isChat?: boolean }) {
     const query = symbolMatch[2].toLowerCase();
     symbolSearchPrefix = `/${cmd} `;
 
-    let expectedCategoryTokens: string[] = [];
-    if (cmd === "forex") expectedCategoryTokens = ["forex"];
-    else if (cmd === "crypto") expectedCategoryTokens = ["crypto"];
-    else if (cmd === "stock") expectedCategoryTokens = ["stock", "equity"];
-    else if (cmd === "etf") expectedCategoryTokens = ["etf", "fund"];
-    else if (cmd === "bond") expectedCategoryTokens = ["bond"];
-    else if (cmd === "index") expectedCategoryTokens = ["index", "indices"];
-    else if (cmd === "futures") expectedCategoryTokens = ["commodity", "commodities", "futures", "energy", "metal"];
-
-    const categoryFiltered = allBrokerSymbols.filter(s => {
-      const cat = (s.category || "").toLowerCase();
-      const path = (s.path || "").toLowerCase();
-      return expectedCategoryTokens.length === 0 || expectedCategoryTokens.some(t => cat.includes(t) || path.includes(t));
-    });
+    const categoryFiltered = allBrokerSymbols.filter(s =>
+      symbolMatchesCommand(s.path || "", cmd)
+    );
 
     if (query) {
       suggestedSymbols = categoryFiltered
@@ -210,19 +201,22 @@ export function ChatCommandBox({ isChat = false }: { isChat?: boolean }) {
           <button
             onClick={() => { setAgentTier("cheap"); setOptimizeEnabled(false); }}
             title="Mode Lite (respons cepat, kredit paling murah)"
+            aria-label="Mode Lite (respons cepat, kredit paling murah)"
             className={`p-1 transition-opacity hover:opacity-80 ${!optimizeEnabled && agentTier === "cheap" ? "bg-[var(--success)] text-black" : "bg-[var(--success-soft)] text-[var(--success)]"}`}
           >
             <Leaf size={14} />
           </button>
-          <button
-            onClick={() => setWebSearchEnabled((v: boolean) => !v)}
-            title="Search Web (belum aktif di backend, lihat catatan tim)"
-            className={`p-1 transition-opacity hover:opacity-80 ${webSearchEnabled ? "bg-[var(--info)] text-black" : "bg-[var(--info-soft)] text-[var(--info)]"}`}
-          >
-            <Globe size={14} />
-          </button>
         </div>
       </div>
+
+      {uploadError && (
+        <div role="alert" className="page-container pb-2">
+          <div className="flex items-center gap-1.5 border border-[var(--danger)] bg-[var(--danger-soft)] px-2 py-1 text-[10px] text-[var(--danger)]">
+            <AlertTriangle size={10} className="flex-shrink-0" />
+            <span>{uploadError}</span>
+          </div>
+        </div>
+      )}
 
       {/* BOTTOM TOOLBAR */}
       <div className="flex items-center justify-between page-container py-2 border-t border-[var(--border)] bg-[var(--surface-alt)]">

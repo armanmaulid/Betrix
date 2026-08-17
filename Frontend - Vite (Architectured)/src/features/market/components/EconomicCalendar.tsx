@@ -3,7 +3,7 @@ import { CalendarClock, RefreshCw, Info, Filter, X } from "lucide-react";
 import { type CalendarEvent } from "../api/marketClient";
 import { useEconomicCalendar, marketKeys } from "../api/queries";
 import { useQueryClient } from "@tanstack/react-query";
-import { getSharedEventSource } from "../hooks/useTickerPrices";
+import { acquireSharedEventSource, releaseSharedEventSource } from "../hooks/useTickerPrices";
 
 const IMPACT_DOT: Record<CalendarEvent["importance"], string> = {
   high: "bg-[var(--danger)]",
@@ -167,8 +167,8 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
 
   // Live update: dengerin event calendar_update dari backend
   useEffect(() => {
-    const es = getSharedEventSource();
-    if (!es) return;
+    let cancelled = false;
+    let es: EventSource | null = null;
 
     const onCalendarUpdate = (e: MessageEvent) => {
       try {
@@ -189,10 +189,24 @@ export const EconomicCalendar = React.memo(function EconomicCalendar() {
       }
     };
 
-    es.addEventListener("calendar_update", onCalendarUpdate);
+    // acquire jadi async karena stream butuh stream-ticket dulu (EventSource
+    // tidak bisa set header; ?token= sudah ditolak backend).
+    acquireSharedEventSource().then((source) => {
+      if (!source) return;
+      if (cancelled) {
+        releaseSharedEventSource();
+        return;
+      }
+      es = source;
+      es.addEventListener("calendar_update", onCalendarUpdate);
+    });
 
     return () => {
-      es.removeEventListener("calendar_update", onCalendarUpdate);
+      cancelled = true;
+      if (es) {
+        es.removeEventListener("calendar_update", onCalendarUpdate);
+        releaseSharedEventSource();
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromDateStr, toDateStr, queryClient]);

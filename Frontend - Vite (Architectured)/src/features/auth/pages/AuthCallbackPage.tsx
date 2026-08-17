@@ -3,31 +3,39 @@ import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import { Loader2, AlertTriangle } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { AuthLayout } from "../components/AuthLayout";
+import { exchangeOAuthCode } from "../api/authClient";
 
 export function AuthCallbackPage() {
   const [searchParams] = useSearchParams();
-  const token = searchParams.get("token");
+  const code = searchParams.get("code");
   const { loginWithToken } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!token) {
-      setError("Token tidak ditemukan. Silakan coba login kembali.");
+    if (!code) {
+      setError("Kode otentikasi tidak ditemukan. Silakan coba login kembali.");
       return;
     }
+    // Narrowing string|null tidak menembus closure async — salin ke const
+    // (bertipe string) supaya exchangeOAuthCode bisa dipakai di processCode.
+    const oauthCode = code;
 
-    async function processToken() {
+    async function processCode() {
       try {
-        await loginWithToken(token!);
+        // Backend sekarang redirect Google OAuth dengan one-time code
+        // (?code=...) — tukar jadi session token, lalu simpan via
+        // loginWithToken (token disimpan hanya setelah fetchMe sukses).
+        const { sessionToken } = await exchangeOAuthCode(oauthCode);
+        await loginWithToken(sessionToken);
         navigate("/", { replace: true });
       } catch (err: any) {
         setError(err.message || "Gagal memproses otentikasi. Silakan coba lagi.");
       }
     }
 
-    processToken();
-  }, [token, loginWithToken, navigate]);
+    processCode();
+  }, [code, loginWithToken, navigate]);
 
   if (error) {
     return (
@@ -44,7 +52,7 @@ export function AuthCallbackPage() {
           </>
         }
       >
-        <div className="flex items-start gap-2 border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-[12px] text-[var(--danger)] animate-[shake_0.4s_ease-in-out]">
+        <div role="alert" className="flex items-start gap-2 border border-[var(--danger)] bg-[var(--danger-soft)] px-3 py-2 text-[12px] text-[var(--danger)] animate-[shake_0.4s_ease-in-out]">
           <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
           <span>{error}</span>
         </div>
