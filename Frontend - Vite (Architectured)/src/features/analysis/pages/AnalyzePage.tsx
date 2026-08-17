@@ -14,7 +14,8 @@ import {
 import { NewsFeed } from "../../news/components/NewsFeed";
 import { EconomicCalendar } from "../../market/components/EconomicCalendar";
 import { ChatMessageItem } from "../../chat/components/ChatMessageItem";
-import { CHAT_SHORTCUTS, CHAT_TEMPLATES } from "../../../shared/lib/analyzePageHelpers";
+import { CHAT_TEMPLATES, deriveCommands } from "../../../shared/lib/analyzePageHelpers";
+import { useBrokerSymbols } from "../../market/api/queries";
 import { useChatStore } from "../../chat/store/useChatStore";
 import { ChatCommandBox } from "../../chat/components/ChatCommandBox";
 import { ChatHistoryList } from "../../chat/components/ChatHistoryList";
@@ -25,6 +26,7 @@ export function AnalyzePage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const symbol = searchParams.get('symbol');
+  const { data: allBrokerSymbols = [] } = useBrokerSymbols();
 
   const { view, setView, messages, setMessages, setCurrentSessionId } = useChatStore();
 
@@ -90,7 +92,7 @@ export function AnalyzePage() {
             <div className="flex flex-col gap-2">
               <h2 className="text-[var(--info)] font-bold tracking-widest text-[11px]">PERINTAH {'>'}</h2>
               <div className="grid grid-cols-3 gap-y-1 gap-x-2">
-                {CHAT_SHORTCUTS.map(s => (
+                {deriveCommands(allBrokerSymbols).map(s => (
                   <div key={s.cmd} className="flex items-center gap-1.5 text-[12px]">
                     <span className="text-[var(--accent)] font-bold">{s.cmd}</span>
                     <span className="text-[var(--text-muted)]">{s.desc}</span>

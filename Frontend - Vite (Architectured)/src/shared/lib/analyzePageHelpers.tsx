@@ -17,9 +17,38 @@ export const markdownComponents: Components = {
   blockquote: (props) => <blockquote className="border-l-2 border-[var(--accent)] pl-3 text-[var(--text-muted)] italic my-2" {...props} />,
 };
 
+// Satu-satunya sumber kebenaran pemetaan command→kategori broker. Kategori
+// broker = turunan `path` MT5 (top-level segment), nilai aktual (17 Aug 2026):
+//   "Stock CFD's", "Crypto", "Forex", "Commodities", "Indices", "Bonds CFDs"
+// plus sub-segment khusus: "ETF" (di Stock CFD's), "Futures" (Energies/Metal/
+// Indices Futures). `deriveCommands` memotong daftar ini ke kategori yang
+// benar-benar punya simbol di broker — command yang muncul di UI TIDAK lagi
+// hardcoded, tapi turun dari `GET /api/v1/market/symbols`.
+interface CommandDefinition {
+  slug: string;
+  label: string;
+  matches: (path: string) => boolean;
+}
+
+const topCategory = (path: string) => (path || "").toLowerCase().split("\\")[0] || "";
+
+export const COMMAND_DEFINITIONS: CommandDefinition[] = [
+  { slug: "forex",     label: "forex pairs",  matches: (p) => topCategory(p) === "forex" },
+  { slug: "crypto",    label: "crypto",       matches: (p) => topCategory(p) === "crypto" },
+  { slug: "stock",     label: "stocks",       matches: (p) => topCategory(p) === "stock cfd's" && !p.includes("etf") },
+  { slug: "etf",       label: "ETFs & funds", matches: (p) => p.includes("etf") },
+  { slug: "bond",      label: "bonds",        matches: (p) => topCategory(p) === "bonds cfds" || topCategory(p) === "bonds" },
+  { slug: "index",     label: "indices",      matches: (p) => topCategory(p) === "indices" && !p.includes("futures") },
+  { slug: "futures",   label: "futures",      matches: (p) => p.includes("futures") },
+  { slug: "commodity", label: "commodities",  matches: (p) => topCategory(p) === "commodities" },
+];
+
 // Command instrumen yang men-trigger fetch data realtime MT5. Simbol diambil
 // dari kata setelah command, mis. "/forex xauusd analisa ..." -> symbol=XAUUSD.
-export const INSTRUMENT_COMMANDS = ["forex", "crypto", "stock", "etf", "bond", "index", "futures"];
+// DAERAH VALIDASI = BACKEND (SYMBOL_NOT_FOUND), bukan daftar slug di sini.
+// `knownCommand` hanya penanda untuk popover grouping, BUKAN gate parse —
+// switch broker / kategori baru tetap diparse, backend yang memutuskan valid.
+export const INSTRUMENT_COMMANDS = COMMAND_DEFINITIONS.map((d) => d.slug);
 export const TIMEFRAME_PATTERN = /\b(M1|M5|M15|M30|H1|H4|D1|W1|MN1)\b/i;
 
 export interface ParsedInstrumentCommand {
@@ -30,8 +59,7 @@ export interface ParsedInstrumentCommand {
 export function parseInstrumentCommand(text: string): ParsedInstrumentCommand | null {
   const match = text.trim().match(/^\/(\w+)\s+(\S+)/);
   if (!match) return null;
-  const [, cmd, symbolRaw] = match;
-  if (!INSTRUMENT_COMMANDS.includes(cmd.toLowerCase())) return null;
+  const [, , symbolRaw] = match;
   const tfMatch = text.match(TIMEFRAME_PATTERN);
   return {
     symbol: symbolRaw.replace(/^\/+/, '').toUpperCase(),
@@ -39,30 +67,25 @@ export function parseInstrumentCommand(text: string): ParsedInstrumentCommand | 
   };
 }
 
-// Satu-satunya sumber kebenaran pemetaan command→kategori broker. Kategori
-// broker = turunan `path` MT5 (top-level segment), nilai aktual (17 Aug 2026):
-//   "Stock CFD's", "Crypto", "Forex", "Commodities", "Indices", "Bonds CFDs"
-// plus sub-segment khusus: "ETF" (di Stock CFD's), "Futures" (Energies/Metal/
-// Indices Futures). Mapping ini dipakai ChatCommandBox (popover filter) supaya
-// tidak ada duplikasi kategori hardcode yang bisa drift dari broker asli.
-// ponytail: Commodities spot (Metals/Softs/Energies spot, mis. XAUUSD) belum
-// punya command khusus — user saat ini menganalisa metal lewat default symbol
-// / tombol "ANALISA SEKARANG", bukan slash command. Tambah `/commodity` kalau
-// butuh.
 export function symbolMatchesCommand(path: string, cmd: string): boolean {
-  const p = (path || "").toLowerCase();
-  const top = p.split("\\")[0] || "";
+  const def = COMMAND_DEFINITIONS.find((d) => d.slug === cmd.toLowerCase());
+  return def ? def.matches(path) : false;
+}
 
-  switch (cmd) {
-    case "forex": return top === "forex";
-    case "crypto": return top === "crypto";
-    case "stock": return top === "stock cfd's" && !p.includes("etf");
-    case "etf": return p.includes("etf");
-    case "bond": return top === "bonds cfds" || top === "bonds";
-    case "index": return top === "indices" && !p.includes("futures");
-    case "futures": return p.includes("futures");
-    default: return false;
-  }
+// Command yang tampil di popover + landing view: turun dari simbol broker
+// (kategori yang benar-benar ada), BUKAN daftar hardcode. Kalau `symbols`
+// kosong (masih loading / fetch gagal), fallback ke seluruh definisi supaya
+// UI tidak kosong.
+export interface CommandShortcut {
+  cmd: string;
+  desc: string;
+}
+
+export function deriveCommands(symbols: { path?: string | null }[]): CommandShortcut[] {
+  const defs = symbols.length === 0
+    ? COMMAND_DEFINITIONS
+    : COMMAND_DEFINITIONS.filter((d) => symbols.some((s) => d.matches(s.path || "")));
+  return defs.map((d) => ({ cmd: `/${d.slug}`, desc: d.label }));
 }
 
 // Cermin dari TASK_TIER_MAP + TIER_CREDIT_COST di backend (domain/services/ModelPolicy.ts)
@@ -92,22 +115,7 @@ export const TAB_TO_NEWS_ASSETS: Record<string, string[] | undefined> = {
   NEWS: ["usd", "metal", "oil", "btc"],
 };
 
-// Shortcut command "/forex", "/crypto", dst yang muncul di popover saat user
-// mulai ngetik "/" di kotak input. Konstanta statis -> ditaruh di module
-// scope (bukan di dalam komponen) supaya tidak dialokasikan ulang tiap render.
-export const CHAT_SHORTCUTS = [
-  { cmd: "/stock", desc: "stocks" },
-  { cmd: "/etf", desc: "ETFs & funds" },
-  { cmd: "/bond", desc: "bonds" },
-  { cmd: "/crypto", desc: "crypto" },
-  { cmd: "/index", desc: "indices" },
-  { cmd: "/portfolio", desc: "portfolio" },
-  { cmd: "/forex", desc: "forex pairs" },
-  { cmd: "/futures", desc: "futures" },
-  { cmd: "/watchlist", desc: "watchlist" },
-];
-
-// Template pertanyaan di landing view. Sama seperti CHAT_SHORTCUTS -- statis,
+// Template pertanyaan di landing view. Statis,
 // tidak bergantung state/props apa pun, jadi aman di module scope.
 export const CHAT_TEMPLATES = [
   {

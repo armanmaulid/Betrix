@@ -4,11 +4,11 @@ import { useChatStore } from "../store/useChatStore";
 import { useChatStream } from "../hooks/useChatStream";
 import { useBrokerSymbols } from "../../market/api/queries";
 import {
-  CHAT_SHORTCUTS,
   INSTRUMENT_COMMANDS,
   AGENT_TIER_LABEL,
   TIER_CREDIT_COST,
   symbolMatchesCommand,
+  deriveCommands,
 } from "../../../shared/lib/analyzePageHelpers";
 import { type BrokerSymbol } from "../../market/api/marketClient";
 
@@ -62,10 +62,11 @@ export function ChatCommandBox({ isChat = false }: { isChat?: boolean }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showAgentMenu]);
 
+  const shortcuts = deriveCommands(allBrokerSymbols);
   const showCommands = inputText.startsWith('/') && !inputText.includes(' ');
   const filteredShortcuts = inputText.length > 1 && showCommands
-    ? CHAT_SHORTCUTS.filter(s => s.cmd.toLowerCase().includes(inputText.toLowerCase().trim()))
-    : CHAT_SHORTCUTS;
+    ? shortcuts.filter(s => s.cmd.toLowerCase().includes(inputText.toLowerCase().trim()))
+    : shortcuts;
 
   let suggestedSymbols: BrokerSymbol[] = [];
   let symbolSearchPrefix = "";
