@@ -38,6 +38,7 @@ import { env } from "@config/env.js";
 import { isDeviceEnforcementEnabled } from "@config/deviceEnforcement.js";
 import { AppSettings } from "@core/settings/AppSettings.js";
 import { ModelPolicy } from "@domain/services/ModelPolicy.js";
+import { TradeAnalysisPromptBuilder } from "@domain/services/TradeAnalysisPromptBuilder.js";
 
 // Use cases
 import { RegisterUseCase } from "@application/use-cases/auth/RegisterUseCase.js";
@@ -102,6 +103,7 @@ import { UserController } from "@presentation/controllers/UserController.js";
 import { MarketController } from "@presentation/controllers/MarketController.js";
 import { NewsController } from "@presentation/controllers/NewsController.js";
 import { MarketDataService } from "@application/services/MarketDataService.js";
+import { TradeAnalysisContextService } from "@application/services/TradeAnalysisContextService.js";
 import { CalendarService } from "@application/services/CalendarService.js";
 import { AuthService } from "@application/services/AuthService.js";
 import { CaptchaService } from "@application/services/CaptchaService.js";
@@ -233,6 +235,8 @@ export function registerDependencies() {
   container.register("NewsService", { useClass: NewsService });
   container.register("AiPromptRegistry", { useClass: AiPromptRegistry });
   container.register("CaptchaService", { useClass: CaptchaService });
+  container.register("TradeAnalysisPromptBuilder", { useClass: TradeAnalysisPromptBuilder });
+  container.register("TradeAnalysisContextService", { useClass: TradeAnalysisContextService });
 
   // Events & Handlers
   container.register("EventDispatcher", { useClass: EventDispatcher }, { lifecycle: Lifecycle.Singleton });

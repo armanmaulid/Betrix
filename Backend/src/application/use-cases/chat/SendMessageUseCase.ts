@@ -12,6 +12,8 @@ import { LIMITS } from "@core/constants/index.js";
 import { sanitizeHistory } from "@core/utils/chat.js";
 import { EventDispatcher, ChatCompleted } from "@domain/events/index.js";
 import { AiPromptRegistry } from "@domain/services/AiPromptRegistry.js";
+import { TradeAnalysisContextService } from "@application/services/TradeAnalysisContextService.js";
+import type { ContextParams } from "@application/dtos/chat.dto.js";
 
 interface SendMessageInput {
   userId: string;
@@ -22,6 +24,7 @@ interface SendMessageInput {
   sessionId?: string;
   tier?: ModelTier;
   image?: string;
+  contextParams?: ContextParams;
 }
 
 interface SendMessageOutput {
@@ -41,7 +44,8 @@ export class SendMessageUseCase {
     @inject("CachePort") private cachePort: CachePort,
     @inject("EventDispatcher") private eventDispatcher: EventDispatcher,
     @inject("AiPromptRegistry") private promptRegistry: AiPromptRegistry,
-    @inject("ModelPolicy") private modelPolicy: ModelPolicy
+    @inject("ModelPolicy") private modelPolicy: ModelPolicy,
+    @inject("TradeAnalysisContextService") private contextService: TradeAnalysisContextService
   ) {}
 
   async execute(input: SendMessageInput): Promise<SendMessageOutput> {
@@ -55,7 +59,13 @@ export class SendMessageUseCase {
     const cost = ModelPolicy.TIER_CREDIT_COST[tier];
 
     const cleanHistory = sanitizeHistory(input.history);
-    const messages = [...cleanHistory, { role: "user" as const, content: input.message.substring(0, LIMITS.MESSAGE_MAX_LENGTH) }];
+
+    const contextBlock = await this.contextService.buildContext(input.contextParams);
+    const userContent = contextBlock
+      ? `${contextBlock}\n\n[PERMINTAAN USER]\n${input.message}`
+      : input.message;
+
+    const messages = [...cleanHistory, { role: "user" as const, content: userContent.substring(0, LIMITS.MESSAGE_MAX_LENGTH) }];
 
     const cacheKey = `${input.userId}:${input.message}`;
     const isCacheable = ["general", "quick_summary", "classify_signal"].includes(input.taskType) && messages.length === 1;

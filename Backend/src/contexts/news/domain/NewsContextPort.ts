@@ -7,4 +7,7 @@
 export interface NewsContextPort {
   /** Hapus artikel lebih tua dari `days` hari. Dipakai konteks admin (system cleanup). */
   cleanupOlderThan(days: number): Promise<number>;
+
+  /** Headline terbaru per asset — dipakai konteks chat untuk konteks berita LLM. */
+  getLatestHeadlines(assets: string[], limit: number): Promise<Array<{ source: string; title: string }>>;
 }

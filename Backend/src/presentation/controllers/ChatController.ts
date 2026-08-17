@@ -7,6 +7,7 @@ import { DeleteChatSessionUseCase } from "@application/use-cases/chat/DeleteChat
 import { ExportChatHistoryUseCase } from "@application/use-cases/chat/ExportChatHistoryUseCase.js";
 import { ChatTaskType } from "@domain/entities/ChatMessage.js";
 import type { User } from "@domain/entities/User.js";
+import { isAppError } from "@core/errors/index.js";
 
 @injectable()
 export class ChatController {
@@ -33,8 +34,9 @@ export class ChatController {
         sessionId: req.body.sessionId,
         tier: req.body.tier,
         image: req.body.image,
+        contextParams: req.body.contextParams,
       });
-      
+
       res.json({
         reply: result.reply,
         modelUsed: result.modelUsed,
@@ -47,15 +49,22 @@ export class ChatController {
   }
 
   async streamMessage(req: Request, res: Response) {
-    try {
+    const controller = new AbortController();
+    req.on("close", () => controller.abort());
+
+    // SSE headers flush lazily on the first token — a pre-stream error
+    // (e.g. SYMBOL_NOT_FOUND) must return a JSON 4xx, not `event: error` + HTTP 200.
+    let sseStarted = false;
+    const startSse = () => {
+      if (sseStarted) return;
+      sseStarted = true;
       res.setHeader("Content-Type", "text/event-stream");
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
       res.flushHeaders?.();
+    };
 
-      const controller = new AbortController();
-      req.on("close", () => controller.abort());
-
+    try {
       const result = await this.streamMessageUseCase.execute({
         userId: this.getUser(req).userId,
         taskType: req.body.taskType,
@@ -65,12 +74,15 @@ export class ChatController {
         sessionId: req.body.sessionId,
         tier: req.body.tier,
         image: req.body.image,
+        contextParams: req.body.contextParams,
         onToken: (token) => {
+          startSse();
           res.write(`data: ${JSON.stringify({ token })}\n\n`);
         },
         signal: controller.signal,
       });
 
+      startSse();
       res.write(`event: done\ndata: ${JSON.stringify({
         modelUsed: result.modelUsed,
         latencyMs: result.latencyMs,
@@ -78,6 +90,14 @@ export class ChatController {
       })}\n\n`);
       res.end();
     } catch (err) {
+      // Pre-stream failure (headers not yet sent) → JSON error with correct status.
+      if (isAppError(err) && !sseStarted) {
+        return res.status(err.statusCode).json({
+          error: err.message,
+          code: err.code,
+          ...(err.details && { details: err.details }),
+        });
+      }
       const errorMessage = (err as Error).message || "Failed to stream message";
       res.write(`event: error\ndata: ${JSON.stringify({ error: errorMessage })}\n\n`);
       res.end();

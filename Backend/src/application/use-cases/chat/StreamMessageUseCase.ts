@@ -12,6 +12,8 @@ import { LIMITS } from "@core/constants/index.js";
 import { sanitizeHistory } from "@core/utils/chat.js";
 import { EventDispatcher, ChatCompleted } from "@domain/events/index.js";
 import { AiPromptRegistry } from "@domain/services/AiPromptRegistry.js";
+import { TradeAnalysisContextService } from "@application/services/TradeAnalysisContextService.js";
+import type { ContextParams } from "@application/dtos/chat.dto.js";
 
 interface StreamMessageInput {
   userId: string;
@@ -22,6 +24,7 @@ interface StreamMessageInput {
   sessionId?: string;
   tier?: ModelTier;
   image?: string;
+  contextParams?: ContextParams;
   onToken: (token: string) => void;
   signal?: AbortSignal;
 }
@@ -43,7 +46,8 @@ export class StreamMessageUseCase {
     @inject("CachePort") private cachePort: CachePort,
     @inject("EventDispatcher") private eventDispatcher: EventDispatcher,
     @inject("AiPromptRegistry") private promptRegistry: AiPromptRegistry,
-    @inject("ModelPolicy") private modelPolicy: ModelPolicy
+    @inject("ModelPolicy") private modelPolicy: ModelPolicy,
+    @inject("TradeAnalysisContextService") private contextService: TradeAnalysisContextService
   ) {}
 
   async execute(input: StreamMessageInput): Promise<StreamMessageOutput> {
@@ -69,7 +73,13 @@ export class StreamMessageUseCase {
     }
 
     const cleanHistory = sanitizeHistory(input.history);
-    const messages = [...cleanHistory, { role: "user" as const, content: input.message.substring(0, LIMITS.MESSAGE_MAX_LENGTH) }];
+
+    const contextBlock = await this.contextService.buildContext(input.contextParams);
+    const userContent = contextBlock
+      ? `${contextBlock}\n\n[PERMINTAAN USER]\n${input.message}`
+      : input.message;
+
+    const messages = [...cleanHistory, { role: "user" as const, content: userContent.substring(0, LIMITS.MESSAGE_MAX_LENGTH) }];
 
     const systemPrompt = this.promptRegistry.getSystemPrompt(input.taskType);
 

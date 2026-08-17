@@ -104,6 +104,12 @@ export class PgNewsRepository implements NewsRepository, NewsContextPort {
     return rowCount || 0;
   }
 
+  async getLatestHeadlines(assets: string[], limit: number): Promise<Array<{ source: string; title: string }>> {
+    if (assets.length === 0) return [];
+    const articles = await this.findByAssetTags(assets, limit, 0);
+    return articles.map((a) => ({ source: a.source, title: a.title }));
+  }
+
   private mapRow(row: NewsArticleRow): NewsArticle {
     return new NewsArticle(
       row.id, row.source, row.title, row.url, row.summary,

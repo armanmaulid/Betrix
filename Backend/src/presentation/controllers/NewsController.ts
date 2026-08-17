@@ -3,8 +3,7 @@ import { inject, injectable } from "tsyringe";
 import { GetNewsUseCase } from "@contexts/news/application/use-cases/GetNewsUseCase.js";
 import { INotifier } from "@domain/ports/INotifier.js";
 import type { AuthenticatedRequest } from "@presentation/middleware/auth.middleware.js";
-
-const VALID_ASSETS = ["usd", "eur", "gbp", "jpy", "metal", "oil", "btc", "eco", "global", "crypto"];
+import { NEWS_ASSETS } from "@core/constants/index.js";
 
 @injectable()
 export class NewsController {
@@ -31,9 +30,9 @@ export class NewsController {
       const limit = Math.min(parseInt(req.query.limit as string) || 30, 100);
       const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
 
-      if (asset && !VALID_ASSETS.includes(asset as string)) {
+      if (asset && !(NEWS_ASSETS as readonly string[]).includes(asset as string)) {
         return res.status(400).json({
-          error: `Asset not recognized, pick one of: ${VALID_ASSETS.join(", ")}`,
+          error: `Asset not recognized, pick one of: ${NEWS_ASSETS.join(", ")}`,
           code: "VALIDATION_ERROR"
         });
       }

@@ -50,3 +50,5 @@ export const MODEL_TIERS = ["cheap", "balanced", "deep"] as const;
 export const USER_STATUSES = ["active", "banned", "suspended"] as const;
 
 export const GENDERS = ["male", "female", "other"] as const;
+
+export const NEWS_ASSETS = ["usd", "eur", "gbp", "jpy", "metal", "oil", "btc", "eco", "global", "crypto"] as const;
