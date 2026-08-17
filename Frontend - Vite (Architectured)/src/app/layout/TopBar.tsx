@@ -13,6 +13,30 @@ interface TopBarProps {
   onSearchSymbol: (symbol: string) => void;
 }
 
+// Jam dipecah jadi leaf component supaya tick tiap detik TIDAK me-re-render
+// seluruh TopBar (yang juga memuat search box, tabs, credits, dan indikator
+// koneksi). Hanya blok jam ini yang punya state `now`.
+const Clock = React.memo(function Clock() {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(t);
+  }, []);
+
+  const offsetMin = -now.getTimezoneOffset();
+  const hrs = Math.floor(Math.abs(offsetMin) / 60);
+  const mins = Math.abs(offsetMin) % 60;
+  const sign = offsetMin >= 0 ? "+" : "-";
+  const gmt = `GMT${sign}${hrs}${mins > 0 ? `:${mins}` : ""}`;
+
+  return (
+    <span className="tabular">
+      {now.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}{" "}
+      {gmt}
+    </span>
+  );
+});
+
 // Dua tab function-key ini navigasi HALAMAN BENERAN sekarang (bukan
 // scroll-anchor satu halaman lagi) — DashboardPage (chart TradingView
 // publik) dan AnalyzePage (KLineChart + StrategyPanel + hasil sinyal AI).
@@ -21,16 +45,10 @@ interface TopBarProps {
 // NOTE: indikator "LIVE" cuma ada DI SINI (sejajar jam), TIDAK ada lagi di
 // TickerStrip — sebelumnya sempat ada di dua tempat sekaligus (dobel).
 export const TopBar = React.memo(function TopBar({ onSearchSymbol }: TopBarProps) {
-  const [now, setNow] = useState(new Date());
   const [query, setQuery] = useState("");
   const { user, isConnected } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
 
   function handleSearchSubmit(e: FormEvent) {
     e.preventDefault();
@@ -118,16 +136,7 @@ export const TopBar = React.memo(function TopBar({ onSearchSymbol }: TopBarProps
       </button>
 
       <div className="flex flex-shrink-0 items-center border-l border-[var(--border)] px-3 text-[11px] font-bold text-[var(--accent)]">
-        <span className="tabular">
-          {now.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}{" "}
-          {(() => {
-            const offsetMin = -now.getTimezoneOffset();
-            const hrs = Math.floor(Math.abs(offsetMin) / 60);
-            const mins = Math.abs(offsetMin) % 60;
-            const sign = offsetMin >= 0 ? "+" : "-";
-            return `GMT${sign}${hrs}${mins > 0 ? `:${mins}` : ""}`;
-          })()}
-        </span>
+        <Clock />
       </div>
     </div>
   );

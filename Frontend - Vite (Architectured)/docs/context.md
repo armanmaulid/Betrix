@@ -153,9 +153,48 @@ Catatan kecil (tidak difix, bukan bug): kedua POST `exchange` (StrictMode dev do
 
 Remaining:
 
-- Manual verification pending (needs browser): chat session history (Phase 1), OAuth callback re-fire (Phase 3), single `tv.js` tag (Phase 4), a11y pass (Phase 6), dan sisa Phase 2 (reconnect ticket baru saat onerror; invalid code → localStorage kosong; logout → localStorage bersih; CSP prod tidak memblokir TradingView).
+- Manual verification — **sebagian besar SUDAH diverifikasi live via browser (Chrome DevTools MCP)** 2026-08-17, dua round konsisten:
+
+| Item | Hasil |
+| --- | --- |
+| Login email/password (`test@betrix.test`) | ✅ 200 → dashboard, `CONN: LIVE` |
+| SSE pakai `?ticket=` (bukan `?token=`) | ✅ 2 EventSource, 0 `?token=` |
+| Invalid OAuth code → error `role="alert"` | ✅ tampil, localStorage tidak ditulis |
+| Logout → localStorage bersih | ✅ `{}` |
+| Chat history "NaNd ago" | ✅ render `"1d ago"` |
+| Klik session → load isi | ✅ (`"apa itu leverage?"` + isi lengkap) |
+| Single `tv.js` setelah ganti simbol | ✅ 1 tag |
+| Font = JetBrains Mono | ✅ computed |
+| `lang="id"` | ✅ |
+| No horizontal scroll @375px | ✅ |
+
+- **Masih butuh manual (di luar kendali automation):** reconnect ticket baru saat server restart/evict; CSP prod (`vite build` → `dist/index.html`); Google OAuth end-to-end (akun Google asli).
+- **Temuan non-regresi (catatan):** console warn `frame-ancestors` diabaikan via `<meta>` — anti-clickjacking meta CSP tidak efektif untuk itu; frame-busting inline script masih jalan. Item arsitektur, bukan bugfix.
 - PR ke `main` belum dibuat — branch `fix/frontend-bugfix-plan` siap: https://github.com/armanmaulid/Betrix/pull/new/fix/frontend-bugfix-plan
 - Commit discipline: one phase = one commit on a branch off `main`.
+
+### Critical anti-pattern arsitektur (dari `frontend-architecture-review.md`)
+
+1. **Prompt LLM dibangun di client** (`analyzePageHelpers.tsx` → `buildTradeAnalysisPrompt`) — ✅ DONE 2026-08-17. Backend live (kontrak di `docs/backend-prompt-migration-response.md`, 14 file / 84 tests / 0 failed). FE eksekusi §5: hapus `buildTradeAnalysisPrompt` + `buildNewsContextPrefix` + `fetchOHLC` + `Candle`; `chatClient.streamChat` tambah `contextParams` + parse error JSON 4xx (SYMBOL_NOT_FOUND/VALIDATION_ERROR sebelum token); `useChatStream` kirim `contextParams` terstruktur (market_analysis | news_context). Gate tsc 0 + build ✓ (AnalyzePage 153.51→150.58 kB).
+2. `marketClient.ts` 401 → `window.location.href="/login"` — ✅ DONE 2026-08-17. Ganti jadi `emitSessionExpired()` + throw; `authEvents.ts` tambah `onSessionExpired`/`emitSessionExpired`; `AuthContext` subscribe → clear token+user → `ProtectedRoute` soft-redirect.
+3. `useChatStream` "God Hook" (~200 baris `handleSubmit`) — ✅ sebagian besar terpecah lewat migration #1 (fetch candle + news + validasi + prompt builder dihapus; tersisa flush token + session writer). Sisanya bisa dirapikan bertahap, tidak lagi kritis.
+
+#### Frontend hardening paralel (aman, tak sentuh chat) — DONE 2026-08-17
+- `AuthContext` SSE retry → ✅ exponential backoff (2s→30s cap, reset on open).
+- `TopBar` clock re-render per detik → ✅ extract `<Clock />` leaf (`React.memo`).
+- `SideNavRail` Dashboard & Chart sama path `/` → ✅ bedakan via hash (`#panel-chart`), `aria-current`, `panel-chart` id ditambahkan di `DashboardPage.tsx`.
+- `SettingsPage.tsx` 687 baris → ✅ pecah ke `src/features/user/pages/settings/` (`ProfileTab`, `SecurityTab`, `SessionsTab`, `UsageTab`), shell jadi ~120 baris.
+
+Warning tersisa: `chatClient` cache `Map` 15s manual (→ React Query). TUNDA, bukan kritis.
+
+#### Temuan backend (blocker sebelum FE merge — WAJIB dibaca Ops)
+Model `dahono/qwen3.8-max` (tier **deep**, dipakai `trade_reasoning` & `risk_narrative` default) → gateway 404 `No active credentials for provider: openai`. **Efek:** `trade_reasoning` tanpa `tier` override balas kosong. Perlu provision model itu di gateway ATAU ganti `MODEL_DEEP` di `.env` — lihat `docs/backend-prompt-migration-response.md` §7.
+
+#### Gap konformansi kontrak BE — FIXED 2026-08-17
+1. **Error code → pesan bersih** — `useChatStream.ts` tambah `friendlyError()`: `SYMBOL_NOT_FOUND`/`VALIDATION_ERROR`/`RATE_LIMITED` → teks Indonesia ramah (bukan string backend mentah).
+2. **Command→kategori sinkron broker** — `analyzePageHelpers.tsx` tambah `symbolMatchesCommand(path, cmd)` (satu sumber, derive dari `path` MT5 aktual), `ChatCommandBox.tsx` popover pakai matcher itu alih-alih hardcode token. Data kategori **diverifikasi lewat backend `GET /api/v1/market/symbols`** (bukan MT5 langsung): top-level `Stock CFD's`/`Crypto`/`Forex`/`Commodities`/`Indices`/`Bonds CFDs`; sub `ETF` + `Futures`. Backend kirim `path` (top-level cukup untuk matcher, field `category` tak perlu).
+
+**Catatan (belum difix, bukan scope gap):** `/portfolio` + `/watchlist` di `CHAT_SHORTCUTS` tampil di popover tapi tidak ada di `INSTRUMENT_COMMANDS` → dead command (parse ditolak). Perlu diputuskan: hapus dari popover, atau implementasi.
 
 ## Commit discipline
 

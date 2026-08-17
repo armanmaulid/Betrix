@@ -2,6 +2,13 @@ import { BACKEND_URL } from "../../../shared/lib/config";
 
 const historyCache = new Map<string, { data: any; timestamp: number }>();
 
+export interface ChatContextParams {
+  type: "market_analysis" | "news_context";
+  symbol?: string;
+  timeframe?: string;
+  assets?: string[];
+}
+
 export async function streamChat(
   message: string,
   displayMessage: string,
@@ -10,6 +17,7 @@ export async function streamChat(
   sessionId: string,
   tier: string | undefined,
   image: string | null,
+  contextParams: ChatContextParams | undefined,
   onToken: (token: string) => void,
   onDone: (result: any) => void,
   onError: (error: string) => void,
@@ -23,13 +31,15 @@ export async function streamChat(
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`
       },
-      body: JSON.stringify({ message, displayMessage, history, taskType, sessionId, tier, image }),
+      body: JSON.stringify({ message, displayMessage, history, taskType, sessionId, tier, image, contextParams }),
       signal
     });
 
     if (!res.ok) {
+      // Error SEBELUM stream mulai (mis. SYMBOL_NOT_FOUND, VALIDATION_ERROR)
+      // datang sebagai JSON 4xx, bukan `event: error`. Baca error JSON bersih.
       const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.error || "Failed to start chat stream");
+      throw new Error(errorData.error || errorData.code || "Failed to start chat stream");
     }
 
     const reader = res.body?.getReader();

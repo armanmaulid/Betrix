@@ -1,35 +1,5 @@
 import { BACKEND_URL } from "../../../shared/lib/config";
-
-export interface Candle {
-  time: number; // unix seconds
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
-}
-
-
-export async function fetchOHLC(symbol: string, timeframe: string, signal?: AbortSignal): Promise<{ candles: Candle[] }> {
-  const url = `${BACKEND_URL}/api/v1/market/ohlc/${encodeURIComponent(symbol)}/${timeframe}`;
-  const token = localStorage.getItem("eaconsole.sessionToken");
-  const headers: HeadersInit = token ? { Authorization: `Bearer ${token}` } : {};
-
-  const res = await fetch(url, { headers, signal });
-  if (res.status === 401) {
-    localStorage.removeItem("eaconsole.sessionToken");
-    window.location.href = "/login";
-    throw new Error("Sesi kadaluarsa, silakan login kembali.");
-  }
-  if (!res.ok) {
-    const body = await res.json().catch(() => null);
-    throw new Error(body?.error || `HTTP ${res.status}`);
-  }
-
-  const data = await res.json();
-  return { candles: data.candles || [] };
-}
-
+import { emitSessionExpired } from "../../../shared/lib/authEvents";
 
 export interface BrokerSymbol {
   symbol: string;
@@ -79,8 +49,7 @@ export async function fetchEconomicCalendar(
   const res = await fetch(`${BACKEND_URL}/api/v1/market/calendar?${params}`, { headers, signal });
 
   if (res.status === 401) {
-    localStorage.removeItem("eaconsole.sessionToken");
-    window.location.href = "/login";
+    emitSessionExpired();
     throw new Error("Sesi kadaluarsa, silakan login kembali.");
   }
   if (!res.ok) {

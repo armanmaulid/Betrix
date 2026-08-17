@@ -7,7 +7,8 @@ import {
   CHAT_SHORTCUTS,
   INSTRUMENT_COMMANDS,
   AGENT_TIER_LABEL,
-  TIER_CREDIT_COST
+  TIER_CREDIT_COST,
+  symbolMatchesCommand,
 } from "../../../shared/lib/analyzePageHelpers";
 import { type BrokerSymbol } from "../../market/api/marketClient";
 
@@ -74,20 +75,9 @@ export function ChatCommandBox({ isChat = false }: { isChat?: boolean }) {
     const query = symbolMatch[2].toLowerCase();
     symbolSearchPrefix = `/${cmd} `;
 
-    let expectedCategoryTokens: string[] = [];
-    if (cmd === "forex") expectedCategoryTokens = ["forex"];
-    else if (cmd === "crypto") expectedCategoryTokens = ["crypto"];
-    else if (cmd === "stock") expectedCategoryTokens = ["stock", "equity"];
-    else if (cmd === "etf") expectedCategoryTokens = ["etf", "fund"];
-    else if (cmd === "bond") expectedCategoryTokens = ["bond"];
-    else if (cmd === "index") expectedCategoryTokens = ["index", "indices"];
-    else if (cmd === "futures") expectedCategoryTokens = ["commodity", "commodities", "futures", "energy", "metal"];
-
-    const categoryFiltered = allBrokerSymbols.filter(s => {
-      const cat = (s.category || "").toLowerCase();
-      const path = (s.path || "").toLowerCase();
-      return expectedCategoryTokens.length === 0 || expectedCategoryTokens.some(t => cat.includes(t) || path.includes(t));
-    });
+    const categoryFiltered = allBrokerSymbols.filter(s =>
+      symbolMatchesCommand(s.path || "", cmd)
+    );
 
     if (query) {
       suggestedSymbols = categoryFiltered

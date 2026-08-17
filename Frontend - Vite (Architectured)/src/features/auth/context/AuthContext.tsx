@@ -1,7 +1,7 @@
 import { createContext, useContext, useCallback, useMemo, useEffect, useState, type ReactNode } from "react";
 import * as authApi from "../api/authClient";
 import type { AuthUser } from "../api/authClient";
-import { emitLogout } from "../../../shared/lib/authEvents";
+import { emitLogout, onSessionExpired } from "../../../shared/lib/authEvents";
 import { BACKEND_URL } from "../../../shared/lib/config";
 
 // Only the session token lives in localStorage — user profile is always
@@ -72,6 +72,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let cancelled = false;
     let es: EventSource | null = null;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    // Exponential backoff untuk reconnect: mulai 2 dtk, ganda tiap kegagalan,
+    // di-cap 30 dtk. Di-reset ke 2 dtk begitu koneksi berhasil (onopen).
+    let backoffMs = 2000;
+    const BACKOFF_CAP_MS = 30000;
 
     async function connect() {
       if (cancelled) return;
@@ -87,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         es = stream;
 
         stream.onopen = () => {
+          backoffMs = 2000; // sukses → reset backoff
           if (!cancelled) setIsConnected(true);
         };
 
@@ -94,12 +99,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setIsConnected(false);
           // EventSource auto-reconnect memakai URL yang sama → ticket lama
           // sudah terbakar → server tutup koneksi (readyState CLOSED).
-          // Deteksi itu dan reconnect dengan ticket BARU.
+          // Deteksi itu dan reconnect dengan ticket BARU + backoff eksponensial.
           if (stream.readyState === EventSource.CLOSED) {
             stream.close();
             if (es === stream) es = null;
             if (!cancelled) {
-              reconnectTimer = setTimeout(connect, 2000);
+              reconnectTimer = setTimeout(connect, backoffMs);
+              backoffMs = Math.min(backoffMs * 2, BACKOFF_CAP_MS);
             }
           }
         };
@@ -149,6 +155,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       emitLogout();
     }
   }, [sessionToken]);
+
+  // Sesi kedaluwarsa di tengah request biasa (mis. 401 dari marketClient):
+  // clear state auth → user jadi null → ProtectedRoute redirect soft ke /login.
+  // Efek #1 di atas ikut terpanggil (sessionToken→null → emitLogout), sehingga
+  // semua stream ikut tertutup — tidak ada yang perlu diurus manual di sini.
+  useEffect(() => {
+    return onSessionExpired(() => {
+      localStorage.removeItem(STORAGE_KEY);
+      setSessionToken(null);
+      setUser(null);
+    });
+  }, []);
 
   const login = useCallback(async (email: string, password: string) => {
     const result = await authApi.login(email, password); // throws AuthApiError on failure
