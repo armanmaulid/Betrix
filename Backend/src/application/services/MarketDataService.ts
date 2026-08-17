@@ -56,14 +56,34 @@ export class MarketDataService {
     M1: 1, M5: 5, M15: 15, M30: 30, H1: 60, H4: 240, D1: 1440, W1: 10080, MN1: 43200,
   };
 
+  // Format a Date (holding broker wall-clock in its UTC fields) as
+  // `YYYY-MM-DDTHH:MM:SS` (len 19). MT5 bridge validates exactly this shape
+  // (rejects `.000Z`/len 24 and date-only is fine but truncates the day).
+  private static toBrokerIso(date: Date): string {
+    const p = (n: number) => n.toString().padStart(2, "0");
+    return `${date.getUTCFullYear()}-${p(date.getUTCMonth() + 1)}-${p(date.getUTCDate())}` +
+      `T${p(date.getUTCHours())}:${p(date.getUTCMinutes())}:${p(date.getUTCSeconds())}`;
+  }
+
   private dateRangeFor(timeframe: string): { fromDate: string; toDate: string } {
     const minutes = MarketDataService.TF_MINUTES[timeframe] ?? 1440;
     const bufferMs = minutes * 60 * 1000 * 100 * 1.5;
-    const now = Date.now();
-    const fromMs = now - bufferMs;
+    const offsetMs = this.settings.brokerUtcOffset * 3600 * 1000;
+    const brokerNow = new Date(Date.now() + offsetMs);
+
+    // Market closed on broker Sat/Sun — snap the window to Friday close so
+    // CopyRates returns the last real bars instead of an empty fallback.
+    const dow = brokerNow.getUTCDay();
+    const to = new Date(brokerNow);
+    if (dow === 6 || dow === 0) {
+      to.setUTCDate(to.getUTCDate() - (dow === 6 ? 1 : 2));
+      to.setUTCHours(23, 59, 0, 0);
+    }
+
+    const from = new Date(to.getTime() - bufferMs);
     return {
-      fromDate: new Date(fromMs).toISOString().slice(0, 10),
-      toDate: new Date(now).toISOString().slice(0, 10),
+      fromDate: MarketDataService.toBrokerIso(from),
+      toDate: MarketDataService.toBrokerIso(to),
     };
   }
 

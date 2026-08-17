@@ -145,7 +145,11 @@ export class Mt5HttpClient {
   }
 
   async fetchHistory(symbol: string, timeframe: string, fromDate: string, toDate: string): Promise<OHLCBar[]> {
-    const url = `${this.getHttpBase()}/v1/history/prices?symbol=${encodeURIComponent(symbol)}&time_frame=${encodeURIComponent(timeframe)}&from_date=${encodeURIComponent(fromDate)}&to_date=${encodeURIComponent(toDate)}`;
+    // NOTE: dates are NOT encodeURIComponent'd. The MT5 bridge (HttpLib.mqh)
+    // does not URL-decode query params, so %3A (encoded ':') is rejected as
+    // "Invalid from_date format". Dates are generated internally as
+    // YYYY-MM-DDTHH:MM:SS (safe chars only), symbols/timeframes likewise.
+    const url = `${this.getHttpBase()}/v1/history/prices?symbol=${symbol}&time_frame=${timeframe}&from_date=${fromDate}&to_date=${toDate}`;
     const data = await this.fetchWithRetry<{ data?: OHLCBar[] }>(url);
     return data.data ?? [];
   }
