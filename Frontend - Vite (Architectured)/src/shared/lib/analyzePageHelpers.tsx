@@ -45,6 +45,9 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
 
 // Command instrumen yang men-trigger fetch data realtime MT5. Simbol diambil
 // dari kata setelah command, mis. "/forex xauusd analisa ..." -> symbol=XAUUSD.
+// DAERAH VALIDASI = BACKEND (SYMBOL_NOT_FOUND), bukan daftar slug di sini.
+// `knownCommand` hanya penanda untuk popover grouping, BUKAN gate parse —
+// switch broker / kategori baru tetap diparse, backend yang memutuskan valid.
 export const INSTRUMENT_COMMANDS = COMMAND_DEFINITIONS.map((d) => d.slug);
 export const TIMEFRAME_PATTERN = /\b(M1|M5|M15|M30|H1|H4|D1|W1|MN1)\b/i;
 
@@ -56,8 +59,7 @@ export interface ParsedInstrumentCommand {
 export function parseInstrumentCommand(text: string): ParsedInstrumentCommand | null {
   const match = text.trim().match(/^\/(\w+)\s+(\S+)/);
   if (!match) return null;
-  const [, cmd, symbolRaw] = match;
-  if (!INSTRUMENT_COMMANDS.includes(cmd.toLowerCase())) return null;
+  const [, , symbolRaw] = match;
   const tfMatch = text.match(TIMEFRAME_PATTERN);
   return {
     symbol: symbolRaw.replace(/^\/+/, '').toUpperCase(),
@@ -113,17 +115,7 @@ export const TAB_TO_NEWS_ASSETS: Record<string, string[] | undefined> = {
   NEWS: ["usd", "metal", "oil", "btc"],
 };
 
-// Shortcut command "/forex", "/crypto", dst yang muncul di popover saat user
-// mulai ngetik "/" di kotak input. DIPERTAHANKAN demi backward compat impor
-// lama; konsumen baru pakai `deriveCommands(symbols)` yang derive dari broker.
-// `/portfolio` + `/watchlist` (bukan instrument command, tak ada handler)
-// sengaja dihapus.
-export const CHAT_SHORTCUTS: CommandShortcut[] = COMMAND_DEFINITIONS.map((d) => ({
-  cmd: `/${d.slug}`,
-  desc: d.label,
-}));
-
-// Template pertanyaan di landing view. Sama seperti CHAT_SHORTCUTS -- statis,
+// Template pertanyaan di landing view. Statis,
 // tidak bergantung state/props apa pun, jadi aman di module scope.
 export const CHAT_TEMPLATES = [
   {

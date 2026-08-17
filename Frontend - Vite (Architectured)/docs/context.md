@@ -180,10 +180,31 @@ Remaining:
 | --- | --- | --- |
 | 1 | Blocker Ops: `MODEL_DEEP` `dahono/qwen3.8-max` → gateway 404 | Tunggu provision/ganti `.env` |
 | 2 | Smoke test browser FE migration (`/forex XAUUSD M15` payload `contextParams` + Entry/SL/TP; `SYMBOL_NOT_FOUND`; Settings tiap tab; nav hash) | Belum dijalankan |
-| 3 | `/portfolio` + `/watchlist` dead command di popover | Keputusan: hapus / implementasi |
+| 3 | `/portfolio` + `/watchlist` dead command di popover | ✅ DONE — dihapus dari CHAT_SHORTCUTS |
 | 4 | `chatClient` cache `Map` 15s → React Query | TUNDA, bukan kritis |
 | 5 | PR ke `main` | Belum dibuat |
 | 6 | Hapus `FRONTEND_DESIGN_FIX_PLAN.md` | Belum dieksekusi |
+
+### Slash command derive dari kategori broker — DONE 2026-08-17
+
+Branch `fix/derive-slash-commands`, commit `e4beb3a` (pushed ke origin). Latar:
+`CHAT_SHORTCUTS` + `INSTRUMENT_COMMANDS` hardcode drift dari kategori broker asli —
+mis. `/futures XAUUSD` padahal XAUUSD = Commodities spot, dan `/portfolio`+`/watchlist`
+bukan instrument command (dead).
+
+Perubahan:
+- `analyzePageHelpers.tsx` — `COMMAND_DEFINITIONS` (slug+label+matcher) satu sumber;
+  `deriveCommands(symbols)` potong daftar command ke kategori yang benar-benar ada di
+  `GET /api/v1/market/symbols`; tambah `/commodity` (XAUUSD). `CHAT_SHORTCUTS` jadi
+  turunan definisi (fallback penuh), `/portfolio`+`/watchlist` dihapus.
+- `ChatCommandBox.tsx` + `AnalyzePage.tsx` — popover & landing pakai `deriveCommands(allBrokerSymbols)`.
+- **Opsi B (decouple, belum commit):** `parseInstrumentCommand` tidak lagi gate
+  `INSTRUMENT_COMMANDS` — ekstrak `/apapun SYMBOL [tf]` apa adanya; validasi symbol =
+  backend (`SYMBOL_NOT_FOUND`). `COMMAND_DEFINITIONS` jadi murni kosmetik (grouping).
+  Efek: switch broker = zero edit parse. Uncommitted di working tree.
+
+Catatan: mapping slug→label (8 baris) tetap hardcode — slug bersih (`/forex`) vs path
+broker (`Forex`) butuh label. Kategori broker = 6 top-level + 2 sub (ETF, Futures).
 
 ### Critical anti-pattern arsitektur (dari `frontend-architecture-review.md`)
 
