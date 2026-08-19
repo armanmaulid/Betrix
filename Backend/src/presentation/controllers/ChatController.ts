@@ -8,6 +8,7 @@ import { ExportChatHistoryUseCase } from "@application/use-cases/chat/ExportChat
 import { ChatTaskType } from "@domain/entities/ChatMessage.js";
 import type { User } from "@domain/entities/User.js";
 import { isAppError } from "@core/errors/index.js";
+import { env } from "@config/env.js";
 
 @injectable()
 export class ChatController {
@@ -50,11 +51,28 @@ export class ChatController {
 
   async streamMessage(req: Request, res: Response) {
     const controller = new AbortController();
-    req.on("close", () => controller.abort());
 
     // SSE headers flush lazily on the first token — a pre-stream error
     // (e.g. SYMBOL_NOT_FOUND) must return a JSON 4xx, not `event: error` + HTTP 200.
     let sseStarted = false;
+    let heartbeatInterval: NodeJS.Timeout | undefined;
+    const stopHeartbeat = () => {
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+      heartbeatInterval = undefined;
+    };
+    // Client disconnect can arrive before the use-case promise settles
+    // (e.g. the AI call hasn't reacted to the abort signal yet) — clear the
+    // heartbeat immediately rather than leaving it ticking until then.
+    req.on("close", () => {
+      controller.abort();
+      stopHeartbeat();
+    });
+
+    // `: comment` frames per the SSE spec — ignored by EventSource/manual
+    // parsers but keep the connection alive through proxies (Railway,
+    // Cloudflare) that close idle connections, and give the FE a liveness
+    // signal independent of AI tokens (which can pause during tool-calling
+    // or long thinking spans without the connection actually being dead).
     const startSse = () => {
       if (sseStarted) return;
       sseStarted = true;
@@ -62,6 +80,9 @@ export class ChatController {
       res.setHeader("Cache-Control", "no-cache");
       res.setHeader("Connection", "keep-alive");
       res.flushHeaders?.();
+      heartbeatInterval = setInterval(() => {
+        res.write(": heartbeat\n\n");
+      }, env.SSE_HEARTBEAT_INTERVAL_MS);
     };
 
     try {
@@ -83,6 +104,7 @@ export class ChatController {
       });
 
       startSse();
+      stopHeartbeat();
       res.write(`event: done\ndata: ${JSON.stringify({
         modelUsed: result.modelUsed,
         latencyMs: result.latencyMs,
@@ -90,6 +112,7 @@ export class ChatController {
       })}\n\n`);
       res.end();
     } catch (err) {
+      stopHeartbeat();
       // Pre-stream failure (headers not yet sent) → JSON error with correct status.
       if (isAppError(err) && !sseStarted) {
         return res.status(err.statusCode).json({

@@ -8,7 +8,6 @@ import { ChatTaskType, ModelTier } from "@domain/entities/ChatMessage.js";
 import { CreditAction } from "@domain/entities/CreditTransaction.js";
 import { InsufficientCreditsError, InternalError } from "@core/errors/index.js";
 import { ModelPolicy } from "@domain/services/ModelPolicy.js";
-import { LIMITS } from "@core/constants/index.js";
 import { sanitizeHistory } from "@core/utils/chat.js";
 import { EventDispatcher, ChatCompleted } from "@domain/events/index.js";
 import { AiPromptRegistry } from "@domain/services/AiPromptRegistry.js";
@@ -65,7 +64,7 @@ export class SendMessageUseCase {
       ? `${contextBlock}\n\n[PERMINTAAN USER]\n${input.message}`
       : input.message;
 
-    const messages = [...cleanHistory, { role: "user" as const, content: userContent.substring(0, LIMITS.MESSAGE_MAX_LENGTH) }];
+    const messages = [...cleanHistory, { role: "user" as const, content: userContent }];
 
     const cacheKey = `${input.userId}:${input.message}`;
     const isCacheable = ["general", "quick_summary", "classify_signal"].includes(input.taskType) && messages.length === 1;

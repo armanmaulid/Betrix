@@ -53,6 +53,11 @@ const envSchema = z.object({
   SESSION_LOOKUP_TIMEOUT_MS: z.coerce.number().default(5000),
   AI_REQUEST_TIMEOUT_MS: z.coerce.number().default(30000),
   AI_STREAM_TIMEOUT_MS: z.coerce.number().default(60000),
+  // Interval SSE `: heartbeat` comment selama stream chat aktif. Menjaga
+  // koneksi tetap hidup lewat proxy/load balancer yang menutup koneksi idle
+  // (Railway, Cloudflare), dan memberi FE sinyal "koneksi masih hidup" yang
+  // independen dari token AI (yang bisa jeda lama saat tool-calling/thinking).
+  SSE_HEARTBEAT_INTERVAL_MS: z.coerce.number().default(15000),
   DB_POOL_MAX: z.coerce.number().default(20),
   DB_STATEMENT_TIMEOUT_MS: z.coerce.number().default(10000),
   DB_QUERY_TIMEOUT_MS: z.coerce.number().default(15000),

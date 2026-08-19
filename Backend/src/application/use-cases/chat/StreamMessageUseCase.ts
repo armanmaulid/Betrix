@@ -8,7 +8,6 @@ import { ChatTaskType, ModelTier } from "@domain/entities/ChatMessage.js";
 import { CreditAction } from "@domain/entities/CreditTransaction.js";
 import { InsufficientCreditsError, InternalError } from "@core/errors/index.js";
 import { ModelPolicy } from "@domain/services/ModelPolicy.js";
-import { LIMITS } from "@core/constants/index.js";
 import { sanitizeHistory } from "@core/utils/chat.js";
 import { EventDispatcher, ChatCompleted } from "@domain/events/index.js";
 import { AiPromptRegistry } from "@domain/services/AiPromptRegistry.js";
@@ -79,10 +78,11 @@ export class StreamMessageUseCase {
       ? `${contextBlock}\n\n[PERMINTAAN USER]\n${input.message}`
       : input.message;
 
-    const messages = [...cleanHistory, { role: "user" as const, content: userContent.substring(0, LIMITS.MESSAGE_MAX_LENGTH) }];
+    const messages = [...cleanHistory, { role: "user" as const, content: userContent }];
 
     const systemPrompt = this.promptRegistry.getSystemPrompt(input.taskType);
 
+    const startedAt = Date.now();
     try {
       const result = await this.aiPort.streamModel({
         model: model.id,
@@ -92,6 +92,7 @@ export class StreamMessageUseCase {
         onToken: input.onToken,
         signal: input.signal,
       });
+      const latencyMs = Date.now() - startedAt;
 
       // Primary operation succeeded - tokens already streamed to client
       // Fire-and-forget logging via Domain Events
@@ -103,7 +104,7 @@ export class StreamMessageUseCase {
           modelUsed: model.id,
           message: input.displayMessage || input.message,
           reply: result.text,
-          latencyMs: 0,
+          latencyMs,
           usage: result.usage,
         })
       );
@@ -111,7 +112,7 @@ export class StreamMessageUseCase {
       return {
         reply: result.text,
         modelUsed: model.id,
-        latencyMs: 0,
+        latencyMs,
         usage: result.usage ?? null,
       };
     } catch {

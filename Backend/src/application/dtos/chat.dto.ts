@@ -17,6 +17,9 @@ export const contextParamsSchema = z.discriminatedUnion("type", [
     type: z.literal("market_analysis"),
     symbol: z.string().min(1).max(20).transform((s) => s.toUpperCase()),
     timeframe: z.enum(["M1", "M5", "M15", "M30", "H1", "H4", "D1", "W1", "MN1"]),
+    // Tab berita (EQUITY/MACRO/NEWS) independen dari command instrumen —
+    // kalau ada, berita diinjeksi ke konteks analisa pasar juga.
+    assets: z.array(z.enum(NEWS_ASSETS)).max(6).optional(),
   }),
   z.object({
     type: z.literal("news_context"),

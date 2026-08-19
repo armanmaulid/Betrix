@@ -3,6 +3,7 @@ import { pgClient } from "@data/orm/pgClient.js";
 import { NewsRepository } from "@contexts/news/domain/NewsRepository.js";
 import { NewsContextPort } from "@contexts/news/domain/NewsContextPort.js";
 import { NewsArticle } from "@contexts/news/domain/NewsArticle.js";
+import { selectHeadlines } from "@contexts/news/domain/headlineSelection.js";
 
 interface NewsArticleRow {
   id: string;
@@ -106,8 +107,11 @@ export class PgNewsRepository implements NewsRepository, NewsContextPort {
 
   async getLatestHeadlines(assets: string[], limit: number): Promise<Array<{ source: string; title: string }>> {
     if (assets.length === 0) return [];
-    const articles = await this.findByAssetTags(assets, limit, 0);
-    return articles.map((a) => ({ source: a.source, title: a.title }));
+    // Terbaru dari MASING-MASING tag, bukan N terbaru campur — kalau campur,
+    // satu tag bisa mendominasi hasil. Heuristik merge/dedup/sort ada di
+    // domain (headlineSelection) supaya testable tanpa IO.
+    const perTag = await Promise.all(assets.map((tag) => this.findByAssetTags([tag], limit, 0)));
+    return selectHeadlines(perTag, limit);
   }
 
   private mapRow(row: NewsArticleRow): NewsArticle {

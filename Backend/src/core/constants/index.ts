@@ -26,7 +26,6 @@ export const ERROR_CODES = {
 } as const;
 
 export const LIMITS = {
-  MESSAGE_MAX_LENGTH: 8000,
   HISTORY_MAX_MESSAGES: 20,
   IMAGE_MAX_BYTES: 8 * 1024 * 1024,
   PASSWORD_MIN_LENGTH: 8,

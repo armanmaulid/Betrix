@@ -8,6 +8,7 @@ export interface TradeAnalysisContext {
   type: "market_analysis";
   symbol: string;
   timeframe: string;
+  assets?: string[];
 }
 
 export interface NewsContext {
@@ -68,15 +69,22 @@ export class TradeAnalysisContextService {
       throw err;
     }
 
-    return this.promptBuilder.buildTradeContext({
+    const tradeBlock = this.promptBuilder.buildTradeContext({
       symbol: ctx.symbol,
       timeframe: ctx.timeframe,
       candles,
     });
+
+    // Tab berita (EQUITY/MACRO/NEWS) independen dari command instrumen.
+    // Kalau ada assets, injeksi berita KE konteks analisa pasar juga.
+    if (!ctx.assets || ctx.assets.length === 0) return tradeBlock;
+    const headlines = await this.newsContextPort.getLatestHeadlines(ctx.assets, 10);
+    const newsBlock = this.promptBuilder.buildNewsContext(headlines);
+    return newsBlock ? `${newsBlock}\n${tradeBlock}` : tradeBlock;
   }
 
   private async buildNewsContext(ctx: NewsContext): Promise<string> {
-    const headlines = await this.newsContextPort.getLatestHeadlines(ctx.assets, 15);
+    const headlines = await this.newsContextPort.getLatestHeadlines(ctx.assets, 10);
     return this.promptBuilder.buildNewsContext(headlines);
   }
 }

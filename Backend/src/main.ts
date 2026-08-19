@@ -1,4 +1,3 @@
-import "tsconfig-paths/register.js";
 import "dotenv/config";
 import { startServer } from "./bootstrap/startServer.js";
 
