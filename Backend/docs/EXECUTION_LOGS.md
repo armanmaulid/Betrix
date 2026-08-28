@@ -842,3 +842,28 @@ Tests:      1 failed  | 79 passed (80) ← 80 total tests
 - `5c38868` — fase 0 foundation
 
 ---
+
+### Step 0.9/1.9 — Fix Z1: zod v4 breaking in `config/env.ts`
+**Timestamp:** 2026-08-28 02:42
+**Tujuan:** Migrate `z.string().transform().default()` → zod v4 idioms
+
+**Changes (src/config/env.ts):**
+- Added helper: `csvToArray(sep)` — split string to string array
+- Added helper: `csvToArrayWithDefault(sep, defaultValue)` — default + transform
+- Added helper: `stringToBoolean(defaultStr)` — default + transform + pipe(z.boolean())
+- Replaced 7 transform().default() patterns with helper calls:
+  - `ALLOWED_ORIGINS`
+  - `DEVICE_ENFORCEMENT`
+  - `MT5_TRACK_PRICES`, `MT5_TRACK_OHLC`, `MT5_TRACK_MBOOK`, `MT5_TRACK_CALENDAR`
+  - `MT5_TRACKING_SYMBOLS`
+  - `REQUIRE_EMAIL_VERIFICATION`, `AI_DEBUG_LOGGING`
+
+**Why needed:**
+- zod v4 stricter type inference: `z.string().transform().default(value)` fails because default value (string) doesn't match transform output type
+- Solution: chain `.default(input).transform().pipe(outputType)` so input default matches input type, output type verified via pipe
+
+**Verification:**
+- npm run typecheck env.ts errors: 9 → 0 ✅
+- Total typecheck errors: 30 → 21 ✅
+
+---
