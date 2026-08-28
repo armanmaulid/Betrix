@@ -4,6 +4,16 @@
 > **Strategi:** Strangler-fig, 1 dev solo, 20 minggu
 > **Cara baca:** Setiap eksekusi step = 1 section dengan timestamp, command yang dijalankan, output penting, file yang dibuat/diubah, dan issue yang ditemukan.
 
+> ⚠️ **ATURAN LOG (APPEND-ONLY):** File ini hanya boleh **ditambah**, tidak ada section yang dihapus atau ditimpa. Setiap eksekusi baru ditambahkan di bawah section sebelumnya. File akan bertumbuh besar untuk audit trail lengkap refactor dari awal sampai akhir. Hanya header (di atas), Keputusan, dan Progress Tracker yang boleh di-update (append/edit minor). Tidak pernah hapus konten lama.
+
+> ⚠️ **ATURAN EKSEKUSI:**
+> 1. **Per-step logging WAJIB** — update `EXECUTION_LOGS.md` SETIAP SELESAI satu step (sebelum lanjut step berikutnya). Tidak boleh batch log di akhir.
+> 2. **Strict ke plan** — ikuti urutan step di `refactoring-plan-2026.md` PERSIS. Tidak boleh skip, re-order, atau tambah step di luar plan tanpa konfirmasi user.
+> 3. **Strict dependencies** — pakai persis versi di `package.json` (sudah di-set ke latest 2026). Tidak boleh swap/ganti/upgrade tanpa konfirmasi.
+> 4. **No deviation** — kalau ada hambatan/ambiguity, TANYA USER dulu, jangan ubah haluan.
+> 5. **Commit per fase** — setiap fase selesai, commit + push ke `feat/refactor-2026-fase-{N}` branch.
+> 6. **Update plan document** — kalau ada perubahan plan/insight baru, update `refactoring-plan-2026.md` (append-only juga).
+
 ---
 
 ## Keputusan yang Sudah Disetujui
