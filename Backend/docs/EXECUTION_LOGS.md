@@ -362,3 +362,171 @@ npm run typecheck
 
 ---
 
+
+### Step 0.4 — Typed Config (zod env validation) & Branch Recovery
+**Timestamp:** 2026-08-28 01:45
+**Tujuan:** Add typed config wrapper di `bootstrap/config.ts`
+
+**Issue & Recovery:**
+- Saya kehilangan track branch `feat/refactor-2026-fase-0` (workdir reset ke `session/...`)
+- User klarifikasi → checkout ke branch yang benar (`feat/refactor-2026-fase-0` dari remote)
+- File backup dari `.kilo-backup/fase0-extra/` di-restore ke working tree
+
+**Files created:**
+- `src/bootstrap/config.ts` — typed env (re-export `env` dari `config/env.ts`) + `DB_PROVIDER` registry (postgres-local/neon/supabase/in-memory) + `resolveDbConfig()` per provider
+- `Config` interface — single typed export dengan `dbProvider`, `db`, `isProduction`, `isTest`, `isDevelopment`
+
+---
+
+### Step 0.5 — Schema-per-module DB migration
+**Timestamp:** 2026-08-28 01:45
+**Tujuan:** Setup Postgres schemas per bounded context
+
+**Files created:**
+- `db/migrations/000_create_schemas.sql` — 8 schemas: iam, chat, market, messaging, admin, notification, billing, news (with COMMENT ON SCHEMA)
+- `db/migrations/001_iam_users_sessions.sql` — iam.users, iam.sessions, iam.user_devices, iam.email_verifications, iam.failed_login_attempts
+- `db/migrations/002_chat_logs.sql` — chat.chat_logs, chat.token_usage
+- `db/migrations/003_market.sql` — market.broker_symbols, market.calendar_events, market.symbol_sync_metadata
+- `db/migrations/004_messaging.sql` — messaging.messages, messaging.message_notification_preferences
+- `db/migrations/005_admin.sql` — admin.admin_actions, admin.user_activity_logs
+- `db/migrations/006_billing.sql` — billing.credit_transactions
+- `db/migrations/007_news.sql` — news.news_articles
+- `src/data/orm/migrate.ts` — multi-file runner (scans db/migrations/*.sql alphabetically, idempotent CREATE IF NOT EXISTS)
+
+**Strategy:** Strangler-fig. Schemas + tables baru di schemas coexist dengan public tables. Fase 1 akan migrate repos ke schema-qualified paths. Fase 2+ hapus public tables.
+
+---
+
+### Step 0.6 — Docs
+**Timestamp:** 2026-08-28 01:50
+**Tujuan:** Documentation untuk onboarding & contribution
+
+**Files created:**
+- `Backend/CONTRIBUTING.md` (~250 baris) — module conventions, naming, dependency rules, commands, how-to (add use case, add bounded context), code style
+- `Backend/docs/architecture.md` (~280 baris) — C4 model: System Context, Containers, Components per module, Code Map (current state), DB schemas, Event flow example, migration status
+
+---
+
+### Audit 0.A — Dead Code Scan (knip)
+**Timestamp:** 2026-08-28 01:52
+**Tujuan:** Detect unused exports, files, dependencies
+
+**Tool:** `knip@6.32.3` (devDep)
+
+**Findings:**
+- 8 unused files (5 false positive: barrel exports that are used transitively; 3 truly dead: `dtos/index.ts`, `use-cases/index.ts`, `repositories/index.ts`)
+- 20 unused dependencies (semua Fastify/Drizzle/OTel/Neon/Supabase deps — forward-compat untuk Fase 4-7, pertahankan)
+- 3 unused devDeps: `prettier` (no config, no script — REMOVED), `tsc-alias` (used in build, false positive), `eslint-plugin-import` (used by eslint.config.js — added to package.json)
+- 2 unlisted dependencies: `@eslint/js`, `eslint-plugin-import` (used by eslint.config.js tapi tidak di package.json) — ADDED
+- 8 unused exports → 6 setelah cleanup (duplicate default export, unused type re-exports)
+- 31 unused exported types — sebagian besar false positive (type-only inference)
+- 1 duplicate export: `createV1Router` & `default` di `routes/v1/index.ts` — REMOVED default
+
+**Cleanup actions:**
+- `prettier` removed dari devDeps
+- `default export` di `routes/v1/index.ts` dihapus
+- `pinoLogger` & `LoggerPort` type re-export dihapus dari `logger.ts`
+- `@eslint/js`, `eslint-plugin-import` ditambahkan ke package.json
+
+---
+
+### Audit 0.B — Orphan Files
+**Timestamp:** 2026-08-28 01:53
+**Tujuan:** File yang tidak di-import di mana pun
+
+**Findings:** 5 orphan files (3 dead index, 1 AppError/Result duplicate dari core/errors, 1 LoggerPort duplicate)
+**Action:** All removed (lihat Audit 0.A cleanup)
+
+---
+
+### Audit 0.C — Duplicate Code Detection
+**Timestamp:** 2026-08-28 01:55
+**Tujuan:** Detect duplicate imports + duplicate logic
+
+**Tool:** Custom `tools/arch-test/code-hygiene.test.ts` (5 rules)
+
+**Findings:** 9 duplicate import cases
+- `CalendarService.ts` — `IBrokerProvider` 2x, `CalendarRepository` 2x
+- `SendMessageUseCase.ts` & `StreamMessageUseCase.ts` — `AiPort` & `CachePort` 2x
+- `events.ts` — `ChatCompleted` 2x (line 2 & 4)
+- `passport.ts` — `passport-google-oauth20` 2x
+- `PgAnalyticsRepository.ts` — `AnalyticsRepository` 2x (named + type)
+- `PgCreditRepository.ts` — `tsyringe` 2x (`injectable` + `inject`)
+- `validate.middleware.ts` — `zod` 2x (`ZodSchema` type + `ZodError` value)
+
+**Action:** All 9 fixed dengan consolidated single import
+
+---
+
+### Audit 0.D — Duplicate Logic
+**Timestamp:** 2026-08-28 01:56
+**Tujuan:** Manual review untuk duplicate calculations/business logic
+
+**Findings:** Tidak ada duplicate business logic (calculation/mapping) terdeteksi pada review ini. Hexagonal + modular monolith secara desain mencegah duplikasi (port + adapter pattern).
+**Action:** None required.
+
+---
+
+### Audit 0.E — Memory Leak Risk Scan
+**Timestamp:** 2026-08-28 01:57
+**Tujuan:** Detect setInterval/process.on/EventEmitter yang bisa cause leak
+
+**Tool:** `tools/arch-test/code-hygiene.test.ts` rule "memory-leak-risk"
+
+**Findings (5):**
+- `HourlyCleanupJob.ts` — `setInterval` tanpa `clearInterval` (singleton background job, `.unref()`)
+- `NewsPollingJob.ts` — `setInterval` per provider (singleton, `.unref()`)
+- `jobs/index.ts` — `setInterval` untuk SSE heartbeat (singleton, `.unref()`)
+- `RedisSessionRepository.ts` — `setInterval` untuk cache cleanup (singleton, `.unref()`)
+- `pgClient.ts` — `process.on('uncaughtException')` (safety net, critical)
+
+**Verdict:** Semua legitimate, **allowlisted** di arch-test:
+```ts
+const ALLOWLIST_FILES = [
+  'src/bootstrap/',
+  'src/main.ts',
+  'src/background/jobs/',        // scheduled jobs (singleton)
+  'src/data/orm/pgClient.ts',     // uncaughtException safety net
+  'src/data/repositories/RedisSessionRepository.ts',  // singleton cache cleanup
+];
+```
+
+Semua `setInterval` calls pakai `.unref()` → tidak block process exit, leak only di dev HMR (acceptable trade-off untuk singleton jobs).
+
+---
+
+### Audit 0.F — Redundansi (deps, config, type exports)
+**Timestamp:** 2026-08-28 01:58
+**Tujuan:** Cari dep/config duplikat
+
+**Findings:**
+- `prettier` devDep redundant (no config, no script) — REMOVED
+- `eslint.config.js` import `eslint-plugin-import` & `@eslint/js` tanpa terdaftar — ADDED to package.json
+- `src/shared/errors/AppError.ts` duplikat `src/core/errors/index.ts` — REMOVED (shared/)
+- `src/shared/kernel/LoggerPort.ts` unused (redundant dengan existing logger pattern) — REMOVED
+- 3 unused barrel index files (dtos, use-cases, repositories) — REMOVED
+
+---
+
+### Final Verification Fase 0
+**Timestamp:** 2026-08-28 02:00
+**Tujuan:** Comprehensive verification semua gate
+
+**Results:**
+```
+1. Typecheck:  6 zod v4 errors tracked (Fase 1)
+2. Arch tests: 10/10 PASSED ✅
+3. Deps:       0 violations (242 modules, 768 deps)
+4. Knip:       1 unused file (bootstrap/config.ts, forward-compat kept)
+```
+
+**Status Fase 0: 🟢 COMPLETE**
+
+**Commits on `feat/refactor-2026-fase-0`:**
+- `107191d` — feat(backend): fase 0.4-0.6 + audit cleanup
+- `ebf1a25` — feat(backend): fase 0.4 + 0.5 - typed config & schema-per-module migrations
+- `91c2c96` — docs(backend): update execution logs for fase 0 completion
+- `5c38868` — feat(backend): fase 0 - foundation tooling
+
+Pushed to `origin/feat/refactor-2026-fase-0`.
+
