@@ -540,3 +540,36 @@ Semua `setInterval` calls pakai `.unref()` → tidak block process exit, leak on
 
 Pushed to `origin/feat/refactor-2026-fase-0`.
 
+
+---
+
+## FASE 1 — Modular Monolith (Mulai 2026-08-28 02:08)
+
+> **Goal:** Konsolidasi inkonsistensi struktur (`use-cases/*` flat vs `contexts/news/*` bounded context) ke satu pola **DDD-lite + Clean Architecture per Module**. Zero behavior change, zero runtime change — hanya struktur folder.
+> **Plan ref:** `refactoring-plan-2026.md` Section "Fase 1 — Konsolidasi ke Bounded Contexts"
+
+### Step 1.1 — Pilih Pola Referensi (ADR)
+**Timestamp:** 2026-08-28 02:08
+**Tujuan:** Tulis ADR sebagai acuan resmi struktur module
+
+**Files created:**
+- `Backend/docs/adr/0001-module-structure.md` (270 baris)
+
+**Keputusan ADR 0001:**
+- **Pattern:** DDD-lite + Clean Architecture per Module
+- **Bounded Contexts (7):** `iam`, `chat`, `market`, `admin`, `messaging`, `news`, `notification`
+- **Per-module structure:** `domain/` (zero deps), `application/` (use cases), `infrastructure/` (adapters), `presentation/` (delivery), `ioc/` (DI registration), `<context>.module.ts` (barrel)
+- **Cross-module rules:** only via `<context>.module.ts` barrel or event bus (Fase 2)
+- **Enforcement:** `dependency-cruiser` rules (sudah di Fase 0) + custom arch-test (akan ditambah di Step 1.7)
+
+**Alternatives yang ditolak:**
+- Pure microservices (overkill untuk 1 dev)
+- Pure modular monolith tanpa layering (no enforcement)
+- VSA (tidak fit dengan existing domain layer)
+- NestJS-style (overhead besar)
+
+**Files changed:** none (documentation only)
+**Plan compliance:** 100% — Step 1.1 di plan: "Pilih pola referensi: DDD-lite + Clean Architecture per module"
+**Dependencies added:** none
+
+---
