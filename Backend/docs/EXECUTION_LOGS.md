@@ -23,15 +23,19 @@
 
 | Fase | Status | Mulai | Selesai | Catatan |
 |---|---|---|---|---|
-| 0 — Foundation & Tooling | 🟡 In Progress | 2026-08-28 | — | |
-| 1 — Modular Monolith | ⏳ Pending | | | |
-| 2 — Hexagonal | ⏳ Pending | | | |
-| 3 — Event Bus + Outbox | ⏳ Pending | | | |
-| 4 — Fastify Gateway | ⏳ Pending | | | |
-| 5 — Drizzle + Multi-provider | ⏳ Pending | | | |
-| 6 — Better Auth | ⏳ Pending | | | |
-| 7 — Observability | ⏳ Pending | | | |
-| 8 — Service Extraction (opsional) | ⏳ Pending | | | |
+| 0 — Foundation & Tooling | 🟢 Done | 2026-08-28 | 2026-08-28 | Commit `feat(refactor): fase 0` |
+| 1 — Modular Monolith | ⏳ Pending | — | — | |
+| 2 — Hexagonal | ⏳ Pending | — | — | |
+| 3 — Event Bus + Outbox | ⏳ Pending | — | — | |
+| 4 — Fastify Gateway | ⏳ Pending | — | — | |
+| 5 — Drizzle + Multi-provider | ⏳ Pending | — | — | |
+| 6 — Better Auth | ⏳ Pending | — | — | |
+| 7 — Observability | ⏳ Pending | — | — | |
+| 8 — Service Extraction (opsional) | ⏳ Pending | — | — | |
+
+### Commits
+
+- `feat(backend): fase 0 - foundation tooling` (2026-08-28) — branch `feat/refactor-2026-fase-0`
 
 ---
 
