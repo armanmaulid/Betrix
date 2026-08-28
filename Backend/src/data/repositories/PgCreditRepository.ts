@@ -1,8 +1,7 @@
-import { injectable } from "tsyringe";
+import { inject, injectable } from "tsyringe";
 import { pgClient } from "../orm/pgClient.js";
 import { CreditRepository } from "@domain/repositories/CreditRepository.js";
 import { CreditTransaction, CreditAction } from "@domain/entities/CreditTransaction.js";
-import { inject } from "tsyringe";
 import { INotifier } from "@domain/ports/INotifier.js";
 
 interface CreditTransactionRow {

@@ -1,8 +1,16 @@
 import { injectable } from "tsyringe";
 import { pgClient } from "../orm/pgClient.js";
 import { redisClient } from "../orm/redisClient.js";
-import { AnalyticsRepository, SystemMetrics, DbStats, UserDetailStats, RecentActivity, AnalyticsQuery } from "@domain/repositories/AnalyticsRepository.js";
-import type { DashboardMetrics, SystemDatabaseStats } from "@domain/repositories/AnalyticsRepository.js";
+import {
+  AnalyticsRepository,
+  SystemMetrics,
+  DbStats,
+  UserDetailStats,
+  RecentActivity,
+  AnalyticsQuery,
+  DashboardMetrics,
+  SystemDatabaseStats,
+} from "@domain/repositories/AnalyticsRepository.js";
 
 @injectable()
 export class PgAnalyticsRepository implements AnalyticsRepository {

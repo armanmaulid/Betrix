@@ -1,12 +1,10 @@
 import { inject, injectable } from "tsyringe";
-import { IBrokerProvider } from "@domain/ports/IBrokerProvider.js";
-import { CalendarRepository } from "@domain/repositories/CalendarRepository.js";
+import { IBrokerProvider, CalendarUpdate, Mt5CalendarEvent } from "@domain/ports/IBrokerProvider.js";
+import { CalendarRepository, CalendarQuery } from "@domain/repositories/CalendarRepository.js";
 import { CalendarEvent, CalendarImportance } from "@domain/entities/CalendarEvent.js";
 import { logger } from "@core/logging/logger.js";
-import { CalendarQuery } from "@domain/repositories/CalendarRepository.js";
 import type { AppSettings } from "@core/settings/AppSettings.js";
 import { INotifier } from "@domain/ports/INotifier.js";
-import { CalendarUpdate, Mt5CalendarEvent } from "@domain/ports/IBrokerProvider.js";
 
 @injectable()
 export class CalendarService {

@@ -70,6 +70,3 @@ class PinoLoggerAdapter implements LoggerPort {
 
 export const logger: LoggerPort = new PinoLoggerAdapter(baseLogger);
 
-// Re-export base pino untuk backward compat dengan code existing
-export const pinoLogger = baseLogger;
-export type { LoggerPort };

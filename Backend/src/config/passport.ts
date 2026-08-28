@@ -1,6 +1,5 @@
 import passport from "passport";
-import type { Profile, VerifyCallback } from "passport-google-oauth20";
-import { Strategy as GoogleStrategy } from "passport-google-oauth20";
+import { Strategy as GoogleStrategy, type Profile, type VerifyCallback } from "passport-google-oauth20";
 import { container } from "tsyringe";
 import type { UserRepository } from "@domain/repositories/UserRepository.js";
 import type { SessionRepository } from "@domain/repositories/SessionRepository.js";

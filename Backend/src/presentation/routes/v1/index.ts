@@ -23,5 +23,3 @@ export function createV1Router(): Router {
 
   return router;
 }
-
-export default createV1Router;

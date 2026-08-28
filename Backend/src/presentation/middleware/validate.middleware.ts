@@ -1,6 +1,5 @@
 import type { Request, Response, NextFunction } from "express";
-import type { ZodSchema} from "zod";
-import { ZodError } from "zod";
+import { ZodError, type ZodSchema } from "zod";
 import { ValidationError } from "@core/errors/index.js";
 
 function hasNestedShape(schema: ZodSchema): boolean {
