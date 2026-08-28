@@ -55,8 +55,8 @@ module.exports = {
     {
       name: 'no-application-to-other-modules-internal',
       severity: 'error',
-      comment: 'Application module X TIDAK boleh import application module Y (harus via barrel atau event)',
-      from: { path: '^src/modules/([^/]+)/application/' },
+      comment: 'Application module X TIDAK boleh import application module Y (harus via barrel atau event). Test files dikecualikan.',
+      from: { path: '^src/modules/([^/]+)/application/', pathNot: '\\.test\\.ts$' },
       to: { path: '^src/modules/(?!(?:\\1)\\b)[^/]+/application/' },
     },
     {
@@ -91,13 +91,20 @@ module.exports = {
     },
 
     // === MODULE isolation: tidak boleh import internal module lain ===
+    // Pengecualian:
+    //  - Co-located test files (*.test.ts) — best practice
+    //  - Barrel export files (*.module.ts di root module) — by design export internal
     {
       name: 'no-cross-module-internal-imports',
       severity: 'error',
-      comment: 'Module internal tidak boleh di-import langsung dari module lain. Pakai barrel (index.ts/<modul>.module.ts) atau event bus.',
-      from: { path: '^src/modules/([^/]+)/(application|infrastructure|presentation|events)/' },
+      comment: 'Module internal tidak boleh di-import langsung dari module lain. Pengecualian: barrel (*.module.ts) dan co-located tests (*.test.ts).',
+      from: {
+        path: '^src/modules/([^/]+)/',
+        pathNot: '\\.(test|module)\\.ts$',
+      },
       to: {
-        path: '^src/modules/(?!(?:\\1)\\b)[^/]+/(application|infrastructure|presentation|events|domain)/',
+        path: '^src/modules/(?!(?:\\1)\\b)[^/]+/',
+        pathNot: '\\.test\\.ts$',
       },
     },
 

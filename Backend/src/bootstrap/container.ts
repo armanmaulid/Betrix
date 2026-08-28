@@ -41,21 +41,21 @@ import { ModelPolicy } from "@domain/services/ModelPolicy.js";
 import { TradeAnalysisPromptBuilder } from "@domain/services/TradeAnalysisPromptBuilder.js";
 
 // Use cases
-import { RegisterUseCase } from "@application/use-cases/auth/RegisterUseCase.js";
-import { LoginUseCase } from "@application/use-cases/auth/LoginUseCase.js";
-import { LogoutUseCase } from "@application/use-cases/auth/LogoutUseCase.js";
-import { VerifyEmailUseCase } from "@application/use-cases/auth/VerifyEmailUseCase.js";
-import { ResendVerificationUseCase } from "@application/use-cases/auth/ResendVerificationUseCase.js";
-import { ChangePasswordUseCase } from "@application/use-cases/auth/ChangePasswordUseCase.js";
-import { ChangeEmailUseCase } from "@application/use-cases/auth/ChangeEmailUseCase.js";
-import { GetProfileUseCase } from "@application/use-cases/auth/GetProfileUseCase.js";
-import { UpdateProfileUseCase } from "@application/use-cases/auth/UpdateProfileUseCase.js";
-import { GetSessionsUseCase } from "@application/use-cases/auth/GetSessionsUseCase.js";
-import { GetStreamTicketUseCase } from "@application/use-cases/auth/GetStreamTicketUseCase.js";
-import { ExchangeOAuthCodeUseCase } from "@application/use-cases/auth/ExchangeOAuthCodeUseCase.js";
-import { RevokeSessionUseCase } from "@application/use-cases/auth/RevokeSessionUseCase.js";
-import { LogoutByCredentialsUseCase } from "@application/use-cases/auth/LogoutByCredentialsUseCase.js";
-import { LogoutAllUseCase } from "@application/use-cases/auth/LogoutAllUseCase.js";
+import { RegisterUseCase } from "@modules/iam/application/use-cases/RegisterUseCase.js";
+import { LoginUseCase } from "@modules/iam/application/use-cases/LoginUseCase.js";
+import { LogoutUseCase } from "@modules/iam/application/use-cases/LogoutUseCase.js";
+import { VerifyEmailUseCase } from "@modules/iam/application/use-cases/VerifyEmailUseCase.js";
+import { ResendVerificationUseCase } from "@modules/iam/application/use-cases/ResendVerificationUseCase.js";
+import { ChangePasswordUseCase } from "@modules/iam/application/use-cases/ChangePasswordUseCase.js";
+import { ChangeEmailUseCase } from "@modules/iam/application/use-cases/ChangeEmailUseCase.js";
+import { GetProfileUseCase } from "@modules/iam/application/use-cases/GetProfileUseCase.js";
+import { UpdateProfileUseCase } from "@modules/iam/application/use-cases/UpdateProfileUseCase.js";
+import { GetSessionsUseCase } from "@modules/iam/application/use-cases/GetSessionsUseCase.js";
+import { GetStreamTicketUseCase } from "@modules/iam/application/use-cases/GetStreamTicketUseCase.js";
+import { ExchangeOAuthCodeUseCase } from "@modules/iam/application/use-cases/ExchangeOAuthCodeUseCase.js";
+import { RevokeSessionUseCase } from "@modules/iam/application/use-cases/RevokeSessionUseCase.js";
+import { LogoutByCredentialsUseCase } from "@modules/iam/application/use-cases/LogoutByCredentialsUseCase.js";
+import { LogoutAllUseCase } from "@modules/iam/application/use-cases/LogoutAllUseCase.js";
 
 import { SendMessageUseCase } from "@application/use-cases/chat/SendMessageUseCase.js";
 import { StreamMessageUseCase } from "@application/use-cases/chat/StreamMessageUseCase.js";
@@ -76,17 +76,17 @@ import { ExportAuditLogsUseCase } from "@application/use-cases/admin/ExportAudit
 import { BroadcastMessageUseCase } from "@application/use-cases/admin/BroadcastMessageUseCase.js";
 import { SystemCleanupUseCase } from "@application/use-cases/admin/SystemCleanupUseCase.js";
 
-import { GetUsageUseCase } from "@application/use-cases/user/GetUsageUseCase.js";
-import { GetMessagesUseCase } from "@application/use-cases/user/GetMessagesUseCase.js";
-import { SendMessageUseCase as SendUserMessageUseCase } from "@application/use-cases/user/SendMessageUseCase.js";
-import { UpdateNotificationPrefsUseCase } from "@application/use-cases/user/UpdateNotificationPrefsUseCase.js";
-import { GetNotificationPrefsUseCase } from "@application/use-cases/user/GetNotificationPrefsUseCase.js";
-import { GetUserActivityUseCase } from "@application/use-cases/user/GetUserActivityUseCase.js";
-import { GetSentMessagesUseCase } from "@application/use-cases/user/GetSentMessagesUseCase.js";
-import { GetMessageDetailUseCase } from "@application/use-cases/user/GetMessageDetailUseCase.js";
-import { GetMessageThreadUseCase } from "@application/use-cases/user/GetMessageThreadUseCase.js";
-import { MarkMessageReadUseCase } from "@application/use-cases/user/MarkMessageReadUseCase.js";
-import { DeleteMessageUseCase as UserDeleteMessageUseCase } from "@application/use-cases/user/DeleteMessageUseCase.js";
+import { GetUsageUseCase } from "@modules/iam/application/use-cases/GetUsageUseCase.js";
+import { GetMessagesUseCase } from "@modules/iam/application/use-cases/GetMessagesUseCase.js";
+import { SendMessageUseCase as SendUserMessageUseCase } from "@modules/iam/application/use-cases/SendMessageUseCase.js";
+import { UpdateNotificationPrefsUseCase } from "@modules/iam/application/use-cases/UpdateNotificationPrefsUseCase.js";
+import { GetNotificationPrefsUseCase } from "@modules/iam/application/use-cases/GetNotificationPrefsUseCase.js";
+import { GetUserActivityUseCase } from "@modules/iam/application/use-cases/GetUserActivityUseCase.js";
+import { GetSentMessagesUseCase } from "@modules/iam/application/use-cases/GetSentMessagesUseCase.js";
+import { GetMessageDetailUseCase } from "@modules/iam/application/use-cases/GetMessageDetailUseCase.js";
+import { GetMessageThreadUseCase } from "@modules/iam/application/use-cases/GetMessageThreadUseCase.js";
+import { MarkMessageReadUseCase } from "@modules/iam/application/use-cases/MarkMessageReadUseCase.js";
+import { DeleteMessageUseCase as UserDeleteMessageUseCase } from "@modules/iam/application/use-cases/DeleteMessageUseCase.js";
 
 import { GetSymbolsUseCase } from "@application/use-cases/market/GetSymbolsUseCase.js";
 import { GetCalendarUseCase } from "@application/use-cases/market/GetCalendarUseCase.js";

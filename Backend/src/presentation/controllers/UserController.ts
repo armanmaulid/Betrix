@@ -1,16 +1,16 @@
 import type { Request, Response, NextFunction } from "express";
 import { inject, injectable } from "tsyringe";
-import { GetUsageUseCase } from "@application/use-cases/user/GetUsageUseCase.js";
-import { GetMessagesUseCase } from "@application/use-cases/user/GetMessagesUseCase.js";
-import { SendMessageUseCase } from "@application/use-cases/user/SendMessageUseCase.js";
-import { GetSentMessagesUseCase } from "@application/use-cases/user/GetSentMessagesUseCase.js";
-import { GetMessageDetailUseCase } from "@application/use-cases/user/GetMessageDetailUseCase.js";
-import { GetMessageThreadUseCase } from "@application/use-cases/user/GetMessageThreadUseCase.js";
-import { MarkMessageReadUseCase } from "@application/use-cases/user/MarkMessageReadUseCase.js";
-import { DeleteMessageUseCase } from "@application/use-cases/user/DeleteMessageUseCase.js";
-import { UpdateNotificationPrefsUseCase } from "@application/use-cases/user/UpdateNotificationPrefsUseCase.js";
-import { GetNotificationPrefsUseCase } from "@application/use-cases/user/GetNotificationPrefsUseCase.js";
-import { GetUserActivityUseCase } from "@application/use-cases/user/GetUserActivityUseCase.js";
+import { GetUsageUseCase } from "@modules/iam/application/use-cases/GetUsageUseCase.js";
+import { GetMessagesUseCase } from "@modules/iam/application/use-cases/GetMessagesUseCase.js";
+import { SendMessageUseCase } from "@modules/iam/application/use-cases/SendMessageUseCase.js";
+import { GetSentMessagesUseCase } from "@modules/iam/application/use-cases/GetSentMessagesUseCase.js";
+import { GetMessageDetailUseCase } from "@modules/iam/application/use-cases/GetMessageDetailUseCase.js";
+import { GetMessageThreadUseCase } from "@modules/iam/application/use-cases/GetMessageThreadUseCase.js";
+import { MarkMessageReadUseCase } from "@modules/iam/application/use-cases/MarkMessageReadUseCase.js";
+import { DeleteMessageUseCase } from "@modules/iam/application/use-cases/DeleteMessageUseCase.js";
+import { UpdateNotificationPrefsUseCase } from "@modules/iam/application/use-cases/UpdateNotificationPrefsUseCase.js";
+import { GetNotificationPrefsUseCase } from "@modules/iam/application/use-cases/GetNotificationPrefsUseCase.js";
+import { GetUserActivityUseCase } from "@modules/iam/application/use-cases/GetUserActivityUseCase.js";
 import type { User } from "@domain/entities/User.js";
 
 @injectable()

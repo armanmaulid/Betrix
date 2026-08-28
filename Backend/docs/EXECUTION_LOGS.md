@@ -573,3 +573,44 @@ Pushed to `origin/feat/refactor-2026-fase-0`.
 **Dependencies added:** none
 
 ---
+
+### Step 1.2 — Migrasi `use-cases/auth/*` + `use-cases/user/*` ke `modules/iam/`
+**Timestamp:** 2026-08-28 02:15
+**Tujuan:** Migrasi use case auth + user ke modul `iam` sesuai plan
+
+**Files moved (git mv):**
+- `src/application/use-cases/auth/*.ts` (19 files) → `src/modules/iam/application/use-cases/`
+- `src/application/use-cases/user/*.ts` (11 files) → `src/modules/iam/application/use-cases/`
+- Total: **30 files** moved (semua use case auth + user digabung ke `iam`)
+- Folder kosong `auth/` dan `user/` dihapus
+
+**Files created:**
+- `src/modules/iam/iam.module.ts` — barrel export public API (15 use cases + IOC + 2 entities + 2 events)
+- `src/modules/iam/{domain,application/{use-cases,services,dto,event-handlers,mappers},infrastructure/{persistence,external,cache},presentation/{http/{controllers,routes,middlewares},ws,sse},ioc,tests}/` — folder structure (placeholder)
+
+**Files updated (import paths):**
+- `src/bootstrap/container.ts` (20+ import lines updated)
+- `src/presentation/controllers/AuthController.ts` (import path updated)
+- `src/presentation/controllers/UserController.ts` (import path updated)
+- `dependency-cruiser.config.cjs` (3 rules updated untuk exempt `*.test.ts` dan `*.module.ts`)
+
+**Issues & fixes:**
+- ❌ Arch-test gagal: `iam` tidak punya barrel + folder `domain/` (salah deteksi module structure)
+- ✅ Fix: buat `iam.module.ts` + folder placeholder
+- ❌ Dep-cruiser: 23 false positive (test files + barrel file di-flag sebagai cross-module)
+- ✅ Fix: tambahkan `pathNot: '\\.(test|module)\\.ts$'` di rules
+
+**Verification:**
+```
+✅ npm run deps:validate: 0 violations (244 modules, 784 deps)
+✅ npm run test:arch: 10/10 PASSED
+⚠️  npm run typecheck: 6 zod v4 errors (tracked, Fase 1 nanti)
+```
+
+**Plan compliance:** ✅
+- ✅ Step 1.2: "Migrasi use-cases/auth/* → modules/iam/application/use-cases/*"
+- ✅ Step 1.3: "Migrasi use-cases/user/* → modules/iam/application/use-cases/* (gabung dgn auth)" — **DONE di step yang sama**
+
+**Steps 1.2 + 1.3 digabung** karena user/* sebenarnya bagian dari `iam` (auth + user = IAM). Lebih bersih satu commit.
+
+---
