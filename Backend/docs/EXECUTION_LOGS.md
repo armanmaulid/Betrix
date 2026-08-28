@@ -614,3 +614,28 @@ Pushed to `origin/feat/refactor-2026-fase-0`.
 **Steps 1.2 + 1.3 digabung** karena user/* sebenarnya bagian dari `iam` (auth + user = IAM). Lebih bersih satu commit.
 
 ---
+
+### Step 1.4 — Migrasi `use-cases/chat/*` ke `modules/chat/`
+**Timestamp:** 2026-08-28 02:18
+**Tujuan:** Migrasi use case chat ke modul `chat`
+
+**Files moved (git mv):**
+- `src/application/use-cases/chat/*.ts` (6 files) → `src/modules/chat/application/use-cases/`
+- Folder kosong `chat/` dihapus
+
+**Files created:**
+- `src/modules/chat/chat.module.ts` — barrel export (5 use cases + IOC + types)
+
+**Files updated:**
+- `src/bootstrap/container.ts` (5 import lines updated)
+
+**Verification:**
+```
+✅ npm run deps:validate: 0 violations (250 modules, 790 deps)
+✅ npm run test:arch: 10/10 PASSED
+⚠️  npm run typecheck: 6 zod v4 (tracked, Fase 1 nanti)
+```
+
+**Plan compliance:** ✅ Step 1.4
+
+---

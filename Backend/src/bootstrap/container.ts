@@ -57,11 +57,11 @@ import { RevokeSessionUseCase } from "@modules/iam/application/use-cases/RevokeS
 import { LogoutByCredentialsUseCase } from "@modules/iam/application/use-cases/LogoutByCredentialsUseCase.js";
 import { LogoutAllUseCase } from "@modules/iam/application/use-cases/LogoutAllUseCase.js";
 
-import { SendMessageUseCase } from "@application/use-cases/chat/SendMessageUseCase.js";
-import { StreamMessageUseCase } from "@application/use-cases/chat/StreamMessageUseCase.js";
-import { GetChatHistoryUseCase } from "@application/use-cases/chat/GetChatHistoryUseCase.js";
-import { DeleteChatSessionUseCase } from "@application/use-cases/chat/DeleteChatSessionUseCase.js";
-import { ExportChatHistoryUseCase } from "@application/use-cases/chat/ExportChatHistoryUseCase.js";
+import { SendMessageUseCase } from "@modules/chat/application/use-cases/SendMessageUseCase.js";
+import { StreamMessageUseCase } from "@modules/chat/application/use-cases/StreamMessageUseCase.js";
+import { GetChatHistoryUseCase } from "@modules/chat/application/use-cases/GetChatHistoryUseCase.js";
+import { DeleteChatSessionUseCase } from "@modules/chat/application/use-cases/DeleteChatSessionUseCase.js";
+import { ExportChatHistoryUseCase } from "@modules/chat/application/use-cases/ExportChatHistoryUseCase.js";
 
 import { GetUsersUseCase } from "@application/use-cases/admin/GetUsersUseCase.js";
 import { GetUserDetailUseCase } from "@application/use-cases/admin/GetUserDetailUseCase.js";
