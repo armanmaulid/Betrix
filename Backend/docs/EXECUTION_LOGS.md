@@ -33,7 +33,16 @@
 
 | Fase | Status | Mulai | Selesai | Catatan |
 |---|---|---|---|---|
-| 0 — Foundation & Tooling | 🟢 Done | 2026-08-28 | 2026-08-28 | Commit `feat(refactor): fase 0` |
+| 0 — Foundation & Tooling | 🟢 Done | 2026-08-28 | 2026-08-28 | Branch `feat/refactor-2026-fase-0`. Commit `5c38868` (foundation) + `107191d` (fase 0.4-0.6 + audit). |
+| 1 — Modular Monolith | 🟢 Done | 2026-08-28 | 2026-08-28 | 5 module barrel + 5 IOC placeholder. 13 service/dto/event-handler/mapper moved. 79/80 tests pass. Commit `0e90d3c`. |
+| 2 — Hexagonal | ⏳ Pending | — | — | Input ports per module, domain zero-deps, tighten arch enforcement |
+| 3 — Event Bus + Outbox | ⏳ Pending | — | — | `InProcessEventBus` + transactional outbox |
+| 4 — Fastify Gateway | ⏳ Pending | — | — | Strangler-fig Express→Fastify |
+| 5 — Drizzle + Multi-provider | ⏳ Pending | — | — | Schema-qualified repos + Neon/Supabase swap |
+| 6 — Better Auth | ⏳ Pending | — | — | Drop passport |
+| 7 — Observability | ⏳ Pending | — | — | OpenTelemetry |
+| 8 — Service Extraction | ⏳ Optional | — | — | Only if evidence |
+|  🟢 Done (2026-08-28 02:38) | 🟢 Done | 2026-08-28 | 2026-08-28 | Commit `feat(refactor): fase 0` |
 | 1 — Modular Monolith | ⏳ Pending | — | — | |
 | 2 — Hexagonal | ⏳ Pending | — | — | |
 | 3 — Event Bus + Outbox | ⏳ Pending | — | — | |
@@ -49,7 +58,7 @@
 
 ---
 
-## FASE 0 — Foundation & Tooling (2026-08-28)
+## FASE  🟢 Done (2026-08-28 02:38) (2026-08-28)
 
 ### Step 0.0.1 — Backup & Branch Setup
 **Timestamp:** 2026-08-28 00:30
