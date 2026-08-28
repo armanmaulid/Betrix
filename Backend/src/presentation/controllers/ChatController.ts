@@ -1,10 +1,10 @@
 import type { Request, Response, NextFunction } from "express";
 import { inject, injectable } from "tsyringe";
-import { SendMessageUseCase } from "@application/use-cases/chat/SendMessageUseCase.js";
-import { StreamMessageUseCase } from "@application/use-cases/chat/StreamMessageUseCase.js";
-import { GetChatHistoryUseCase } from "@application/use-cases/chat/GetChatHistoryUseCase.js";
-import { DeleteChatSessionUseCase } from "@application/use-cases/chat/DeleteChatSessionUseCase.js";
-import { ExportChatHistoryUseCase } from "@application/use-cases/chat/ExportChatHistoryUseCase.js";
+import { SendMessageUseCase } from "@modules/chat/application/use-cases/SendMessageUseCase.js";
+import { StreamMessageUseCase } from "@modules/chat/application/use-cases/StreamMessageUseCase.js";
+import { GetChatHistoryUseCase } from "@modules/chat/application/use-cases/GetChatHistoryUseCase.js";
+import { DeleteChatSessionUseCase } from "@modules/chat/application/use-cases/DeleteChatSessionUseCase.js";
+import { ExportChatHistoryUseCase } from "@modules/chat/application/use-cases/ExportChatHistoryUseCase.js";
 import { ChatTaskType } from "@domain/entities/ChatMessage.js";
 import type { User } from "@domain/entities/User.js";
 import { isAppError } from "@core/errors/index.js";

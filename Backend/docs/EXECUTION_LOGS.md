@@ -639,3 +639,42 @@ Pushed to `origin/feat/refactor-2026-fase-0`.
 **Plan compliance:** ✅ Step 1.4
 
 ---
+
+### Step 1.5 — Migrasi `use-cases/admin/*` + `use-cases/market/*` ke modul masing-masing
+**Timestamp:** 2026-08-28 02:26
+**Tujuan:** Migrasi use case admin (12) + market (2) ke bounded contexts masing-masing
+
+**Files moved (git mv):**
+- `src/application/use-cases/admin/*.ts` (12 files) → `src/modules/admin/application/use-cases/`
+- `src/application/use-cases/market/*.ts` (2 files) → `src/modules/market/application/use-cases/`
+- Total: **14 files** moved
+
+**Files created:**
+- `src/modules/admin/admin.module.ts` — barrel (12 use cases + IOC + 2 entity types)
+- `src/modules/market/market.module.ts` — barrel (2 use cases + IOC + 2 entity types)
+- `src/modules/{admin,chat,iam,market}/ioc/register.ts` — placeholder IOC (TODO BETRIX-001: migrate container.ts registrations)
+
+**Files updated (import paths):**
+- `src/bootstrap/container.ts` (16 import lines updated)
+- `src/presentation/controllers/AdminController.ts` (8 import lines)
+- `src/presentation/controllers/ChatController.ts` (5 import lines)
+- `src/background/jobs/HourlyCleanupJob.ts` (1 import line)
+- `src/background/jobs/index.ts` (1 import line)
+
+**Other fixes during step:**
+- ✅ Restored `src/shared/kernel/LoggerPort.ts` (was removed in cleanup, but `logger.ts` still imports it)
+- ✅ Fixed `EventDispatcher.ts` (was reference non-existent `event.eventId`, changed to `event.type`)
+- ✅ Fixed `logger.ts` LogLevel type cast (TypeScript strict mode issue with pino LogFn variance)
+- ✅ Fixed `admin.module.ts` ActivityLog → UserActivity (correct entity name)
+- ✅ Fixed TODO ticket reference pattern (use `BETRIX-001` not `FASE2-001`)
+
+**Verification:**
+```
+✅ npm run deps:validate: 0 violations (251 modules, 806 deps)
+✅ npm run test:arch: 10/10 PASSED
+⚠️  npm run typecheck: 29 errors (semua pre-existing zod v4 + UserController zod v4)
+```
+
+**Plan compliance:** ✅ Step 1.5
+
+---

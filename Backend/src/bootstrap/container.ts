@@ -63,18 +63,18 @@ import { GetChatHistoryUseCase } from "@modules/chat/application/use-cases/GetCh
 import { DeleteChatSessionUseCase } from "@modules/chat/application/use-cases/DeleteChatSessionUseCase.js";
 import { ExportChatHistoryUseCase } from "@modules/chat/application/use-cases/ExportChatHistoryUseCase.js";
 
-import { GetUsersUseCase } from "@application/use-cases/admin/GetUsersUseCase.js";
-import { GetUserDetailUseCase } from "@application/use-cases/admin/GetUserDetailUseCase.js";
-import { UpdateUserUseCase } from "@application/use-cases/admin/UpdateUserUseCase.js";
-import { DeleteUserUseCase } from "@application/use-cases/admin/DeleteUserUseCase.js";
-import { ResetUserPasswordUseCase } from "@application/use-cases/admin/ResetUserPasswordUseCase.js";
-import { GetMetricsUseCase } from "@application/use-cases/admin/GetMetricsUseCase.js";
-import { GetAnalyticsUseCase } from "@application/use-cases/admin/GetAnalyticsUseCase.js";
-import { GetSystemInfoUseCase } from "@application/use-cases/admin/GetSystemInfoUseCase.js";
-import { GetAuditLogsUseCase } from "@application/use-cases/admin/GetAuditLogsUseCase.js";
-import { ExportAuditLogsUseCase } from "@application/use-cases/admin/ExportAuditLogsUseCase.js";
-import { BroadcastMessageUseCase } from "@application/use-cases/admin/BroadcastMessageUseCase.js";
-import { SystemCleanupUseCase } from "@application/use-cases/admin/SystemCleanupUseCase.js";
+import { GetUsersUseCase } from "@modules/admin/application/use-cases/GetUsersUseCase.js";
+import { GetUserDetailUseCase } from "@modules/admin/application/use-cases/GetUserDetailUseCase.js";
+import { UpdateUserUseCase } from "@modules/admin/application/use-cases/UpdateUserUseCase.js";
+import { DeleteUserUseCase } from "@modules/admin/application/use-cases/DeleteUserUseCase.js";
+import { ResetUserPasswordUseCase } from "@modules/admin/application/use-cases/ResetUserPasswordUseCase.js";
+import { GetMetricsUseCase } from "@modules/admin/application/use-cases/GetMetricsUseCase.js";
+import { GetAnalyticsUseCase } from "@modules/admin/application/use-cases/GetAnalyticsUseCase.js";
+import { GetSystemInfoUseCase } from "@modules/admin/application/use-cases/GetSystemInfoUseCase.js";
+import { GetAuditLogsUseCase } from "@modules/admin/application/use-cases/GetAuditLogsUseCase.js";
+import { ExportAuditLogsUseCase } from "@modules/admin/application/use-cases/ExportAuditLogsUseCase.js";
+import { BroadcastMessageUseCase } from "@modules/admin/application/use-cases/BroadcastMessageUseCase.js";
+import { SystemCleanupUseCase } from "@modules/admin/application/use-cases/SystemCleanupUseCase.js";
 
 import { GetUsageUseCase } from "@modules/iam/application/use-cases/GetUsageUseCase.js";
 import { GetMessagesUseCase } from "@modules/iam/application/use-cases/GetMessagesUseCase.js";
@@ -88,8 +88,8 @@ import { GetMessageThreadUseCase } from "@modules/iam/application/use-cases/GetM
 import { MarkMessageReadUseCase } from "@modules/iam/application/use-cases/MarkMessageReadUseCase.js";
 import { DeleteMessageUseCase as UserDeleteMessageUseCase } from "@modules/iam/application/use-cases/DeleteMessageUseCase.js";
 
-import { GetSymbolsUseCase } from "@application/use-cases/market/GetSymbolsUseCase.js";
-import { GetCalendarUseCase } from "@application/use-cases/market/GetCalendarUseCase.js";
+import { GetSymbolsUseCase } from "@modules/market/application/use-cases/GetSymbolsUseCase.js";
+import { GetCalendarUseCase } from "@modules/market/application/use-cases/GetCalendarUseCase.js";
 
 import { FetchNewsUseCase } from "@contexts/news/application/use-cases/FetchNewsUseCase.js";
 import { StoreNewsUseCase } from "@contexts/news/application/use-cases/StoreNewsUseCase.js";

@@ -37,10 +37,12 @@ class PinoLoggerAdapter implements LoggerPort {
   constructor(private readonly logger: PinoLogger) {}
 
   private log(level: LogLevel, message: string, context?: LogContext): void {
+    // Cast to LogFn to satisfy strict pino types (key signature variance)
+    const fn = (this.logger[level] as (msgOrObj: unknown, msg?: string) => void);
     if (context && Object.keys(context).length > 0) {
-      this.logger[level](context, message);
+      fn(context, message);
     } else {
-      this.logger[level](message);
+      fn(message);
     }
   }
 

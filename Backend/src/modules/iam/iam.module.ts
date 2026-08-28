@@ -33,5 +33,4 @@ export type { User } from "@domain/entities/User.js";
 export type { Session } from "@domain/entities/Session.js";
 
 // === Public Domain Events ===
-export type { UserLoggedIn } from "@domain/events/UserLoggedIn.js";
-export type { UserRegistered } from "@domain/events/UserRegistered.js";
+export type { UserLoggedIn, UserRegistered } from "@domain/events/index.js";

@@ -1,6 +1,6 @@
 import { container } from "tsyringe";
 import { logger } from "@core/logging/logger.js";
-import { SystemCleanupUseCase } from "@application/use-cases/admin/SystemCleanupUseCase.js";
+import { SystemCleanupUseCase } from "@modules/admin/application/use-cases/SystemCleanupUseCase.js";
 
 export class HourlyCleanupJob {
   static async execute(): Promise<void> {

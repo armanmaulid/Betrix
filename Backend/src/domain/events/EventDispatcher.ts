@@ -14,7 +14,7 @@ export class EventDispatcher {
       try {
         await handler(event);
       } catch (err) {
-        log.error("Error handling event", { error: err, eventName, eventId: event.eventId });
+        log.error("Error handling event", { error: err, eventName, eventType: event.type });
       }
     });
   }
