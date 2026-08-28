@@ -332,3 +332,81 @@ Saat ekstraksi: tiap service **WAJIB punya DB sendiri** (no shared DB) dan API c
 
 **Ringkasan satu kalimat:**
 > Pertahankan *satu deployable*, tapi pecah jadi **bounded contexts** dengan **module boundary enforcement**, **schema per modul**, **in-process event bus**, **OpenAPI contracts**, dan **observability by default** — microservices diekstrak hanya saat bukti kebutuhan muncul, bukan karena trend.
+
+---
+
+## 9. Status Implementasi (Live)
+
+> Di-update setiap fase selesai. Untuk detail step-by-step eksekusi, lihat **`Backend/docs/EXECUTION_LOGS.md`** (append-only audit trail).
+
+| Fase | Status | Commit | Catatan |
+|---|---|---|---|
+| **0 — Foundation & Tooling** | 🟢 **DONE** (2026-08-28) | `5c38868` | dependency-cruiser + 3 arch-test + Pino logger + LoggerPort + AppError + Result. 247 modules 0 violations, 5/5 arch-test pass. |
+| 0.4 — Typed config (zod env) | ⏳ Next in Fase 0 | — | Validasi env var dengan zod, fail-fast |
+| 0.5 — Schema-per-module (DB) | ⏳ Next in Fase 0 | — | `iam`, `market`, `chat`, `news`, `messaging`, `admin`, `notification`, `billing` schemas di Postgres |
+| 0.6 — Docs setup | ⏳ Next in Fase 0 | — | README, architecture.md, CONTRIBUTING.md |
+| 1 — Modular Monolith | ⏳ Pending | — | Migrasi 7 use-case group + `contexts/news` → `src/modules/<bounded-context>/` |
+| 2 — Hexagonal | ⏳ Pending | — | Per-module input ports, domain zero-deps |
+| 3 — Event Bus + Outbox | ⏳ Pending | — | `InProcessEventBus` + transactional outbox |
+| 4 — Fastify Gateway | ⏳ Pending | — | Strangler-fig, Express + Fastify coexist, port 3001 → 3000 cutover |
+| 5 — Drizzle + Multi-provider | ⏳ Pending | — | `DatabaseProvider` registry (Neon/Supabase/Postgres) |
+| 6 — Better Auth | ⏳ Pending | — | Replace passport + Google OAuth |
+| 7 — Observability | ⏳ Pending | — | OpenTelemetry + Pino instrumentation |
+| 8 — Service Extraction | ⏳ Optional | — | Hanya jika bukti kebutuhan muncul |
+
+---
+
+## 10. Apa yang Akan Dilakukan di Fase 1 (Berikutnya)
+
+**Tujuan:** Konsolidasi inkonsistensi struktur (`use-cases/*` flat vs `contexts/news/*` bounded context) ke satu pola **Modular Monolith + hexagonal per module**. Zero behavior change, zero runtime change — hanya struktur folder.
+
+**Module yang akan dibuat (7):**
+
+```
+src/modules/
+├── iam/          # Identity & Access Management (auth + user + session)
+├── chat/         # AI chat (sessions, history, streaming)
+├── market/       # symbols, calendar, market data
+├── messaging/    # user-to-user messages, notifications
+├── admin/        # analytics, audit log, broadcast
+├── news/         # news feed (dari contexts/news)
+└── notification/ # email, SSE, push (infra-only)
+```
+
+**Tiap module punya struktur:**
+
+```
+modules/<context>/
+├── domain/         # entities, value-objects, events, ports (interface only)
+├── application/    # use-cases, services, dto, mappers
+├── infrastructure/ # repo impls, external adapter
+├── presentation/   # controllers, routes, middlewares
+├── events/         # event handlers
+├── ioc/            # tsyringe registration
+├── tests/          # integration tests
+├── <context>.module.ts  # barrel export (public API)
+└── README.md
+```
+
+**Urutan eksekusi:**
+
+1. **Step 1.1** — Tulis ADR `0001-module-structure.md` & template module
+2. **Step 1.2** — Migrasi `iam` (paling kompleks, 30+ files) sebagai pilot
+3. **Step 1.3** — Migrasi `chat`
+4. **Step 1.4** — Migrasi `market`
+5. **Step 1.5** — Migrasi `admin`
+6. **Step 1.6** — Migrasi `messaging`
+7. **Step 1.7** — Refactor `contexts/news` → `modules/news`
+8. **Step 1.8** — Setup `notification` module
+9. **Step 1.9** — Setup `billing` (jika ada credit/usage logic)
+10. **Step 1.10** — Cleanup folder lama + main.ts composition root
+
+**Effort:** ~3-5 hari (Fase 1) untuk solo dev, dengan validasi arch-test di setiap step.
+
+**Risiko & mitigasi:**
+
+- Risiko: lupa update satu import → app crash di runtime
+- Mitigasi: jalankan `npm test` di setiap step + arch-test `no-cross-module-internal-imports` akan auto-detect
+
+**Detail lengkap di `refactoring-plan-2026.md` Section 2 (Target Struktur Direktori) + Section 3 Fase 1.**
+
