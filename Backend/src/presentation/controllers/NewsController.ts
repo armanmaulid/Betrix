@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 import { inject, injectable } from "tsyringe";
-import { GetNewsUseCase } from "@contexts/news/application/use-cases/GetNewsUseCase.js";
+import { GetNewsUseCase } from "@modules/news/application/use-cases/GetNewsUseCase.js";
 import { INotifier } from "@domain/ports/INotifier.js";
 import type { AuthenticatedRequest } from "@presentation/middleware/auth.middleware.js";
 import { NEWS_ASSETS } from "@core/constants/index.js";

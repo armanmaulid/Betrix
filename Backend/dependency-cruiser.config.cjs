@@ -41,7 +41,7 @@ module.exports = {
       severity: 'error',
       comment: 'Module X domain TIDAK boleh import module Y (harus via barrel atau event bus)',
       from: { path: '^src/modules/([^/]+)/domain/' },
-      to: { path: '^src/modules/(?!(?:\\1)\\b)[^/]+/' },
+      to: { path: '^src/modules/(?!$1)[^/]+/' },
     },
 
     // === APPLICATION layer rules ===
@@ -57,7 +57,7 @@ module.exports = {
       severity: 'error',
       comment: 'Application module X TIDAK boleh import application module Y (harus via barrel atau event). Test files dikecualikan.',
       from: { path: '^src/modules/([^/]+)/application/', pathNot: '\\.test\\.ts$' },
-      to: { path: '^src/modules/(?!(?:\\1)\\b)[^/]+/application/' },
+      to: { path: '^src/modules/(?!$1)[^/]+/application/' },
     },
     {
       name: 'no-application-to-infra-persistence',
@@ -103,8 +103,8 @@ module.exports = {
         pathNot: '\\.(test|module)\\.ts$',
       },
       to: {
-        path: '^src/modules/(?!(?:\\1)\\b)[^/]+/',
-        pathNot: '\\.test\\.ts$',
+        path: '^src/modules/(?!$1)[^/]+/',
+        pathNot: '\\.(test|module)\\.ts$',
       },
     },
 

@@ -678,3 +678,38 @@ Pushed to `origin/feat/refactor-2026-fase-0`.
 **Plan compliance:** ✅ Step 1.5
 
 ---
+
+### Step 1.6 — Migrasi `contexts/news/*` ke `modules/news/*`
+**Timestamp:** 2026-08-28 02:33
+**Tujuan:** Migrasi `contexts/news` ke `modules/news` + tambah `presentation/`, `events/`, `ioc/`, `news.module.ts`
+
+**Files moved (git mv):**
+- `src/contexts/news/{domain,application,infrastructure}/*` → `src/modules/news/{domain,application,infrastructure}/`
+- Total: **13 files** moved (3 use cases, 1 service, 8 domain, 2 infra)
+
+**Files created:**
+- `src/modules/news/news.module.ts` — barrel (3 use cases + IOC + 4 types)
+- `src/modules/news/ioc/register.ts` — placeholder
+- `src/modules/news/presentation/{http/{controllers,routes,middlewares}}/` (folders)
+
+**Files updated (11 import paths):**
+- `@contexts/news/` → `@modules/news/` di: SystemCleanupUseCase, PgNewsRepository, FinnhubNewsAdapter, NewsService, 3 use cases, container.ts, NewsPollingJob, TradeAnalysisContextService
+
+**Issues & fixes:**
+- ❌ `SystemCleanupUseCase.ts` (admin module) import `NewsContextPort` dari news (CROSS-MODULE) — terdeteksi dep-cruiser
+- ✅ Fix: tambah `NewsContextPort` ke `news.module.ts` barrel; ubah import ke `@modules/news/news.module.js`
+- ❌ `dependency-cruiser` config: group matching regex salah pakai `\1` (JS regex escape) — mestinya `$1` (depcruiser special var)
+- ✅ Fix: replace `(?!(?:\\1)\\b)` → `(?!$1)` di semua rules
+- ❌ Brrel `*.module.ts` di-flag sebagai cross-module internal import
+- ✅ Fix: tambah `pathNot: '\\.(test|module)\\.ts$'` di `to` part juga
+
+**Verification:**
+```
+✅ npm run deps:validate: 0 violations (253 modules, 810 deps)
+✅ npm run test:arch: 10/10 PASSED
+⚠️  npm run typecheck: 29 pre-existing zod v4 errors
+```
+
+**Plan compliance:** ✅ Step 1.6 (rename + tambah presentation/events/ioc — events/ioc dilakukan di step 1.7 barrel)
+
+---

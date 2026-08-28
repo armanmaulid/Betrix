@@ -1,8 +1,8 @@
 import { inject, injectable } from "tsyringe";
-import { NewsRepository } from "@contexts/news/domain/NewsRepository.js";
-import { NewsArticle } from "@contexts/news/domain/NewsArticle.js";
-import { RawNewsArticle } from "@contexts/news/domain/INewsProvider.js";
-import { tagNewsArticle } from "@contexts/news/domain/newsTagging.js";
+import { NewsRepository } from "@modules/news/domain/NewsRepository.js";
+import { NewsArticle } from "@modules/news/domain/NewsArticle.js";
+import { RawNewsArticle } from "@modules/news/domain/INewsProvider.js";
+import { tagNewsArticle } from "@modules/news/domain/newsTagging.js";
 
 @injectable()
 export class NewsService {

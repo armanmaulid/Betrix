@@ -1,9 +1,9 @@
 import { injectable } from "tsyringe";
 import { pgClient } from "@data/orm/pgClient.js";
-import { NewsRepository } from "@contexts/news/domain/NewsRepository.js";
-import { NewsContextPort } from "@contexts/news/domain/NewsContextPort.js";
-import { NewsArticle } from "@contexts/news/domain/NewsArticle.js";
-import { selectHeadlines } from "@contexts/news/domain/headlineSelection.js";
+import { NewsRepository } from "@modules/news/domain/NewsRepository.js";
+import { NewsContextPort } from "@modules/news/domain/NewsContextPort.js";
+import { NewsArticle } from "@modules/news/domain/NewsArticle.js";
+import { selectHeadlines } from "@modules/news/domain/headlineSelection.js";
 
 interface NewsArticleRow {
   id: string;

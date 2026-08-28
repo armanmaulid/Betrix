@@ -1,8 +1,8 @@
 import { container } from "tsyringe";
 import { logger } from "@core/logging/logger.js";
-import { FetchNewsUseCase } from "@contexts/news/application/use-cases/FetchNewsUseCase.js";
-import { StoreNewsUseCase } from "@contexts/news/application/use-cases/StoreNewsUseCase.js";
-import type { INewsProvider } from "@contexts/news/domain/INewsProvider.js";
+import { FetchNewsUseCase } from "@modules/news/application/use-cases/FetchNewsUseCase.js";
+import { StoreNewsUseCase } from "@modules/news/application/use-cases/StoreNewsUseCase.js";
+import type { INewsProvider } from "@modules/news/domain/INewsProvider.js";
 
 export class NewsPollingJob {
   private static consecutiveErrors = new Map<string, number>();

@@ -1,6 +1,6 @@
 import { inject, injectable } from "tsyringe";
-import { NewsRepository } from "@contexts/news/domain/NewsRepository.js";
-import { NewsArticle } from "@contexts/news/domain/NewsArticle.js";
+import { NewsRepository } from "@modules/news/domain/NewsRepository.js";
+import { NewsArticle } from "@modules/news/domain/NewsArticle.js";
 import { INotifier } from "@domain/ports/INotifier.js";
 import { logger } from "@core/logging/logger.js";
 

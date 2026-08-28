@@ -1,4 +1,4 @@
-import { INewsProvider, RawNewsArticle } from "@contexts/news/domain/INewsProvider.js";
+import { INewsProvider, RawNewsArticle } from "@modules/news/domain/INewsProvider.js";
 import { env } from "@config/env.js";
 import { injectable } from "tsyringe";
 

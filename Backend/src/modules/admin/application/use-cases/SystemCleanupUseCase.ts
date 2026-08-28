@@ -1,6 +1,6 @@
 import { inject, injectable } from "tsyringe";
 import { VerificationRepository } from "@domain/repositories/VerificationRepository.js";
-import { NewsContextPort } from "@contexts/news/domain/NewsContextPort.js";
+import { NewsContextPort } from "@modules/news/news.module.js";
 import { logger } from "@core/logging/logger.js";
 
 @injectable()

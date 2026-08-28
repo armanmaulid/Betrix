@@ -1,7 +1,7 @@
 import { inject, injectable } from "tsyringe";
-import { INewsProvider } from "@contexts/news/domain/INewsProvider.js";
+import { INewsProvider } from "@modules/news/domain/INewsProvider.js";
 import { NewsService } from "../NewsService.js";
-import { NewsArticle } from "@contexts/news/domain/NewsArticle.js";
+import { NewsArticle } from "@modules/news/domain/NewsArticle.js";
 
 @injectable()
 export class FetchNewsUseCase {

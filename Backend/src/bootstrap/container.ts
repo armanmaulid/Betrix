@@ -9,7 +9,7 @@ import { PgCreditRepository } from "@data/repositories/PgCreditRepository.js";
 import { PgDeviceRepository } from "@data/repositories/PgDeviceRepository.js";
 import { PgAdminActionRepository } from "@data/repositories/PgAdminActionRepository.js";
 import { PgMessageRepository } from "@data/repositories/PgMessageRepository.js";
-import { PgNewsRepository } from "@contexts/news/infrastructure/PgNewsRepository.js";
+import { PgNewsRepository } from "@modules/news/infrastructure/PgNewsRepository.js";
 import { PgUserActivityRepository } from "@data/repositories/PgUserActivityRepository.js";
 import { PgSymbolRepository } from "@data/repositories/PgSymbolRepository.js";
 import { PgCalendarRepository } from "@data/repositories/PgCalendarRepository.js";
@@ -32,7 +32,7 @@ import { Mt5BrokerAdapter } from "@data/external/Mt5BrokerAdapter.js";
 import { Mt5HttpClient } from "@data/external/Mt5HttpClient.js";
 import { Mt5WebsocketClient } from "@data/external/Mt5WebsocketClient.js";
 import { GeneralCacheStore } from "@data/cache/GeneralCacheStore.js";
-import { FinnhubNewsAdapter } from "@contexts/news/infrastructure/FinnhubNewsAdapter.js";
+import { FinnhubNewsAdapter } from "@modules/news/infrastructure/FinnhubNewsAdapter.js";
 import { SseNotifier } from "@infrastructure/sse/SseNotifier.js";
 import { env } from "@config/env.js";
 import { isDeviceEnforcementEnabled } from "@config/deviceEnforcement.js";
@@ -91,9 +91,9 @@ import { DeleteMessageUseCase as UserDeleteMessageUseCase } from "@modules/iam/a
 import { GetSymbolsUseCase } from "@modules/market/application/use-cases/GetSymbolsUseCase.js";
 import { GetCalendarUseCase } from "@modules/market/application/use-cases/GetCalendarUseCase.js";
 
-import { FetchNewsUseCase } from "@contexts/news/application/use-cases/FetchNewsUseCase.js";
-import { StoreNewsUseCase } from "@contexts/news/application/use-cases/StoreNewsUseCase.js";
-import { GetNewsUseCase } from "@contexts/news/application/use-cases/GetNewsUseCase.js";
+import { FetchNewsUseCase } from "@modules/news/application/use-cases/FetchNewsUseCase.js";
+import { StoreNewsUseCase } from "@modules/news/application/use-cases/StoreNewsUseCase.js";
+import { GetNewsUseCase } from "@modules/news/application/use-cases/GetNewsUseCase.js";
 
 // Controllers
 import { AuthController } from "@presentation/controllers/AuthController.js";
@@ -107,7 +107,7 @@ import { TradeAnalysisContextService } from "@application/services/TradeAnalysis
 import { CalendarService } from "@application/services/CalendarService.js";
 import { AuthService } from "@application/services/AuthService.js";
 import { CaptchaService } from "@application/services/CaptchaService.js";
-import { NewsService } from "@contexts/news/application/NewsService.js";
+import { NewsService } from "@modules/news/application/NewsService.js";
 
 // Events & Handlers
 import { EventDispatcher } from "@domain/events/index.js";
