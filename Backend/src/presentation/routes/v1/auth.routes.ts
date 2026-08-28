@@ -5,7 +5,7 @@ import { AuthController } from "@presentation/controllers/AuthController.js";
 import { authMiddleware, guestMiddleware } from "@presentation/middleware/auth.middleware.js";
 import { validate } from "@presentation/middleware/validate.middleware.js";
 import { authLimiter, registerLimiter, sensitiveLimiter } from "@core/middleware/rateLimiter.js";
-import { registerDto, loginDto, changePasswordDto, changeEmailDto, updateProfileDto, verifyEmailDto, resendVerificationDto, oauthExchangeDto } from "@application/dtos/auth.dto.js";
+import { registerDto, loginDto, changePasswordDto, changeEmailDto, updateProfileDto, verifyEmailDto, resendVerificationDto, oauthExchangeDto } from "@modules/iam/application/dto/auth.dto.js";
 
 export function createAuthRouter(): Router {
   const router = Router();

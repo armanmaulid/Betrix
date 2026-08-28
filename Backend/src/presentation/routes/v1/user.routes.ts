@@ -3,7 +3,7 @@ import { container } from "tsyringe";
 import { UserController } from "@presentation/controllers/UserController.js";
 import { authMiddleware } from "@presentation/middleware/auth.middleware.js";
 import { validate } from "@presentation/middleware/validate.middleware.js";
-import { getUsageDto, getMessagesDto, sendMessageDto, updateNotificationPrefsDto, getActivityDto } from "@application/dtos/user.dto.js";
+import { getUsageDto, getMessagesDto, sendMessageDto, updateNotificationPrefsDto, getActivityDto } from "@modules/iam/application/dto/user.dto.js";
 
 export function createUserRouter(): Router {
   const router = Router();

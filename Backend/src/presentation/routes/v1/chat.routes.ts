@@ -3,7 +3,7 @@ import { container } from "tsyringe";
 import { ChatController } from "@presentation/controllers/ChatController.js";
 import { authMiddleware } from "@presentation/middleware/auth.middleware.js";
 import { validate } from "@presentation/middleware/validate.middleware.js";
-import { sendMessageDto, getHistoryDto, deleteSessionDto, exportHistoryDto } from "@application/dtos/chat.dto.js";
+import { sendMessageDto, getHistoryDto, deleteSessionDto, exportHistoryDto } from "@modules/chat/application/dto/chat.dto.js";
 
 export function createChatRouter(): Router {
   const router = Router();

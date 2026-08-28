@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from "express";
 import { inject, injectable } from "tsyringe";
-import { MarketDataService } from "@application/services/MarketDataService.js";
-import { CalendarService } from "@application/services/CalendarService.js";
+import { MarketDataService } from "@modules/market/application/services/MarketDataService.js";
+import { CalendarService } from "@modules/market/application/services/CalendarService.js";
 import { CalendarImportance } from "@domain/entities/CalendarEvent.js";
 
 @injectable()

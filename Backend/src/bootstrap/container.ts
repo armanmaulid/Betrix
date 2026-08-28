@@ -102,16 +102,16 @@ import { AdminController } from "@presentation/controllers/AdminController.js";
 import { UserController } from "@presentation/controllers/UserController.js";
 import { MarketController } from "@presentation/controllers/MarketController.js";
 import { NewsController } from "@presentation/controllers/NewsController.js";
-import { MarketDataService } from "@application/services/MarketDataService.js";
-import { TradeAnalysisContextService } from "@application/services/TradeAnalysisContextService.js";
-import { CalendarService } from "@application/services/CalendarService.js";
-import { AuthService } from "@application/services/AuthService.js";
-import { CaptchaService } from "@application/services/CaptchaService.js";
+import { MarketDataService } from "@modules/market/application/services/MarketDataService.js";
+import { TradeAnalysisContextService } from "@modules/chat/application/services/TradeAnalysisContextService.js";
+import { CalendarService } from "@modules/market/application/services/CalendarService.js";
+import { AuthService } from "@modules/iam/application/services/AuthService.js";
+import { CaptchaService } from "@modules/iam/application/services/CaptchaService.js";
 import { NewsService } from "@modules/news/application/NewsService.js";
 
 // Events & Handlers
 import { EventDispatcher } from "@domain/events/index.js";
-import { ChatLoggingHandler } from "@application/event-handlers/ChatLoggingHandler.js";
+import { ChatLoggingHandler } from "@modules/chat/application/event-handlers/ChatLoggingHandler.js";
 import { AiPromptRegistry } from "@domain/services/AiPromptRegistry.js";
 
 export function registerDependencies() {

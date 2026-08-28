@@ -713,3 +713,49 @@ Pushed to `origin/feat/refactor-2026-fase-0`.
 **Plan compliance:** ✅ Step 1.6 (rename + tambah presentation/events/ioc — events/ioc dilakukan di step 1.7 barrel)
 
 ---
+
+### Step 1.7 — Hapus folder lama (cleanup)
+**Timestamp:** 2026-08-28 02:37
+**Tujuan:** Hapus `application/` (services campur, use-cases/* flat) + `contexts/news/*` (sudah dimigrasi)
+
+**Files moved (git mv):**
+- `src/application/services/AuthService.ts` → `src/modules/iam/application/services/`
+- `src/application/services/CaptchaService.ts` → `src/modules/iam/application/services/`
+- `src/application/services/CalendarService.ts` → `src/modules/market/application/services/`
+- `src/application/services/MarketDataService.ts` → `src/modules/market/application/services/`
+- `src/application/services/SymbolService.ts` + `.test.ts` → `src/modules/market/application/services/`
+- `src/application/services/TradeAnalysisContextService.ts` → `src/modules/chat/application/services/`
+- `src/application/dtos/admin.dto.ts` → `src/modules/admin/application/dto/`
+- `src/application/dtos/auth.dto.ts` → `src/modules/iam/application/dto/`
+- `src/application/dtos/chat.dto.ts` → `src/modules/chat/application/dto/`
+- `src/application/dtos/market.dto.ts` → `src/modules/market/application/dto/`
+- `src/application/dtos/user.dto.ts` → `src/modules/iam/application/dto/`
+- `src/application/event-handlers/ChatLoggingHandler.ts` → `src/modules/chat/application/event-handlers/`
+- `src/application/mappers/user.mapper.ts` → `src/modules/iam/application/mappers/`
+
+Total: **13 files** moved dari `application/` ke `modules/<m>/application/`
+
+**Folders removed:**
+- `src/application/` (kosong setelah dipindah)
+- `src/contexts/` (sudah dimigrasi di Step 1.6)
+
+**Import paths updated (sed across all .ts):**
+- `@application/services/{Service}` → `@modules/{module}/application/services/{Service}`
+- `@application/dtos/{Dto}` → `@modules/{module}/application/dto/{Dto}`
+- `@application/event-handlers/ChatLoggingHandler` → `@modules/chat/application/event-handlers/ChatLoggingHandler`
+- `@application/mappers/user` → `@modules/iam/application/mappers/user`
+
+**Cross-module import found & fixed:**
+- ❌ `TradeAnalysisContextService.ts` (chat) import `NewsContextPort` (news) — direct internal import
+- ✅ Fix: ganti ke `@modules/news/news.module.js` (via barrel)
+
+**Verification:**
+```
+✅ npm run deps:validate: 0 violations (254 modules, 810 deps)
+✅ npm run test:arch: 10/10 PASSED
+⚠️  npm run typecheck: 30 pre-existing zod v4 errors
+```
+
+**Plan compliance:** ✅ Step 1.7 (hapus folder lama)
+
+---

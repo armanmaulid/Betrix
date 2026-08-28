@@ -4,7 +4,7 @@ import { AdminController } from "@presentation/controllers/AdminController.js";
 import { authMiddleware } from "@presentation/middleware/auth.middleware.js";
 import { adminMiddleware } from "@presentation/middleware/admin.middleware.js";
 import { validate } from "@presentation/middleware/validate.middleware.js";
-import { adminGetUsersDto, adminUpdateUserDto, adminResetPasswordDto, adminMetricsDto, adminAnalyticsDto, adminLogsDto, adminActionsDto, adminBroadcastDto } from "@application/dtos/admin.dto.js";
+import { adminGetUsersDto, adminUpdateUserDto, adminResetPasswordDto, adminMetricsDto, adminAnalyticsDto, adminLogsDto, adminActionsDto, adminBroadcastDto } from "@modules/admin/application/dto/admin.dto.js";
 
 export function createAdminRouter(): Router {
   const router = Router();

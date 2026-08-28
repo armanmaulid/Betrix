@@ -2,8 +2,8 @@ import { container } from "tsyringe";
 import { env } from "@config/env.js";
 import { logger } from "@core/logging/logger.js";
 import type { IBrokerProvider } from "@domain/ports/IBrokerProvider.js";
-import { MarketDataService } from "@application/services/MarketDataService.js";
-import { CalendarService } from "@application/services/CalendarService.js";
+import { MarketDataService } from "@modules/market/application/services/MarketDataService.js";
+import { CalendarService } from "@modules/market/application/services/CalendarService.js";
 
 export class Mt5SubscriptionJob {
   static async setupAndConnect(): Promise<void> {

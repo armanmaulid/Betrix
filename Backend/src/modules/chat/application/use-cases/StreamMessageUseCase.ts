@@ -10,8 +10,8 @@ import { ModelPolicy } from "@domain/services/ModelPolicy.js";
 import { sanitizeHistory } from "@core/utils/chat.js";
 import { EventDispatcher, ChatCompleted } from "@domain/events/index.js";
 import { AiPromptRegistry } from "@domain/services/AiPromptRegistry.js";
-import { TradeAnalysisContextService } from "@application/services/TradeAnalysisContextService.js";
-import type { ContextParams } from "@application/dtos/chat.dto.js";
+import { TradeAnalysisContextService } from "@modules/chat/application/services/TradeAnalysisContextService.js";
+import type { ContextParams } from "@modules/chat/application/dto/chat.dto.js";
 
 interface StreamMessageInput {
   userId: string;

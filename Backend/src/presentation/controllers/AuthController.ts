@@ -17,11 +17,11 @@ import { GetSessionsUseCase } from "@modules/iam/application/use-cases/GetSessio
 import { RevokeSessionUseCase } from "@modules/iam/application/use-cases/RevokeSessionUseCase.js";
 import { LogoutByCredentialsUseCase } from "@modules/iam/application/use-cases/LogoutByCredentialsUseCase.js";
 import { LogoutAllUseCase } from "@modules/iam/application/use-cases/LogoutAllUseCase.js";
-import { AuthService } from "@application/services/AuthService.js";
+import { AuthService } from "@modules/iam/application/services/AuthService.js";
 import { User } from "@domain/entities/User.js";
 import type { AppSettings } from "@core/settings/AppSettings.js";
 import type { RequestInput } from "@core/utils/request.js";
-import { toUserResponseDto } from "@application/mappers/user.mapper.js";
+import { toUserResponseDto } from "@modules/iam/application/mappers/user.mapper.js";
 
 @injectable()
 export class AuthController {

@@ -1,7 +1,7 @@
 import { inject, injectable } from "tsyringe";
 import { MarketDataService } from "./MarketDataService.js";
 import { TradeAnalysisPromptBuilder } from "@domain/services/TradeAnalysisPromptBuilder.js";
-import { NewsContextPort } from "@modules/news/domain/NewsContextPort.js";
+import { NewsContextPort } from "@modules/news/news.module.js";
 import { AppError } from "@core/errors/index.js";
 
 export interface TradeAnalysisContext {

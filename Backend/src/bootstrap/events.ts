@@ -1,6 +1,6 @@
 import { container } from "tsyringe";
 import type { EventDispatcher, ChatCompleted } from "@domain/events/index.js";
-import { ChatLoggingHandler } from "@application/event-handlers/ChatLoggingHandler.js";
+import { ChatLoggingHandler } from "@modules/chat/application/event-handlers/ChatLoggingHandler.js";
 
 export function registerEventHandlers() {
   // Resolve via string token — must match the @inject("EventDispatcher") token

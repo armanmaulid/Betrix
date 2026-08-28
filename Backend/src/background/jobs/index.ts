@@ -1,7 +1,7 @@
 import { container } from "tsyringe";
 import { logger } from "@core/logging/logger.js";
-import { SymbolService } from "@application/services/SymbolService.js";
-import { CalendarService } from "@application/services/CalendarService.js";
+import { SymbolService } from "@modules/market/application/services/SymbolService.js";
+import { CalendarService } from "@modules/market/application/services/CalendarService.js";
 import { SystemCleanupUseCase } from "@modules/admin/application/use-cases/SystemCleanupUseCase.js";
 import { SseNotifier } from "@infrastructure/sse/SseNotifier.js";
 import { FinnhubClient } from "@data/external/FinnhubClient.js";

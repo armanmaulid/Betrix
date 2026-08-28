@@ -3,7 +3,7 @@ import { container } from "tsyringe";
 import { MarketController } from "@presentation/controllers/MarketController.js";
 import { authMiddleware } from "@presentation/middleware/auth.middleware.js";
 import { validate } from "@presentation/middleware/validate.middleware.js";
-import { getSymbolsDto, getCalendarDto } from "@application/dtos/market.dto.js";
+import { getSymbolsDto, getCalendarDto } from "@modules/market/application/dto/market.dto.js";
 import { z } from "zod";
 
 export function createMarketRouter(): Router {
