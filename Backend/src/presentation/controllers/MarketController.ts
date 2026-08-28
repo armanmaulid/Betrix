@@ -3,6 +3,7 @@ import { inject, injectable } from "tsyringe";
 import { MarketDataService } from "@modules/market/application/services/MarketDataService.js";
 import { CalendarService } from "@modules/market/application/services/CalendarService.js";
 import { CalendarImportance } from "@domain/entities/CalendarEvent.js";
+import { queryString, queryStringArray, queryStringUpper } from "@shared/http/queryHelpers.js";
 
 @injectable()
 export class MarketController {
@@ -13,8 +14,8 @@ export class MarketController {
 
   async getPrice(req: Request, res: Response, next: NextFunction) {
     try {
-      const { symbol } = req.params;
-      const price = await this.marketDataService.getPrice(symbol.toUpperCase());
+      const symbol = (req.params.symbol as string).toUpperCase();
+      const price = await this.marketDataService.getPrice(symbol);
       if (!price) {
         return res.status(404).json({ error: "Price not found for symbol", code: "NOT_FOUND" });
       }
@@ -26,11 +27,11 @@ export class MarketController {
 
   async getPrices(req: Request, res: Response, next: NextFunction) {
     try {
-      const { symbols } = req.query;
+      const symbols = queryString(req.query.symbols);
       if (!symbols) {
         return res.status(400).json({ error: "symbols query parameter required", code: "VALIDATION_ERROR" });
       }
-      const symbolList = (symbols as string).split(",").map(s => s.trim().toUpperCase());
+      const symbolList = symbols.split(",").map(s => s.trim().toUpperCase());
       const prices = await this.marketDataService.getPrices(symbolList);
       const result: Record<string, unknown> = {};
       prices.forEach((price, symbol) => { result[symbol] = price; });
@@ -42,12 +43,13 @@ export class MarketController {
 
   async getOHLC(req: Request, res: Response, next: NextFunction) {
     try {
-      const { symbol, timeframe } = req.params;
-      const candles = await this.marketDataService.getOHLC(symbol.toUpperCase(), timeframe.toUpperCase());
+      const symbol = (req.params.symbol as string).toUpperCase();
+      const timeframe = (req.params.timeframe as string).toUpperCase();
+      const candles = await this.marketDataService.getOHLC(symbol, timeframe);
       if (candles.length === 0) {
         return res.status(404).json({ error: "OHLC data not found", code: "NOT_FOUND" });
       }
-      res.json({ symbol: symbol.toUpperCase(), timeframe: timeframe.toUpperCase(), candles });
+      res.json({ symbol, timeframe, candles });
     } catch (err) {
       const msg = (err as Error).message;
       if (msg.includes("Failed after") || msg.includes("ECONNREFUSED") || msg.includes("fetch failed")) {
@@ -59,8 +61,8 @@ export class MarketController {
 
   async getMarketBook(req: Request, res: Response, next: NextFunction) {
     try {
-      const { symbol } = req.params;
-      const mbook = await this.marketDataService.getMarketBook(symbol.toUpperCase());
+      const symbol = (req.params.symbol as string).toUpperCase();
+      const mbook = await this.marketDataService.getMarketBook(symbol);
       if (!mbook) {
         return res.status(404).json({ error: "Market book not found", code: "NOT_FOUND" });
       }
@@ -72,7 +74,7 @@ export class MarketController {
 
   async getSymbols(req: Request, res: Response, next: NextFunction) {
     try {
-      const { active } = req.query;
+      const active = queryString(req.query.active);
       const symbols = await this.marketDataService.getSymbols(active !== "false");
       res.json({ symbols });
     } catch (err) {
@@ -82,8 +84,8 @@ export class MarketController {
 
   async getSymbolInfo(req: Request, res: Response, next: NextFunction) {
     try {
-      const { symbol } = req.params;
-      const info = await this.marketDataService.getSymbolInfo(symbol.toUpperCase());
+      const symbol = (req.params.symbol as string).toUpperCase();
+      const info = await this.marketDataService.getSymbolInfo(symbol);
       if (!info) {
         return res.status(404).json({ error: "Symbol not found", code: "NOT_FOUND" });
       }
@@ -95,7 +97,7 @@ export class MarketController {
 
   async getSymbolsByCategory(req: Request, res: Response, next: NextFunction) {
     try {
-      const { category } = req.params;
+      const { category } = req.params as { category: string };
       const symbols = await this.marketDataService.getSymbolsByCategory(category);
       res.json({ symbols });
     } catch (err) {
@@ -116,11 +118,11 @@ export class MarketController {
 
   async getAllOHLC(req: Request, res: Response, next: NextFunction) {
     try {
-      const { timeframe } = req.query;
+      const timeframe = queryString(req.query.timeframe);
       if (!timeframe) {
         return res.status(400).json({ error: "timeframe query parameter required", code: "VALIDATION_ERROR" });
       }
-      const ohlc = await this.marketDataService.getAllOHLC(timeframe as string);
+      const ohlc = await this.marketDataService.getAllOHLC(timeframe);
       const result: Record<string, unknown> = {};
       ohlc.forEach((c) => { result[(c as { symbol: string }).symbol] = c; });
       res.json({ ohlc: result });
@@ -142,14 +144,19 @@ export class MarketController {
 
   async getCalendar(req: Request, res: Response, next: NextFunction) {
     try {
-      const { fromDate, toDate, country, currency, importance, limit } = req.query;
+      const fromDate = queryString(req.query.fromDate);
+      const toDate = queryString(req.query.toDate);
+      const country = queryString(req.query.country);
+      const currency = queryString(req.query.currency);
+      const importance = queryString(req.query.importance) as CalendarImportance | undefined;
+      const limitStr = queryString(req.query.limit);
       const events = await this.calendarService.getCalendar({
-        startDate: fromDate ? new Date(fromDate as string) : undefined,
-        endDate: toDate ? new Date(toDate as string) : undefined,
-        country: country as string,
-        currency: currency as string,
-        importance: importance as CalendarImportance | undefined,
-        limit: limit ? parseInt(limit as string) : undefined
+        startDate: fromDate ? new Date(fromDate) : undefined,
+        endDate: toDate ? new Date(toDate) : undefined,
+        country,
+        currency,
+        importance,
+        limit: limitStr ? parseInt(limitStr) : undefined
       });
       res.json({ events });
     } catch (err) {

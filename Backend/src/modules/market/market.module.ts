@@ -5,6 +5,9 @@
 export { GetSymbolsUseCase } from "./application/use-cases/GetSymbolsUseCase.js";
 export { GetCalendarUseCase } from "./application/use-cases/GetCalendarUseCase.js";
 
+// === Services (public — used by chat for trade analysis) ===
+export { MarketDataService } from "./application/services/MarketDataService.js";
+
 // === IOC ===
 export { registerMarketContainer } from "./ioc/register.js";
 

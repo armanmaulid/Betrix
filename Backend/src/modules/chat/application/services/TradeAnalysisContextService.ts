@@ -1,5 +1,5 @@
 import { inject, injectable } from "tsyringe";
-import { MarketDataService } from "./MarketDataService.js";
+import { MarketDataService } from "@modules/market/market.module.js";
 import { TradeAnalysisPromptBuilder } from "@domain/services/TradeAnalysisPromptBuilder.js";
 import { NewsContextPort } from "@modules/news/news.module.js";
 import { AppError } from "@core/errors/index.js";

@@ -867,3 +867,63 @@ Tests:      1 failed  | 79 passed (80) ← 80 total tests
 - Total typecheck errors: 30 → 21 ✅
 
 ---
+
+### Step 0.10/1.10 — Fix All Errors/Warnings Fase 0 & 1
+**Timestamp:** 2026-08-28 02:59
+**Tujuan:** Zero-error baseline untuk Fase 0 & 1
+
+**Categories fixed:**
+
+**Z1. zod v4 breaking in `config/env.ts` (9 errors)**
+- Added 3 helpers: `csvToArray`, `csvToArrayWithDefault`, `stringToBoolean`
+- Replaced 7 patterns: `.string().transform().default()` → `.default().transform().pipe(z.X())`
+- Reason: zod v4 stricter type inference requires default value to match input type
+
+**Z2. TradeAnalysisContextService.ts (1 error)**
+- Wrong relative import `./MarketDataService.js` → fixed to `@modules/market/...`
+
+**Z3-Z7. Controllers `string | string[]` issue (19 errors)**
+- Created `src/shared/http/queryHelpers.ts` with 3 helpers: `queryString`, `queryStringArray`, `queryStringUpper`
+- `QueryValue` type alias for Express query type union
+- Updated 5 controllers:
+  - `UserController.ts` — 4 errors fixed (req.params.X as string)
+  - `AdminController.ts` — 4 errors fixed
+  - `AuthController.ts` — 1 error fixed
+  - `ChatController.ts` — 1 error fixed
+  - `MarketController.ts` — 8 errors fixed (using queryString helper + req.params.X as string)
+
+**Z8. validate.middleware.ts (2 errors)**
+- zod v4: `err.errors` → `err.issues` (property rename)
+
+**T1+T2. Vitest path aliases**
+- `vitest.config.ts` — added aliases: `@modules`, `@shared`, `@interfaces`
+- `vitest.arch.config.ts` — same aliases
+- `vitest.setup.ts` — created with dummy env vars (DATABASE_URL, JWT_SECRET, etc.) for test runs
+
+**T3. TradeAnalysisPromptBuilder business bug (1 test)**
+- Pre-existing: code used `slice(0, 10)` but test expects max 5 headlines
+- Fixed: `slice(0, 10)` → `slice(0, 5)` in `buildNewsContext`
+
+**Cross-module import leak found & fixed:**
+- `TradeAnalysisContextService.ts` (chat) import `MarketDataService` from market directly
+- Fix: expose `MarketDataService` via `market.module.ts` barrel
+- Update chat import to use `@modules/market/market.module`
+
+**Final verification (ALL GREEN):**
+```
+✅ npm run typecheck: 0 errors
+✅ npm run deps:validate: 0 violations (254 modules, 812 deps)
+✅ npm run test:arch: 10/10 passed
+✅ npm test: 97/97 passed (16 test files)
+```
+
+**Stats:**
+- Errors fixed: 30 typecheck + 3 tests = 33 total
+- Files created: 2 (queryHelpers.ts, vitest.setup.ts)
+- Files modified: 8 (env.ts, 5 controllers, 1 middleware, 1 trade analysis, 2 vitest configs, 1 market.module barrel, 1 chat service)
+- LOC added: ~80
+- LOC removed: ~40 (cleaner patterns)
+
+**Status: Fase 0 + Fase 1 ZERO-ERROR BASELINE ACHIEVED** 🟢
+
+---

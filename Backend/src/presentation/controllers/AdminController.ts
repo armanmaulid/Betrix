@@ -63,7 +63,7 @@ export class AdminController {
 
   async getUserDetail(req: Request, res: Response, next: NextFunction) {
     try {
-      const result = await this.getUserDetailUseCase.execute({ userId: req.params.id });
+      const result = await this.getUserDetailUseCase.execute({ userId: req.params.id as string });
       res.json(result);
     } catch (err) {
       next(err);
@@ -74,7 +74,7 @@ export class AdminController {
     try {
       const result = await this.updateUserUseCase.execute({
         adminId: this.getUser(req).userId,
-        targetUserId: req.params.id,
+        targetUserId: req.params.id as string,
         status: req.body.status,
         isAdmin: req.body.isAdmin,
         requestIp: this.getRequestInput(req).ip,
@@ -90,7 +90,7 @@ export class AdminController {
     try {
       await this.deleteUserUseCase.execute({
         adminId: this.getUser(req).userId,
-        targetUserId: req.params.id,
+        targetUserId: req.params.id as string,
         requestIp: this.getRequestInput(req).ip,
         requestUserAgent: this.getRequestInput(req).userAgent,
       });
@@ -104,7 +104,7 @@ export class AdminController {
     try {
       const result = await this.resetUserPasswordUseCase.execute({
         adminId: this.getUser(req).userId,
-        targetUserId: req.params.id,
+        targetUserId: req.params.id as string,
         sendEmail: req.body.sendEmail ?? true,
         requestIp: this.getRequestInput(req).ip,
         requestUserAgent: this.getRequestInput(req).userAgent,

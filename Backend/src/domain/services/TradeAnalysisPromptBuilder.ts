@@ -67,7 +67,7 @@ export class TradeAnalysisPromptBuilder {
 
   buildNewsContext(items: NewsHeadline[]): string {
     if (items.length === 0) return "";
-    const lines = items.slice(0, 10).map((n) => `- [${n.source}] ${n.title}`).join("\n");
+    const lines = items.slice(0, 5).map((n) => `- [${n.source}] ${n.title}`).join("\n");
     return `[BERITA TERBARU]\n${lines}\n\n`;
   }
 }

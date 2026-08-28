@@ -108,7 +108,7 @@ export class UserController {
   async getMessageDetail(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await this.getMessageDetailUseCase.execute({
-        id: req.params.id,
+        id: req.params.id as string,
         userId: this.getUser(req).userId,
       });
       res.json(result);
@@ -120,7 +120,7 @@ export class UserController {
   async getMessageThread(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await this.getMessageThreadUseCase.execute({
-        threadId: req.params.threadId,
+        threadId: req.params.threadId as string,
         userId: this.getUser(req).userId,
       });
       res.json(result);
@@ -132,7 +132,7 @@ export class UserController {
   async markMessageRead(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await this.markMessageReadUseCase.execute({
-        id: req.params.id,
+        id: req.params.id as string,
         userId: this.getUser(req).userId,
       });
       res.json(result);
@@ -144,7 +144,7 @@ export class UserController {
   async deleteMessage(req: Request, res: Response, next: NextFunction) {
     try {
       const result = await this.userDeleteMessageUseCase.execute({
-        id: req.params.id,
+        id: req.params.id as string,
         userId: this.getUser(req).userId,
       });
       res.json(result);

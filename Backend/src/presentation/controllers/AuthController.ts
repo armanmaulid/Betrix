@@ -259,7 +259,7 @@ export class AuthController {
     try {
       await this.revokeSessionUseCase.execute({
         sessionToken: this.getSessionToken(req),
-        fingerprint: req.params.fingerprint,
+        fingerprint: req.params.fingerprint as string,
         request: this.getRequestInput(req),
       });
       res.json({ message: "Session revoked" });

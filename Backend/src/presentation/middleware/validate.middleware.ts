@@ -33,14 +33,15 @@ export function validate(schema: ZodSchema) {
       
       schema.parse(target);
       next();
-    } catch (err) {
-      if (err instanceof ZodError) {
-        const details = err.errors.map(e => ({
-          path: e.path.join("."),
-          message: e.message,
-        }));
-        next(new ValidationError("Validation failed", { errors: details }));
-      } else {
+      } catch (err) {
+        if (err instanceof ZodError) {
+          // zod v4: .errors → .issues. Issue type is $ZodIssue from zod/v4/core.
+          const details = (err as ZodError).issues.map((e) => ({
+            path: e.path.join("."),
+            message: e.message,
+          }));
+          next(new ValidationError("Validation failed", { errors: details }));
+        } else {
         next(err);
       }
     }

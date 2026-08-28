@@ -147,7 +147,7 @@ export class ChatController {
     try {
       await this.deleteChatSessionUseCase.execute({
         userId: this.getUser(req).userId,
-        sessionId: req.params.sessionId,
+        sessionId: req.params.sessionId as string,
       });
       res.json({ message: "Session deleted" });
     } catch (err) {
