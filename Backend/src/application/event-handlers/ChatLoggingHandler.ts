@@ -4,6 +4,9 @@ import { ChatCompleted } from "@domain/events/index.js";
 import { ActivityLogRepository } from "@domain/repositories/ActivityLogRepository.js";
 import { ChatRepository } from "@domain/repositories/ChatRepository.js";
 import { ChatMessage } from "@domain/entities/ChatMessage.js";
+import { logger } from "@infrastructure/observability/logger.js";
+
+const log = logger.child({ module: "chat", handler: "ChatLoggingHandler" });
 
 @injectable()
 export class ChatLoggingHandler {
@@ -34,7 +37,7 @@ export class ChatLoggingHandler {
           usage?.outputTokens ?? 0,
           new Date()
         )
-      ).catch(err => console.error("[ChatLoggingHandler] chatRepo.save failed:", err)),
+      ).catch(error => log.error("chatRepo.save failed", { error, userId, sessionId })),
 
       this.activityLogRepo.logMetrics({
         type: "chat_completion",
@@ -44,7 +47,7 @@ export class ChatLoggingHandler {
         inputTokens: usage?.inputTokens,
         outputTokens: usage?.outputTokens,
         userId,
-      }).catch(err => console.error("[ChatLoggingHandler] logMetrics failed:", err)),
+      }).catch(error => log.error("logMetrics failed", { error, userId, taskType })),
 
       usage ? this.activityLogRepo.logTokenUsage({
         userId,
@@ -53,7 +56,7 @@ export class ChatLoggingHandler {
         inputTokens: usage.inputTokens,
         outputTokens: usage.outputTokens,
         latencyMs,
-      }).catch(err => console.error("[ChatLoggingHandler] logTokenUsage failed:", err)) : Promise.resolve(),
+      }).catch(error => log.error("logTokenUsage failed", { error, userId, taskType })) : Promise.resolve(),
 
       this.activityLogRepo.logUserActivity({
         userId,
@@ -61,7 +64,7 @@ export class ChatLoggingHandler {
         details: { model: modelUsed, taskType },
         ip: "unknown",
         userAgent: "unknown",
-      }).catch(err => console.error("[ChatLoggingHandler] logUserActivity failed:", err)),
+      }).catch(error => log.error("logUserActivity failed", { error, userId })),
     ]);
   }
 }

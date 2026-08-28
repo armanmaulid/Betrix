@@ -2,6 +2,9 @@ import { injectable } from "tsyringe";
 import { pgClient } from "../orm/pgClient.js";
 import { CalendarRepository, CalendarQuery } from "@domain/repositories/CalendarRepository.js";
 import { CalendarEvent, CalendarImportance } from "@domain/entities/CalendarEvent.js";
+import { logger } from "@infrastructure/observability/logger.js";
+
+const log = logger.child({ module: "market", repo: "PgCalendarRepository" });
 
 interface CalendarEventRow {
   value_id: number;
@@ -52,7 +55,7 @@ export class PgCalendarRepository implements CalendarRepository {
     const uniqueEvents = Array.from(uniqueEventsMap.values());
     
     const client = await pgClient.connect();
-    const onError = (err: Error) => console.error("Client error in saveMany:", err.message);
+    const onError = (err: Error) => log.error("pg client error in saveMany", { error: err.message });
     client.on("error", onError);
 
     try {

@@ -7,6 +7,9 @@ import type { SessionRepository } from "@domain/repositories/SessionRepository.j
 import { env } from "@config/env";
 import { User } from "@domain/entities/User.js";
 import { Email } from "@domain/value-objects";
+import { logger } from "@infrastructure/observability/logger.js";
+
+const log = logger.child({ module: "iam", component: "passport-config" });
 
 const googleOAuthConfigured = Boolean(env.GOOGLE_CLIENT_ID) && Boolean(env.GOOGLE_CLIENT_SECRET) && Boolean(env.GOOGLE_CALLBACK_URL);
 
@@ -70,7 +73,7 @@ if (googleOAuthConfigured) {
     }
   ));
 } else {
-  console.warn("[passport] Google OAuth not configured - skipping strategy registration");
+  log.warn("Google OAuth not configured - skipping strategy registration");
 }
 
 passport.serializeUser((user: Express.User, done) => done(null, user.id));

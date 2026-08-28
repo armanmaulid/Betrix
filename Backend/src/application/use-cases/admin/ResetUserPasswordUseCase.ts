@@ -6,6 +6,9 @@ import { INotifier } from "@domain/ports/INotifier.js";
 import type { EmailPort } from "@domain/ports/index.js";
 import { hashPassword, generateSecureToken } from "@core/utils/index.js";
 import { ActivityLogRepository } from "@domain/repositories/ActivityLogRepository.js";
+import { logger } from "@infrastructure/observability/logger.js";
+
+const log = logger.child({ module: "admin", useCase: "ResetUserPassword" });
 
 interface ResetUserPasswordInput {
   adminId: string;
@@ -60,7 +63,7 @@ export class ResetUserPasswordUseCase {
         });
         emailSent = true;
       } catch (err) {
-        console.error("[ResetUserPassword] email failed:", err);
+        log.error("email send failed", { error: err, targetUserId: input.targetUserId });
       }
     }
 

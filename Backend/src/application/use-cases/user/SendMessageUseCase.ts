@@ -5,6 +5,9 @@ import type { EmailPort } from "@domain/ports/index.js";
 import { Message } from "@domain/entities/Message.js";
 import { randomUUID } from "crypto";
 import { Email } from "@domain/value-objects/index.js";
+import { logger } from "@infrastructure/observability/logger.js";
+
+const log = logger.child({ module: "messaging", useCase: "SendMessage" });
 
 interface SendMessageInput {
   fromUserId: string;
@@ -79,7 +82,7 @@ export class SendMessageUseCase {
         subject: `New Message: ${input.subject}`,
         text: `You have a new message from ${input.fromUserId}.\n\n${input.body}`,
         html: `<p>You have a new message.</p><p>${input.body.replace(/\n/g, "<br>")}</p>`,
-      }).catch(err => console.error("[SendMessage] email failed:", err));
+      }).catch(error => log.error("email send failed", { error, fromUserId: input.fromUserId, toEmail: input.toEmail }));
     }
 
     return { id: savedMessage.id, createdAt: savedMessage.createdAt };

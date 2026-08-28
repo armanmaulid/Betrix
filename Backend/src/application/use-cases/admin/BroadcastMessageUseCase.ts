@@ -6,6 +6,9 @@ import { UserStatus } from "@domain/entities/User.js";
 import type { EmailPort } from "@domain/ports/index.js";
 import { ActivityLogRepository } from "@domain/repositories/ActivityLogRepository.js";
 import { randomUUID } from "crypto";
+import { logger } from "@infrastructure/observability/logger.js";
+
+const log = logger.child({ module: "admin", useCase: "BroadcastMessage" });
 
 interface BroadcastMessageInput {
   adminId: string;
@@ -81,7 +84,7 @@ export class BroadcastMessageUseCase {
           });
           emailsSent++;
         } catch (err) {
-          console.error(`[broadcast] email to ${user.email} failed:`, err);
+          log.error("email send failed", { error: err, to: user.email });
         }
       }
     });
